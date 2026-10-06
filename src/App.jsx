@@ -12,6 +12,7 @@ import PlayersMapping from './Components/Admin/PlayersMapping'
 import HostelProvision from './Components/Admin/HostelProvision'
 import FoodTokens from './Components/Admin/FoodTokens'
 import CautionDeposite from './Components/Admin/CautionDeposite'
+import ManageAdmin from './Components/Admin/ManageAdmin'
 
 const theme = createTheme({
   typography: {
@@ -43,6 +44,7 @@ function App() {
           <Route path="/admin/hostel-provision" element={<HostelProvision />} />
           <Route path="/admin/food-tokens" element={<FoodTokens />} />
           <Route path="/admin/caution-deposite" element={<CautionDeposite />} />
+          <Route path="/admin/manage-admin" element={<ManageAdmin />} />
         </Route>
       </Routes>
     </ThemeProvider>

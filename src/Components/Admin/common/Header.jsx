@@ -52,7 +52,7 @@ const Header = ({ title }) => {
             >
                 <Avatar
                     src={`https://ui-avatars.com/api/?name=${user.username}&background=0b5299&color=fff`}
-                    sx={{ width: 44, height: 44 }}
+                    sx={{ width: 35, height: 35 }}
                 />
             </Box>
 

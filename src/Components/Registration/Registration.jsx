@@ -4,7 +4,6 @@ import { toast } from 'sonner';
 
 const Registration = () => {
     const [teamDetails, setTeamDetails] = useState({
-        teamName: '',
         universityName: '',
         address: '',
         universityContact: ''
@@ -20,7 +19,8 @@ const Registration = () => {
         arrivalDate: '',
         arrivalTime: '',
         departureDate: '',
-        departureTime: ''
+        departureTime: '',
+        accommodation: 'Yes'
     }]);
 
     const [coaches, setCoaches] = useState([{
@@ -56,7 +56,8 @@ const Registration = () => {
             arrivalDate: '',
             arrivalTime: '',
             departureDate: '',
-            departureTime: ''
+            departureTime: '',
+            accommodation: 'Yes'
         }]);
     };
 
@@ -100,9 +101,6 @@ const Registration = () => {
     const validateForm = () => {
         let newErrors = { team: {}, players: [], coaches: [] };
         let isValid = true;
-
-        if (!teamDetails.teamName) { newErrors.team.teamName = 'Team Name is required'; isValid = false; }
-        else if (!/^[A-Za-z0-9\s\.\-']+$/.test(teamDetails.teamName)) { newErrors.team.teamName = 'Invalid Team Name'; isValid = false; }
 
         if (!teamDetails.universityName) { newErrors.team.universityName = 'University Name is required'; isValid = false; }
         else if (!/^[A-Za-z0-9\s\.\-']+$/.test(teamDetails.universityName)) { newErrors.team.universityName = 'Invalid University Name'; isValid = false; }
@@ -170,15 +168,10 @@ const Registration = () => {
                 <Box component="h1" className="registration-title">Registration</Box>
 
                 <Box component="form" onSubmit={handleSubmit} noValidate>
-                    {/* Team Details Section */}
+                    {/* University Details Section */}
                     <Box component="fieldset" className="section-fieldset">
-                        <Box component="legend" className="section-legend">Team Details</Box>
+                        <Box component="legend" className="section-legend">University Details</Box>
                         <Box className="form-grid">
-                            <Box className="form-group">
-                                <Box component="label">Team Name</Box>
-                                <Box component="input" type="text" name="teamName" className="form-input" placeholder="Enter Team Name" value={teamDetails.teamName} onChange={handleTeamChange} />
-                                {errors.team.teamName && <Box component="span" sx={{color: "red", fontSize: "12px", mt: 0.5, display: "block"}} >{errors.team.teamName}</Box>}
-                            </Box>
                             <Box className="form-group">
                                 <Box component="label">Name of University</Box>
                                 <Box component="input" type="text" name="universityName" className="form-input" placeholder="Enter University Name" value={teamDetails.universityName} onChange={handleTeamChange} />
@@ -277,6 +270,19 @@ const Registration = () => {
                                         <Box component="label">Time of Departure</Box>
                                         <Box component="input" type="time" name="departureTime" className="form-input" value={player.departureTime} onChange={(e) => handlePlayerChange(index, e)} />
                                         {errors.players[index]?.departureTime && <Box component="span" sx={{color: "red", fontSize: "12px", mt: 0.5, display: "block"}} >{errors.players[index]?.departureTime}</Box>}
+                                    </Box>
+                                    <Box className="form-group">
+                                        <Box component="label">Accommodation Required?</Box>
+                                        <Box className="radio-group">
+                                            <Box component="label" className="radio-label">
+                                                <Box component="input" type="radio" name={`player-accommodation-${index}`} value="Yes" checked={player.accommodation === 'Yes'} onChange={(e) => handlePlayerChange(index, { target: { name: 'accommodation', value: 'Yes' } })} />
+                                                Yes
+                                            </Box>
+                                            <Box component="label" className="radio-label">
+                                                <Box component="input" type="radio" name={`player-accommodation-${index}`} value="No" checked={player.accommodation === 'No'} onChange={(e) => handlePlayerChange(index, { target: { name: 'accommodation', value: 'No' } })} />
+                                                No
+                                            </Box>
+                                        </Box>
                                     </Box>
                                 </Box>
                             </Box>
