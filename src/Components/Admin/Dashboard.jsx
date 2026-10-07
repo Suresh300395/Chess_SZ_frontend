@@ -53,7 +53,7 @@ const Dashboard = () => {
             if (res.ok) {
                 const data = await res.json();
                 setRegistrations(data);
-                
+
                 // Calculate Stats
                 setTotalTeams(data.length);
                 let playersCount = 0;
@@ -77,7 +77,7 @@ const Dashboard = () => {
 
     return (
         <Box sx={{ p: 1, width: '100%' }}>
-            <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '800', mb: 1, fontSize: { xs: '1.8rem', md: '2.4rem' } }}>
+            <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', mb: 1, fontSize: { xs: '1rem', md: '2rem' } }}>
                 Welcome to Admin Dashboard
             </Typography>
             <Typography sx={{ color: 'text.secondary', mb: 4 }}>
@@ -90,6 +90,7 @@ const Dashboard = () => {
                         <Card sx={{
                             borderRadius: 3,
                             bgcolor: 'aliceblue',
+                            border: 'none',
                             boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
                             transition: 'transform 0.2s',
                             height: '100%',
@@ -120,7 +121,7 @@ const Dashboard = () => {
                 ))}
             </Box>
 
-            <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: 'bold', mb: 3 }}>
+            <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', mb: 3, fontSize: { xs: '1rem', md: '2rem' } }}>
                 Registered Teams Overview
             </Typography>
 
@@ -148,20 +149,20 @@ const Dashboard = () => {
                             registrations
                                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                                 .map((reg, index) => (
-                                <TableRow key={reg._id} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
-                                    <TableCell>{page * rowsPerPage + index + 1}</TableCell>
-                                    <TableCell sx={{ fontWeight: 500, color: '#0f172a' }}>{reg.universityName}</TableCell>
-                                    <TableCell>{reg.universityContact}</TableCell>
-                                    <TableCell>{reg.players?.length || 0}</TableCell>
-                                    <TableCell>{reg.coaches?.length || 0}</TableCell>
-                                    <TableCell>{new Date(reg.createdAt).toLocaleDateString('en-GB')}</TableCell>
-                                    <TableCell>
-                                        <Button variant="outlined" size="small" sx={{ borderColor: '#0b5299', color: '#0b5299' }} onClick={() => handleOpenDialog(reg)}>
-                                            View
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-                            ))
+                                    <TableRow key={reg._id} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+                                        <TableCell>{page * rowsPerPage + index + 1}</TableCell>
+                                        <TableCell sx={{ fontWeight: 500, color: '#0f172a' }}>{reg.universityName}</TableCell>
+                                        <TableCell>{reg.universityContact}</TableCell>
+                                        <TableCell>{reg.players?.length || 0}</TableCell>
+                                        <TableCell>{reg.coaches?.length || 0}</TableCell>
+                                        <TableCell>{new Date(reg.createdAt).toLocaleDateString('en-GB')}</TableCell>
+                                        <TableCell>
+                                            <Button variant="outlined" size="small" sx={{ borderColor: '#0b5299', color: '#0b5299' }} onClick={() => handleOpenDialog(reg)}>
+                                                View
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))
                         )}
                     </TableBody>
                 </Table>
@@ -215,8 +216,8 @@ const Dashboard = () => {
                                                     <TableCell>{player.gender}</TableCell>
                                                     <TableCell>{player.dob}</TableCell>
                                                     <TableCell>{player.transportMode} {player.transportNumber ? `(${player.transportNumber})` : ''}</TableCell>
-                                                    <TableCell>{player.arrivalDate} <br/> <small>{player.arrivalTime}</small></TableCell>
-                                                    <TableCell>{player.departureDate} <br/> <small>{player.departureTime}</small></TableCell>
+                                                    <TableCell>{player.arrivalDate} <br /> <small>{player.arrivalTime}</small></TableCell>
+                                                    <TableCell>{player.departureDate} <br /> <small>{player.departureTime}</small></TableCell>
                                                     <TableCell>{player.accommodation}</TableCell>
                                                 </TableRow>
                                             ))}

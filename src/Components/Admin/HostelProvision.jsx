@@ -53,7 +53,7 @@ const HostelProvision = () => {
 
     return (
         <Box sx={{ p: 2 }}>
-            <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: 'bold', mb: 1 }}>
+            <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', mb: 1, fontSize: { xs: '1rem', md: '2rem' } }}>
                 Accommodation List
             </Typography>
             <Typography sx={{ color: 'text.secondary', mb: 4 }}>

@@ -92,7 +92,7 @@ const ManageAdmin = () => {
 
     return (
         <Box sx={{ p: 1 }}>
-            <Typography variant="h4" sx={{ color: '#0b5299', fontWeight: 'bold', mb: 3 }}>
+            <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', mb: 3, fontSize: { xs: '1rem', md: '2rem' } }}>
                 Manage Admin
             </Typography>
 

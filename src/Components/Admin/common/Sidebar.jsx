@@ -12,7 +12,7 @@ const Sidebar = () => {
     const menus = getMenusByRole(user.role);
 
     return (
-        <Box sx={{ width: '270px', backgroundColor: '#ffffff', color: '#0b5299', p: 3, display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{ width: '270px', backgroundColor: '#ffffff', color: '#0b5299', px: 2, py: 3, display: 'flex', flexDirection: 'column' }}>
             <Box
                 component="img"
                 src="/ADITYA LOGO2.png"
@@ -31,9 +31,9 @@ const Sidebar = () => {
                                 alignItems: 'center',
                                 gap: 1.5,
                                 cursor: 'pointer', 
-                                fontWeight: isActive ? 700 : 600, 
+                                fontWeight: isActive ? 500 : 300, 
                                 fontSize: '14px',
-                                padding: '12px 18px',
+                                padding: '12px 14px',
                                 borderRadius: '8px',
                                 color: isActive ? '#ffffff' : '#0b5299',
                                 backgroundColor: isActive ? '#d06c38' : 'transparent',
@@ -46,7 +46,7 @@ const Sidebar = () => {
                             }}
                         >
                             {menu.icon}
-                            <Typography sx={{ fontWeight: 'inherit', fontSize: 'inherit' }}>
+                            <Typography sx={{ fontWeight: 'inherit', fontSize: 'inherit', whiteSpace: 'nowrap' }}>
                                 {menu.name}
                             </Typography>
                         </Box>
