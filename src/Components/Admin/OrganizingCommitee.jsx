@@ -61,7 +61,7 @@ const OrganizingCommitee = () => {
 
     const handleDelete = async (id) => {
         if (!window.confirm('Are you sure you want to delete this member?')) return;
-        
+
         try {
             const response = await fetch(`http://localhost:3003/api/committee/${id}`, {
                 method: 'DELETE'
@@ -186,7 +186,6 @@ const OrganizingCommitee = () => {
                                 fullWidth
                                 label="Designation (Role)*"
                                 name="designation"
-                                placeholder="e.g. Chief Patron"
                                 value={formData.designation}
                                 onChange={handleChange}
                                 required
@@ -197,7 +196,6 @@ const OrganizingCommitee = () => {
                                 fullWidth
                                 label="Position in Committee*"
                                 name="position"
-                                placeholder="e.g. Vice Chancellor"
                                 value={formData.position}
                                 onChange={handleChange}
                                 required

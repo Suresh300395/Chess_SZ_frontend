@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box } from '@mui/material';
+import { Box, TextField, MenuItem, FormControl, FormLabel, RadioGroup, FormControlLabel, Radio, Button, Typography, Paper } from '@mui/material';
 import { toast } from 'sonner';
 
 const Registration = () => {
@@ -92,100 +92,179 @@ const Registration = () => {
         setCoaches(updatedCoaches);
     };
 
-        const [errors, setErrors] = useState({
+    const [errors, setErrors] = useState({
         team: {},
         players: [],
         coaches: []
     });
 
     const validateForm = () => {
-        let newErrors = { team: {}, players: [], coaches: [] };
         let isValid = true;
+        let newErrors = { team: {}, players: [], coaches: [] };
 
-        if (!teamDetails.universityName) { newErrors.team.universityName = 'University Name is required'; isValid = false; }
-        else if (!/^[A-Za-z0-9\s\.\-']+$/.test(teamDetails.universityName)) { newErrors.team.universityName = 'Invalid University Name'; isValid = false; }
+        // Team validations
+        if (!teamDetails.universityName.trim()) {
+            newErrors.team.universityName = 'University name is required';
+            isValid = false;
+        }
+        if (!teamDetails.universityContact.trim()) {
+            newErrors.team.universityContact = 'University contact is required';
+            isValid = false;
+        } else if (!/^\d{10}$/.test(teamDetails.universityContact)) {
+            newErrors.team.universityContact = 'Must be exactly 10 digits';
+            isValid = false;
+        }
+        if (!teamDetails.address.trim()) {
+            newErrors.team.address = 'Address is required';
+            isValid = false;
+        }
 
-        if (!teamDetails.universityContact) { newErrors.team.universityContact = 'Contact is required'; isValid = false; }
-        else if (!/^[6-9][0-9]{9}$/.test(teamDetails.universityContact)) { newErrors.team.universityContact = 'Must be 10 digits starting with 6-9'; isValid = false; }
-
-        if (!teamDetails.address) { newErrors.team.address = 'Address is required'; isValid = false; }
-
-        players.forEach((player, i) => {
-            let pErrs = {};
-            if (!player.playerName) { pErrs.playerName = 'Player Name is required'; isValid = false; }
-            else if (!/^[A-Za-z\s\.\-']+$/.test(player.playerName)) { pErrs.playerName = 'Invalid Name'; isValid = false; }
-
-            if (!player.mobileNo) { pErrs.mobileNo = 'Mobile is required'; isValid = false; }
-            else if (!/^[6-9][0-9]{9}$/.test(player.mobileNo)) { pErrs.mobileNo = 'Must be 10 digits starting with 6-9'; isValid = false; }
-
-            if (!player.gender) { pErrs.gender = 'Gender is required'; isValid = false; }
-            if (!player.dob) { pErrs.dob = 'DOB is required'; isValid = false; }
-            if (!player.transportMode) { pErrs.transportMode = 'Transport Mode is required'; isValid = false; }
-            if ((player.transportMode === 'Train' || player.transportMode === 'Flight') && !player.transportNumber) {
-                pErrs.transportNumber = 'Transport Number is required'; isValid = false;
+        // Player validations
+        players.forEach((player, index) => {
+            let playerErrors = {};
+            if (!player.playerName.trim()) {
+                playerErrors.playerName = 'Name is required';
+                isValid = false;
             }
-            if (!player.arrivalDate) { pErrs.arrivalDate = 'Arrival Date is required'; isValid = false; }
-            if (!player.arrivalTime) { pErrs.arrivalTime = 'Arrival Time is required'; isValid = false; }
-            if (!player.departureDate) { pErrs.departureDate = 'Departure Date is required'; isValid = false; }
-            else if (player.arrivalDate && player.departureDate < player.arrivalDate) { pErrs.departureDate = 'Must be >= Arrival Date'; isValid = false; }
-            if (!player.departureTime) { pErrs.departureTime = 'Departure Time is required'; isValid = false; }
-
-            newErrors.players[i] = pErrs;
+            if (!player.mobileNo.trim()) {
+                playerErrors.mobileNo = 'Mobile number is required';
+                isValid = false;
+            } else if (!/^\d{10}$/.test(player.mobileNo)) {
+                playerErrors.mobileNo = 'Must be 10 digits';
+                isValid = false;
+            }
+            if (!player.gender) {
+                playerErrors.gender = 'Gender is required';
+                isValid = false;
+            }
+            if (!player.dob) {
+                playerErrors.dob = 'DOB is required';
+                isValid = false;
+            }
+            if (!player.transportMode) {
+                playerErrors.transportMode = 'Transport mode is required';
+                isValid = false;
+            }
+            if ((player.transportMode === 'Train' || player.transportMode === 'Flight') && !player.transportNumber) {
+                playerErrors.transportNumber = 'Transport number is required';
+                isValid = false;
+            }
+            if (!player.arrivalDate) {
+                playerErrors.arrivalDate = 'Arrival date is required';
+                isValid = false;
+            }
+            if (!player.arrivalTime) {
+                playerErrors.arrivalTime = 'Arrival time is required';
+                isValid = false;
+            }
+            if (!player.departureDate) {
+                playerErrors.departureDate = 'Departure date is required';
+                isValid = false;
+            }
+            if (!player.departureTime) {
+                playerErrors.departureTime = 'Departure time is required';
+                isValid = false;
+            }
+            newErrors.players[index] = playerErrors;
         });
 
-        coaches.forEach((coach, i) => {
-            let cErrs = {};
-            if (!coach.name) { cErrs.name = 'Name is required'; isValid = false; }
-            else if (!/^[A-Za-z\s\.\-']+$/.test(coach.name)) { cErrs.name = 'Invalid Name'; isValid = false; }
-
-            if (!coach.mobileNo) { cErrs.mobileNo = 'Mobile is required'; isValid = false; }
-            else if (!/^[6-9][0-9]{9}$/.test(coach.mobileNo)) { cErrs.mobileNo = 'Must be 10 digits starting with 6-9'; isValid = false; }
-
-            if (!coach.mailId) { cErrs.mailId = 'Email is required'; isValid = false; }
-            else if (!/^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$/i.test(coach.mailId)) { cErrs.mailId = 'Invalid Email'; isValid = false; }
-
-            if (!coach.gender) { cErrs.gender = 'Gender is required'; isValid = false; }
-            
-            newErrors.coaches[i] = cErrs;
+        // Coach validations
+        coaches.forEach((coach, index) => {
+            let coachErrors = {};
+            if (!coach.role) {
+                coachErrors.role = 'Role is required';
+                isValid = false;
+            }
+            if (!coach.name.trim()) {
+                coachErrors.name = 'Name is required';
+                isValid = false;
+            }
+            if (!coach.mobileNo.trim()) {
+                coachErrors.mobileNo = 'Mobile number is required';
+                isValid = false;
+            } else if (!/^\d{10}$/.test(coach.mobileNo)) {
+                coachErrors.mobileNo = 'Must be 10 digits';
+                isValid = false;
+            }
+            if (!coach.mailId.trim()) {
+                coachErrors.mailId = 'Email is required';
+                isValid = false;
+            } else if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i.test(coach.mailId)) {
+                coachErrors.mailId = 'Invalid email address';
+                isValid = false;
+            }
+            if (!coach.gender) {
+                coachErrors.gender = 'Gender is required';
+                isValid = false;
+            }
+            newErrors.coaches[index] = coachErrors;
         });
 
         setErrors(newErrors);
+
+        if (!isValid) {
+            toast.error('Please correct the errors in the form.');
+        }
+
         return isValid;
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (validateForm()) {
-            try {
-                const response = await fetch('http://localhost:3003/api/registration', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        teamDetails,
-                        players,
-                        coaches
-                    }),
-                });
+        
+        if (!validateForm()) return;
 
-                if (response.ok) {
-                    const result = await response.json();
-                    toast.success('Form submitted successfully!');
-                    // Optionally reset form here
-                    setTeamDetails({ universityName: '', address: '', universityContact: '' });
-                    setPlayers([{ playerName: '', mobileNo: '', gender: '', dob: '', transportMode: '', transportNumber: '', arrivalDate: '', arrivalTime: '', departureDate: '', departureTime: '', accommodation: 'Yes' }]);
-                    setCoaches([{ role: 'Coach', name: '', mobileNo: '', mailId: '', gender: '', foodType: 'Veg', accommodation: 'Yes' }]);
-                } else {
-                    const errorData = await response.json();
-                    toast.error(errorData.message || 'Failed to submit form');
-                }
-            } catch (error) {
-                console.error('Submission error:', error);
-                toast.error('Network error. Please try again later.');
+        const payload = {
+            teamDetails: {
+                universityName: teamDetails.universityName,
+                address: teamDetails.address,
+                universityContact: teamDetails.universityContact
+            },
+            players: players.map(p => ({
+                playerName: p.playerName,
+                mobileNo: p.mobileNo,
+                gender: p.gender,
+                dob: p.dob,
+                transportMode: p.transportMode,
+                transportNumber: p.transportNumber,
+                arrivalDate: p.arrivalDate,
+                arrivalTime: p.arrivalTime,
+                departureDate: p.departureDate,
+                departureTime: p.departureTime,
+                accommodation: p.accommodation
+            })),
+            coaches: coaches.map(c => ({
+                role: c.role,
+                name: c.name,
+                mobileNo: c.mobileNo,
+                mailId: c.mailId,
+                gender: c.gender,
+                foodType: c.foodType,
+                accommodation: c.accommodation
+            }))
+        };
+
+        try {
+            const res = await fetch('http://localhost:3003/api/registration', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                toast.success('Registration successful!');
+                // Reset form completely
+                setTeamDetails({ universityName: '', address: '', universityContact: '' });
+                setPlayers([{ playerName: '', mobileNo: '', gender: '', dob: '', transportMode: '', transportNumber: '', arrivalDate: '', arrivalTime: '', departureDate: '', departureTime: '', accommodation: 'Yes' }]);
+                setCoaches([{ role: 'Coach', name: '', mobileNo: '', mailId: '', gender: '', foodType: 'Veg', accommodation: 'Yes' }]);
+                setErrors({ team: {}, players: [], coaches: [] });
+            } else {
+                const data = await res.json();
+                toast.error(data.error || 'Failed to submit registration');
             }
-        } else {
-            toast.error('Please fill all the required fields correctly');
+        } catch (error) {
+            console.error('Submit error:', error);
+            toast.error('Server error, please try again.');
         }
     };
 
@@ -199,20 +278,14 @@ const Registration = () => {
                     <Box component="fieldset" className="section-fieldset">
                         <Box component="legend" className="section-legend">University Details</Box>
                         <Box className="form-grid">
-                            <Box className="form-group">
-                                <Box component="label">Name of University</Box>
-                                <Box component="input" type="text" name="universityName" className="form-input" placeholder="Enter University Name" value={teamDetails.universityName} onChange={handleTeamChange} />
-                                {errors.team.universityName && <Box component="span" sx={{color: "red", fontSize: "12px", mt: 0.5, display: "block"}} >{errors.team.universityName}</Box>}
+                            <Box sx={{ mt: 1 }}>
+                                <TextField fullWidth label="Name of University*" name="universityName" value={teamDetails.universityName} onChange={handleTeamChange} error={!!errors.team?.universityName} helperText={errors.team?.universityName} />
                             </Box>
-                            <Box className="form-group">
-                                <Box component="label">University Contact No</Box>
-                                <Box component="input" type="tel" name="universityContact" className="form-input" placeholder="Contact Number" value={teamDetails.universityContact} onChange={handleTeamChange} maxLength="10" />
-                                {errors.team.universityContact && <Box component="span" sx={{color: "red", fontSize: "12px", mt: 0.5, display: "block"}} >{errors.team.universityContact}</Box>}
+                            <Box sx={{ mt: 1 }}>
+                                <TextField fullWidth label="University Contact No*" name="universityContact" type="tel" inputProps={{ maxLength: 10 }} value={teamDetails.universityContact} onChange={handleTeamChange} error={!!errors.team?.universityContact} helperText={errors.team?.universityContact} />
                             </Box>
-                            <Box className="form-group">
-                                <Box component="label">Address</Box>
-                                <Box component="textarea" name="address" className="form-input" placeholder="Full Address" value={teamDetails.address} onChange={handleTeamChange} rows="1"></Box>
-                                {errors.team.address && <Box component="span" sx={{color: "red", fontSize: "12px", mt: 0.5, display: "block"}} >{errors.team.address}</Box>}
+                            <Box sx={{ mt: 1 }}>
+                                <TextField fullWidth multiline rows={1} label="Address*" name="address" value={teamDetails.address} onChange={handleTeamChange} error={!!errors.team?.address} helperText={errors.team?.address} />
                             </Box>
                         </Box>
                     </Box>
@@ -232,95 +305,71 @@ const Registration = () => {
                                 </Box>
 
                                 <Box className="form-grid">
-                                    <Box className="form-group">
-                                        <Box component="label">Player Name (as per SSC)</Box>
-                                        <Box component="input" type="text" name="playerName" className="form-input" placeholder="Full Name" value={player.playerName} onChange={(e) => handlePlayerChange(index, e)} />
-                                        {errors.players[index]?.playerName && <Box component="span" sx={{color: "red", fontSize: "12px", mt: 0.5, display: "block"}} >{errors.players[index]?.playerName}</Box>}
+                                    <Box sx={{ mt: 1 }}>
+                                        <TextField fullWidth label="Player Name (as per SSC)*" name="playerName" value={player.playerName} onChange={(e) => handlePlayerChange(index, e)} error={!!errors.players[index]?.playerName} helperText={errors.players[index]?.playerName} />
                                     </Box>
-                                    <Box className="form-group">
-                                        <Box component="label">Mobile No</Box>
-                                        <Box component="input" type="tel" name="mobileNo" className="form-input" placeholder="Mobile Number" value={player.mobileNo} onChange={(e) => handlePlayerChange(index, e)} maxLength="10" />
-                                        {errors.players[index]?.mobileNo && <Box component="span" sx={{color: "red", fontSize: "12px", mt: 0.5, display: "block"}} >{errors.players[index]?.mobileNo}</Box>}
+                                    <Box sx={{ mt: 1 }}>
+                                        <TextField fullWidth label="Mobile No*" name="mobileNo" type="tel" inputProps={{ maxLength: 10 }} value={player.mobileNo} onChange={(e) => handlePlayerChange(index, e)} error={!!errors.players[index]?.mobileNo} helperText={errors.players[index]?.mobileNo} />
                                     </Box>
-                                    <Box className="form-group">
-                                        <Box component="label">Gender</Box>
-                                        <Box component="select" name="gender" className="form-select" value={player.gender} onChange={(e) => handlePlayerChange(index, e)}>
-                                            <option value="">Select Gender</option>
-                                            <option value="Male">Male</option>
-                                            <option value="Female">Female</option>
-                                            <option value="Other">Other</option>
-                                        </Box>
-                                        {errors.players[index]?.gender && <Box component="span" sx={{color: "red", fontSize: "12px", mt: 0.5, display: "block"}} >{errors.players[index]?.gender}</Box>}
+                                    <Box sx={{ mt: 1 }}>
+                                        <TextField select fullWidth label="Gender*" name="gender" value={player.gender} onChange={(e) => handlePlayerChange(index, e)} error={!!errors.players[index]?.gender} helperText={errors.players[index]?.gender}>
+                                            <MenuItem value="Male">Male</MenuItem>
+                                            <MenuItem value="Female">Female</MenuItem>
+                                            <MenuItem value="Other">Other</MenuItem>
+                                        </TextField>
                                     </Box>
-                                    <Box className="form-group">
-                                        <Box component="label">DOB (as per SSC)</Box>
-                                        <Box component="input" type="date" name="dob" className="form-input" value={player.dob} onChange={(e) => handlePlayerChange(index, e)} />
-                                        {errors.players[index]?.dob && <Box component="span" sx={{color: "red", fontSize: "12px", mt: 0.5, display: "block"}} >{errors.players[index]?.dob}</Box>}
+                                    <Box sx={{ mt: 1 }}>
+                                        <TextField fullWidth label="DOB (as per SSC)*" name="dob" type="date" InputLabelProps={{ shrink: true }} slotProps={{ inputLabel: { shrink: true } }} placeholder=" " value={player.dob} onChange={(e) => handlePlayerChange(index, e)} error={!!errors.players[index]?.dob} helperText={errors.players[index]?.dob} />
                                     </Box>
-                                    <Box className="form-group">
-                                        <Box component="label">Mode of Transport</Box>
-                                        <Box component="select" name="transportMode" className="form-select" value={player.transportMode} onChange={(e) => handlePlayerChange(index, e)}>
-                                            <option value="">Select Mode</option>
-                                            <option value="Own">Own Vehicle</option>
-                                            <option value="Bus">Bus</option>
-                                            <option value="Train">Train</option>
-                                            <option value="Flight">Flight</option>
-                                        </Box>
-                                        {errors.players[index]?.transportMode && <Box component="span" sx={{color: "red", fontSize: "12px", mt: 0.5, display: "block"}} >{errors.players[index]?.transportMode}</Box>}
+                                    <Box sx={{ mt: 1 }}>
+                                        <TextField select fullWidth label="Mode of Transport*" name="transportMode" value={player.transportMode} onChange={(e) => handlePlayerChange(index, e)} error={!!errors.players[index]?.transportMode} helperText={errors.players[index]?.transportMode}>
+                                            <MenuItem value="Own">Own Vehicle</MenuItem>
+                                            <MenuItem value="Bus">Bus</MenuItem>
+                                            <MenuItem value="Train">Train</MenuItem>
+                                            <MenuItem value="Flight">Flight</MenuItem>
+                                        </TextField>
                                     </Box>
                                     {(player.transportMode === 'Train' || player.transportMode === 'Flight') && (
-                                        <Box className="form-group">
-                                            <Box component="label">{player.transportMode} No.</Box>
-                                            <Box component="input" type="text" name="transportNumber" className="form-input" value={player.transportNumber || ''} onChange={(e) => handlePlayerChange(index, e)} placeholder={`Enter ${player.transportMode} No.`} />
-                                            {errors.players[index]?.transportNumber && <Box component="span" sx={{color: "red", fontSize: "12px", mt: 0.5, display: "block"}} >{errors.players[index]?.transportNumber}</Box>}
+                                        <Box sx={{ mt: 1 }}>
+                                            <TextField fullWidth label={`${player.transportMode} No.*`} name="transportNumber" value={player.transportNumber || ''} onChange={(e) => handlePlayerChange(index, e)} error={!!errors.players[index]?.transportNumber} helperText={errors.players[index]?.transportNumber} />
                                         </Box>
                                     )}
                                 </Box>
 
                                 <Box className="form-grid">
-                                    <Box className="form-group">
-                                        <Box component="label">Date of Arrival</Box>
-                                        <Box component="input" type="date" name="arrivalDate" className="form-input" value={player.arrivalDate} onChange={(e) => handlePlayerChange(index, e)} />
-                                        {errors.players[index]?.arrivalDate && <Box component="span" sx={{color: "red", fontSize: "12px", mt: 0.5, display: "block"}} >{errors.players[index]?.arrivalDate}</Box>}
+                                    <Box sx={{ mt: 1 }}>
+                                        <TextField fullWidth label="Date of Arrival*" name="arrivalDate" type="date" InputLabelProps={{ shrink: true }} slotProps={{ inputLabel: { shrink: true } }} placeholder=" " value={player.arrivalDate} onChange={(e) => handlePlayerChange(index, e)} error={!!errors.players[index]?.arrivalDate} helperText={errors.players[index]?.arrivalDate} />
                                     </Box>
-                                    <Box className="form-group">
-                                        <Box component="label">Time of Arrival</Box>
-                                        <Box component="input" type="time" name="arrivalTime" className="form-input" value={player.arrivalTime} onChange={(e) => handlePlayerChange(index, e)} />
-                                        {errors.players[index]?.arrivalTime && <Box component="span" sx={{color: "red", fontSize: "12px", mt: 0.5, display: "block"}} >{errors.players[index]?.arrivalTime}</Box>}
+                                    <Box sx={{ mt: 1 }}>
+                                        <TextField fullWidth label="Time of Arrival*" name="arrivalTime" type="time" InputLabelProps={{ shrink: true }} slotProps={{ inputLabel: { shrink: true } }} placeholder=" " value={player.arrivalTime} onChange={(e) => handlePlayerChange(index, e)} error={!!errors.players[index]?.arrivalTime} helperText={errors.players[index]?.arrivalTime} />
                                     </Box>
-                                    <Box className="form-group">
-                                        <Box component="label">Date of Departure</Box>
-                                        <Box component="input" type="date" name="departureDate" className="form-input" value={player.departureDate} onChange={(e) => handlePlayerChange(index, e)} />
-                                        {errors.players[index]?.departureDate && <Box component="span" sx={{color: "red", fontSize: "12px", mt: 0.5, display: "block"}} >{errors.players[index]?.departureDate}</Box>}
+                                    <Box sx={{ mt: 1 }}>
+                                        <TextField fullWidth label="Date of Departure*" name="departureDate" type="date" InputLabelProps={{ shrink: true }} slotProps={{ inputLabel: { shrink: true } }} placeholder=" " value={player.departureDate} onChange={(e) => handlePlayerChange(index, e)} error={!!errors.players[index]?.departureDate} helperText={errors.players[index]?.departureDate} />
                                     </Box>
-                                    <Box className="form-group">
-                                        <Box component="label">Time of Departure</Box>
-                                        <Box component="input" type="time" name="departureTime" className="form-input" value={player.departureTime} onChange={(e) => handlePlayerChange(index, e)} />
-                                        {errors.players[index]?.departureTime && <Box component="span" sx={{color: "red", fontSize: "12px", mt: 0.5, display: "block"}} >{errors.players[index]?.departureTime}</Box>}
+                                    <Box sx={{ mt: 1 }}>
+                                        <TextField fullWidth label="Time of Departure*" name="departureTime" type="time" InputLabelProps={{ shrink: true }} slotProps={{ inputLabel: { shrink: true } }} placeholder=" " value={player.departureTime} onChange={(e) => handlePlayerChange(index, e)} error={!!errors.players[index]?.departureTime} helperText={errors.players[index]?.departureTime} />
                                     </Box>
-                                    <Box className="form-group">
-                                        <Box component="label">Accommodation Required?</Box>
-                                        <Box className="radio-group">
-                                            <Box component="label" className="radio-label">
-                                                <Box component="input" type="radio" name={`player-accommodation-${index}`} value="Yes" checked={player.accommodation === 'Yes'} onChange={(e) => handlePlayerChange(index, { target: { name: 'accommodation', value: 'Yes' } })} />
-                                                Yes
-                                            </Box>
-                                            <Box component="label" className="radio-label">
-                                                <Box component="input" type="radio" name={`player-accommodation-${index}`} value="No" checked={player.accommodation === 'No'} onChange={(e) => handlePlayerChange(index, { target: { name: 'accommodation', value: 'No' } })} />
-                                                No
-                                            </Box>
-                                        </Box>
+                                    <Box sx={{ mt: 1 }}>
+                                        <FormControl component="fieldset">
+                                            <FormLabel component="legend" sx={{ fontSize: '12px', mb: 0.5, color: '#0D233B', fontWeight: 500 }}>Accommodation Required?*</FormLabel>
+                                            <RadioGroup row name={`player-accommodation-${index}`} value={player.accommodation} onChange={(e) => handlePlayerChange(index, { target: { name: 'accommodation', value: e.target.value } })}>
+                                                <FormControlLabel value="Yes" control={<Radio size="small" />} label="Yes" />
+                                                <FormControlLabel value="No" control={<Radio size="small" />} label="No" />
+                                            </RadioGroup>
+                                        </FormControl>
                                     </Box>
                                 </Box>
                             </Box>
                         ))}
 
-                        <Box component="button" type="button" className="btn-secondary" onClick={addPlayer}>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <line x1="12" y1="5" x2="12" y2="19"></line>
-                                <line x1="5" y1="12" x2="19" y2="12"></line>
-                            </svg>
-                            Add Another Player
+                        <Box sx={{ display: 'flex', justifyContent: { xs: 'center', sm: 'flex-start' } }}>
+                            <Box component="button" type="button" className="btn-secondary" onClick={addPlayer}>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                                Add Another Player
+                            </Box>
                         </Box>
                     </Box>
 
@@ -338,75 +387,58 @@ const Registration = () => {
                                     )}
                                 </Box>
                                 <Box className="form-grid">
-                                    <Box className="form-group">
-                                        <Box component="label">Role</Box>
-                                        <Box component="select" name="role" className="form-select" value={coach.role} onChange={(e) => handleCoachChange(index, e)}>
-                                            <option value="Coach">Coach</option>
-                                            <option value="Manager">Manager</option>
-                                        </Box>
-                                        {errors.coaches[index]?.role && <Box component="span" sx={{color: "red", fontSize: "12px", mt: 0.5, display: "block"}} >{errors.coaches[index]?.role}</Box>}
+                                    <Box sx={{ mt: 1 }}>
+                                        <TextField select fullWidth label="Role*" name="role" value={coach.role} onChange={(e) => handleCoachChange(index, e)} error={!!errors.coaches[index]?.role} helperText={errors.coaches[index]?.role}>
+                                            <MenuItem value="Coach">Coach</MenuItem>
+                                            <MenuItem value="Manager">Manager</MenuItem>
+                                        </TextField>
                                     </Box>
-                                    <Box className="form-group">
-                                        <Box component="label">Name</Box>
-                                        <Box component="input" type="text" name="name" className="form-input" placeholder="Full Name" value={coach.name} onChange={(e) => handleCoachChange(index, e)} />
-                                        {errors.coaches[index]?.name && <Box component="span" sx={{color: "red", fontSize: "12px", mt: 0.5, display: "block"}} >{errors.coaches[index]?.name}</Box>}
+                                    <Box sx={{ mt: 1 }}>
+                                        <TextField fullWidth label="Name*" name="name" value={coach.name} onChange={(e) => handleCoachChange(index, e)} error={!!errors.coaches[index]?.name} helperText={errors.coaches[index]?.name} />
                                     </Box>
-                                    <Box className="form-group">
-                                        <Box component="label">Mobile No</Box>
-                                        <Box component="input" type="tel" name="mobileNo" className="form-input" placeholder="Mobile Number" value={coach.mobileNo} onChange={(e) => handleCoachChange(index, e)} maxLength="10" />
-                                        {errors.coaches[index]?.mobileNo && <Box component="span" sx={{color: "red", fontSize: "12px", mt: 0.5, display: "block"}} >{errors.coaches[index]?.mobileNo}</Box>}
+                                    <Box sx={{ mt: 1 }}>
+                                        <TextField fullWidth label="Mobile No*" name="mobileNo" type="tel" inputProps={{ maxLength: 10 }} value={coach.mobileNo} onChange={(e) => handleCoachChange(index, e)} error={!!errors.coaches[index]?.mobileNo} helperText={errors.coaches[index]?.mobileNo} />
                                     </Box>
-                                    <Box className="form-group">
-                                        <Box component="label">Mail ID</Box>
-                                        <Box component="input" type="email" name="mailId" className="form-input" placeholder="Email Address" value={coach.mailId} onChange={(e) => handleCoachChange(index, e)} />
-                                        {errors.coaches[index]?.mailId && <Box component="span" sx={{color: "red", fontSize: "12px", mt: 0.5, display: "block"}} >{errors.coaches[index]?.mailId}</Box>}
+                                    <Box sx={{ mt: 1 }}>
+                                        <TextField fullWidth label="Email Address*" name="mailId" type="email" value={coach.mailId} onChange={(e) => handleCoachChange(index, e)} error={!!errors.coaches[index]?.mailId} helperText={errors.coaches[index]?.mailId} />
                                     </Box>
-                                    <Box className="form-group">
-                                        <Box component="label">Gender</Box>
-                                        <Box component="select" name="gender" className="form-select" value={coach.gender} onChange={(e) => handleCoachChange(index, e)}>
-                                            <option value="">Select Gender</option>
-                                            <option value="Male">Male</option>
-                                            <option value="Female">Female</option>
-                                            <option value="Other">Other</option>
-                                        </Box>
-                                        {errors.coaches[index]?.gender && <Box component="span" sx={{color: "red", fontSize: "12px", mt: 0.5, display: "block"}} >{errors.coaches[index]?.gender}</Box>}
+                                    <Box sx={{ mt: 1 }}>
+                                        <TextField select fullWidth label="Gender*" name="gender" value={coach.gender} onChange={(e) => handleCoachChange(index, e)} error={!!errors.coaches[index]?.gender} helperText={errors.coaches[index]?.gender}>
+                                            <MenuItem value="Male">Male</MenuItem>
+                                            <MenuItem value="Female">Female</MenuItem>
+                                            <MenuItem value="Other">Other</MenuItem>
+                                        </TextField>
                                     </Box>
-                                    <Box className="form-group">
-                                        <Box component="label">Food Type</Box>
-                                        <Box className="radio-group">
-                                            <Box component="label" className="radio-label">
-                                                <Box component="input" type="radio" name={`foodType-${index}`} value="Veg" checked={coach.foodType === 'Veg'} onChange={(e) => handleCoachChange(index, { target: { name: 'foodType', value: 'Veg' } })} />
-                                                Veg
-                                            </Box>
-                                            <Box component="label" className="radio-label">
-                                                <Box component="input" type="radio" name={`foodType-${index}`} value="Non-Veg" checked={coach.foodType === 'Non-Veg'} onChange={(e) => handleCoachChange(index, { target: { name: 'foodType', value: 'Non-Veg' } })} />
-                                                Non-Veg
-                                            </Box>
-                                        </Box>
+                                    <Box sx={{ mt: 1 }}>
+                                        <FormControl component="fieldset">
+                                            <FormLabel component="legend" sx={{ fontSize: '12px', mb: 0.5, color: '#0D233B', fontWeight: 500 }}>Food Type*</FormLabel>
+                                            <RadioGroup row name={`foodType-${index}`} value={coach.foodType} onChange={(e) => handleCoachChange(index, { target: { name: 'foodType', value: e.target.value } })}>
+                                                <FormControlLabel value="Veg" control={<Radio size="small" />} label="Veg" />
+                                                <FormControlLabel value="Non-Veg" control={<Radio size="small" />} label="Non-Veg" />
+                                            </RadioGroup>
+                                        </FormControl>
                                     </Box>
-                                    <Box className="form-group">
-                                        <Box component="label">Accommodation Required?</Box>
-                                        <Box className="radio-group">
-                                            <Box component="label" className="radio-label">
-                                                <Box component="input" type="radio" name={`accommodation-${index}`} value="Yes" checked={coach.accommodation === 'Yes'} onChange={(e) => handleCoachChange(index, { target: { name: 'accommodation', value: 'Yes' } })} />
-                                                Yes
-                                            </Box>
-                                            <Box component="label" className="radio-label">
-                                                <Box component="input" type="radio" name={`accommodation-${index}`} value="No" checked={coach.accommodation === 'No'} onChange={(e) => handleCoachChange(index, { target: { name: 'accommodation', value: 'No' } })} />
-                                                No
-                                            </Box>
-                                        </Box>
+                                    <Box sx={{ mt: 1 }}>
+                                        <FormControl component="fieldset">
+                                            <FormLabel component="legend" sx={{ fontSize: '12px', mb: 0.5, color: '#0D233B', fontWeight: 500 }}>Accommodation Required?*</FormLabel>
+                                            <RadioGroup row name={`accommodation-${index}`} value={coach.accommodation} onChange={(e) => handleCoachChange(index, { target: { name: 'accommodation', value: e.target.value } })}>
+                                                <FormControlLabel value="Yes" control={<Radio size="small" />} label="Yes" />
+                                                <FormControlLabel value="No" control={<Radio size="small" />} label="No" />
+                                            </RadioGroup>
+                                        </FormControl>
                                     </Box>
                                 </Box>
                             </Box>
                         ))}
 
-                        <Box component="button" type="button" className="btn-secondary" onClick={addCoach}>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <line x1="12" y1="5" x2="12" y2="19"></line>
-                                <line x1="5" y1="12" x2="19" y2="12"></line>
-                            </svg>
-                            Add Coach / Manager
+                        <Box sx={{ display: 'flex', justifyContent: { xs: 'center', sm: 'flex-start' } }}>
+                            <Box component="button" type="button" className="btn-secondary" onClick={addCoach}>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                                Add Coach / Manager
+                            </Box>
                         </Box>
                     </Box>
 

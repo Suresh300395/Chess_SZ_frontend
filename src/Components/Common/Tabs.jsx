@@ -72,7 +72,7 @@ const Tabs = ({ tabs, activeTab, setActiveTab }) => {
     };
 
     return (
-        <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', py: 5, backgroundColor: '#FAF6F3', px: 2, gap: 1 }}>
+        <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', py: 1, px: 2, gap: 1 }}>
             {isMobile && (
                 <IconButton 
                     onClick={handlePrev} 
