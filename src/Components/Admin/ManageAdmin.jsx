@@ -64,7 +64,7 @@ const ManageAdmin = () => {
     const handleEdit = (admin) => {
         setFormData({
             username: admin.username,
-            password: '', // Leave empty if you don't want to change
+            password: 'Aditya@123',
             mobile: admin.mobile || ''
         });
         setEditId(admin._id);
@@ -113,7 +113,7 @@ const ManageAdmin = () => {
                                 required
                                 variant="outlined"
                                 autoComplete="off"
-                                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1 } }}
                             />
                         </Box>
                         <Box sx={{ flex: 1 }}>
@@ -157,7 +157,7 @@ const ManageAdmin = () => {
                                         </InputAdornment>
                                     )
                                 }}
-                                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1 } }}
                             />
                         </Box>
                         <Box sx={{ flex: 1 }}>
@@ -171,7 +171,7 @@ const ManageAdmin = () => {
                                 required
                                 variant="outlined"
                                 autoComplete="new-password"
-                                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1 } }}
                             />
                         </Box>
                     </Box>
@@ -183,7 +183,7 @@ const ManageAdmin = () => {
                                     setEditId(null);
                                     setFormData({ username: '', password: 'Aditya@123', mobile: '' });
                                 }}
-                                sx={{ mr: 2, py: 1.5, px: 4, borderRadius: 2, fontSize: '1rem', fontWeight: 'bold', textTransform: 'none' }}
+                                sx={{ mr: 2, py: 1.5, px: 4, borderRadius: 1, fontSize: '1rem', fontWeight: 'bold', textTransform: 'none' }}
                             >
                                 Cancel
                             </Button>
@@ -195,7 +195,7 @@ const ManageAdmin = () => {
                                 py: 1.5,
                                 px: 4,
                                 bgcolor: '#0b5299',
-                                borderRadius: 2,
+                                borderRadius: 1,
                                 fontSize: '1rem',
                                 fontWeight: 'bold',
                                 textTransform: 'none',

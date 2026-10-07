@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PersonIcon from '@mui/icons-material/Person';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
+import ShieldIcon from '@mui/icons-material/Shield';
 
 const Header = ({ title }) => {
     const navigate = useNavigate();
@@ -99,37 +100,61 @@ const Header = ({ title }) => {
                     },
                 }}
             >
-                <Box sx={{ p: 2, bgcolor: '#f6f8fb', borderRadius: 3, mb: 1.5 }}>
-                    <Typography sx={{ color: '#64748b', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', mb: 0.5 }}>
-                        Role
-                    </Typography>
-                    <Typography sx={{ fontWeight: 800, color: '#d06c38', fontSize: '1.25rem', textTransform: 'capitalize' }}>
-                        {user.role}
-                    </Typography>
+                {/* User Info Section */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2, pb: 1.5 }}>
+                    <Avatar
+                        src={`https://ui-avatars.com/api/?name=${user.username}&background=0b5299&color=fff`}
+                        sx={{ width: 50, height: 50, bgcolor: '#e3f0fb', color: '#0b5299', fontWeight: 'bold' }}
+                    />
+                    <Box>
+                        <Typography sx={{ fontWeight: 700, color: '#0f172a', fontSize: '16px', lineHeight: 1.2 }}>
+                            {user.username}
+                        </Typography>
+                        <Typography sx={{ color: '#64748b', fontSize: '13px', mt: 0.5 }}>
+                            {user.email || 'admin@adityauniversity.edu.in'}
+                        </Typography>
+                    </Box>
                 </Box>
 
-                <Divider sx={{ my: 1, mx: 1, borderColor: 'rgba(0,0,0,0.05)' }} />
-
-                <MenuItem onClick={handleClose} sx={{ '&:hover': { bgcolor: '#f2f6fb' } }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 42, height: 42, borderRadius: '50%', bgcolor: '#e3f0fb', color: '#0b5299' }}>
-                        <PersonIcon />
+                {/* Role Badge */}
+                <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+                    <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1.5, bgcolor: '#fff0e8', px: 2, py: 1, borderRadius: '20px' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, bgcolor: '#d06c38', color: '#fff', borderRadius: '50%' }}>
+                            <ShieldIcon sx={{ fontSize: '14px' }} />
+                        </Box>
+                        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                            <Typography sx={{ color: '#a85b32', fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', lineHeight: 1 }}>
+                                ROLE
+                            </Typography>
+                            <Typography sx={{ fontWeight: 800, color: '#d06c38', fontSize: '14px', textTransform: 'capitalize', lineHeight: 1, mt: 0.5 }}>
+                                {user.role}
+                            </Typography>
+                        </Box>
                     </Box>
-                    <Typography sx={{ fontWeight: 700, color: '#0f172a', flexGrow: 1, fontSize: '14px' }}>
-                        Profile
-                    </Typography>
-                    <KeyboardArrowRightIcon sx={{ color: '#94a3b8' }} />
-                </MenuItem>
+                </Box>
 
-                <Divider sx={{ my: 1, mx: 1, borderColor: 'rgba(0,0,0,0.05)' }} />
+                <Divider sx={{ my: 1, mx: 2, borderColor: 'rgba(0,0,0,0.06)' }} />
 
-                <MenuItem onClick={handleLogout} sx={{ '&:hover': { bgcolor: '#fff0e8' } }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 42, height: 42, borderRadius: '50%', bgcolor: '#ffede4', color: '#d06c38' }}>
-                        <LogoutIcon />
-                    </Box>
-                    <Typography sx={{ fontWeight: 700, color: '#d06c38', fontSize: '14px' }}>
-                        Logout
-                    </Typography>
-                </MenuItem>
+                {/* Profile Item */}
+                <Box sx={{ px: 2, py: 1 }}>
+                    <MenuItem onClick={handleClose} sx={{ bgcolor: '#f4f7fc', borderRadius: '12px', py: 1.5, px: 2, '&:hover': { bgcolor: '#eef2f9' } }}>
+                        <PersonIcon sx={{ color: '#0b5299', mr: 2 }} />
+                        <Typography sx={{ fontWeight: 600, color: '#0f172a', flexGrow: 1, fontSize: '15px' }}>
+                            Profile
+                        </Typography>
+                        <KeyboardArrowRightIcon sx={{ color: '#64748b' }} />
+                    </MenuItem>
+                </Box>
+
+                {/* Logout Item */}
+                <Box sx={{ px: 2, pb: 1 }}>
+                    <MenuItem onClick={handleLogout} sx={{ bgcolor: '#fff5f0', borderRadius: '12px', py: 1.5, px: 2, '&:hover': { bgcolor: '#ffefe6' } }}>
+                        <LogoutIcon sx={{ color: '#d06c38', mr: 2 }} />
+                        <Typography sx={{ fontWeight: 600, color: '#d06c38', fontSize: '15px' }}>
+                            Logout
+                        </Typography>
+                    </MenuItem>
+                </Box>
             </Menu>
         </Box>
     );

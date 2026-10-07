@@ -153,10 +153,37 @@ const Registration = () => {
         return isValid;
     };
 
-        const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         if (validateForm()) {
-            toast.success('Form submitted successfully!');
+            try {
+                const response = await fetch('http://localhost:3003/api/registration', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        teamDetails,
+                        players,
+                        coaches
+                    }),
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    toast.success('Form submitted successfully!');
+                    // Optionally reset form here
+                    setTeamDetails({ universityName: '', address: '', universityContact: '' });
+                    setPlayers([{ playerName: '', mobileNo: '', gender: '', dob: '', transportMode: '', transportNumber: '', arrivalDate: '', arrivalTime: '', departureDate: '', departureTime: '', accommodation: 'Yes' }]);
+                    setCoaches([{ role: 'Coach', name: '', mobileNo: '', mailId: '', gender: '', foodType: 'Veg', accommodation: 'Yes' }]);
+                } else {
+                    const errorData = await response.json();
+                    toast.error(errorData.message || 'Failed to submit form');
+                }
+            } catch (error) {
+                console.error('Submission error:', error);
+                toast.error('Network error. Please try again later.');
+            }
         } else {
             toast.error('Please fill all the required fields correctly');
         }

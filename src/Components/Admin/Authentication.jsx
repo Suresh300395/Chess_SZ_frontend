@@ -49,7 +49,7 @@ const Authentication = () => {
 
     return (
         <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FAF6F3', p: 2 }}>
-            <Box sx={{ maxWidth: 450, width: '100%', bgcolor: 'white', p: { xs: 4, md: 5 }, borderRadius: 4, boxShadow: '0 10px 40px rgba(11, 82, 153, 0.08)' }}>
+            <Box sx={{ maxWidth: 450, width: '100%', bgcolor: 'white', p: { xs: 4, md: 5 }, borderRadius: 2, boxShadow: '0 10px 40px rgba(11, 82, 153, 0.08)' }}>
                 <Box component="h2" className="tab-card-title" sx={{ textAlign: 'center', mb: 1, mt: 0, fontSize: 'clamp(24px, 4vw, 32px)' }}>
                     Admin Login
                 </Box>
@@ -91,11 +91,7 @@ const Authentication = () => {
                         />
                     </Box>
 
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: -1 }}>
-                        <Link href="#" underline="hover" sx={{ color: 'var(--color-orange)', fontSize: 'var(--text-label)', fontWeight: 600 }}>
-                            Forgot password?
-                        </Link>
-                    </Box>
+
 
                     <Box component="button" type="submit" disabled={loading} className="btn-primary" sx={{ width: '100%', margin: '1rem 0 0 0', opacity: loading ? 0.7 : 1 }}>
                         {loading ? 'Logging in...' : 'Log In'}
