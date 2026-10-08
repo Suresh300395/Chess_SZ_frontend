@@ -45,7 +45,7 @@ import HowToRegIcon from '@mui/icons-material/HowToReg';
 import io from 'socket.io-client';
 import { toast } from 'sonner';
 import CustomTabs from '../Common/Tabs';
-import { registrationAPI } from '../../utils/api';
+import { registrationAPI, SOCKET_URL } from '../../utils/api';
 
 
 // Configuration for buildings, floors, and rooms (5 rooms per floor, max 4 members per room)
@@ -74,27 +74,6 @@ const HostelProvision = () => {
     const [activeTab, setActiveTab] = useState('Players');
     const tabsList = ['Players', 'Coaches / Managers'];
 
-    useEffect(() => {
-        const fetchRegistrations = async () => {
-            try {
-                const response = await registrationAPI.getAll();
-
-                if (response.ok) {
-                    const data = await response.json();
-                    let list = [];
-                    data.forEach(reg => {
-                        if (reg.players) {
-                            reg.players.forEach(player => {
-                                if (player.accommodation === 'Yes') {
-                                    list.push({
-                                        id: player._id || Math.random().toString(),
-                                        name: player.playerName,
-                                        role: 'Player',
-                                        university: reg.universityName,
-                                        gender: player.gender,
-                                        phone: player.mobileNo
-                                    });
-                                }
     // Search query state
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -114,7 +93,7 @@ const HostelProvision = () => {
     // Fetch all registrations (fetching both accommodation Yes & No)
     const fetchRegistrations = async () => {
         try {
-            const response = await fetch('http://localhost:3003/api/registration');
+            const response = await registrationAPI.getAll();
             if (response.ok) {
                 const data = await response.json();
                 let list = [];
@@ -165,7 +144,7 @@ const HostelProvision = () => {
     useEffect(() => {
         fetchRegistrations();
 
-        const socket = io('http://localhost:3003');
+        const socket = io(SOCKET_URL);
         socket.on('dataUpdated', () => {
             fetchRegistrations();
         });
