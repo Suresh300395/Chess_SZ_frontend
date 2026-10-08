@@ -1,5 +1,5 @@
 import './App.css'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { ThemeProvider, createTheme } from '@mui/material/styles'
 import { Toaster } from 'sonner'
 import Home from './Components/Home'
@@ -13,6 +13,9 @@ import HostelProvision from './Components/Admin/HostelProvision'
 import FoodTokens from './Components/Admin/FoodTokens'
 import CautionDeposite from './Components/Admin/CautionDeposite'
 import ManageAdmin from './Components/Admin/ManageAdmin'
+import UserDashboard from './Components/User/UserDashboard'
+import FrontendLayout from './Components/FrontendLayout'
+import ProtectedRoute from './Components/Common/ProtectedRoute'
 
 const theme = createTheme({
   typography: {
@@ -137,14 +140,23 @@ function App() {
     <ThemeProvider theme={theme}>
       <Toaster position="top-right" richColors />
       <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/registration" element={<Registration />} />
-        
-        {/* Admin Login */}
-        <Route path="/admin" element={<Authentication />} />
-        
+        {/* Frontend Layout for Public and User Pages */}
+        <Route element={<FrontendLayout />}>
+            <Route path="/" element={<Home />} />
+            <Route path="/registration" element={<Registration />} />
+            <Route path="/user/dashboard" element={
+                <ProtectedRoute allowedRoles={['player']}>
+                    <UserDashboard />
+                </ProtectedRoute>
+            } />
+        </Route>
+
         {/* Admin Dashboard & Other Protected Pages with Common Layout */}
-        <Route element={<Main_layout />}>
+        <Route element={
+            <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
+                <Main_layout />
+            </ProtectedRoute>
+        }>
           <Route path="/admin/dashboard" element={<Dashboard />} />
           <Route path="/admin/organizing-committee" element={<OrganizingCommitee />} />
           <Route path="/admin/players-mapping" element={<PlayersMapping />} />

@@ -3,8 +3,9 @@ import { Box, Typography, Card, CardContent, Paper, Table, TableBody, TableCell,
 import GroupsIcon from '@mui/icons-material/Groups';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import FormatListNumberedIcon from '@mui/icons-material/FormatListNumbered';
-
 import io from 'socket.io-client';
+import { registrationAPI, SOCKET_URL } from '../../utils/api';
+
 
 const Dashboard = () => {
     const [registrations, setRegistrations] = useState([]);
@@ -37,7 +38,8 @@ const Dashboard = () => {
     useEffect(() => {
         fetchRegistrations();
 
-        const socket = io('http://localhost:3003');
+        const socket = io(SOCKET_URL);
+
         socket.on('dataUpdated', () => {
             fetchRegistrations();
         });
@@ -49,7 +51,8 @@ const Dashboard = () => {
 
     const fetchRegistrations = async () => {
         try {
-            const res = await fetch('http://localhost:3003/api/registration');
+            const res = await registrationAPI.getAll();
+
             if (res.ok) {
                 const data = await res.json();
                 setRegistrations(data);
