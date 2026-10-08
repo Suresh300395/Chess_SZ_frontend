@@ -39,14 +39,173 @@ const Registration = () => {
 
     const handleTeamChange = (e) => {
         const { name, value } = e.target;
-        setTeamDetails({ ...teamDetails, [name]: value });
+        let finalValue = value;
+        let errorMsg = '';
+
+        if (name === 'universityName') {
+            // Text field: do not allow numbers
+            if (/[0-9]/.test(value)) {
+                errorMsg = 'Numbers are not allowed in university name';
+            }
+            finalValue = value.replace(/[0-9]/g, '');
+        } else if (name === 'universityContact') {
+            // Mobile Number field: only digits, max 10, must start with 6, 7, 8, 9
+            let digits = value.replace(/\D/g, '');
+            if (digits.length === 12 && digits.startsWith('91')) {
+                digits = digits.slice(2);
+            } else if (digits.length === 11 && digits.startsWith('0')) {
+                digits = digits.slice(1);
+            }
+
+            if (digits.length > 0 && !/^[6-9]/.test(digits)) {
+                errorMsg = 'Mobile number must start with 6, 7, 8, or 9';
+                setErrors(prev => ({
+                    ...prev,
+                    team: { ...prev.team, [name]: errorMsg }
+                }));
+                return;
+            }
+            finalValue = digits.slice(0, 10);
+            if (finalValue.length === 10) {
+                errorMsg = '';
+            }
+        }
+
+        setTeamDetails(prev => ({ ...prev, [name]: finalValue }));
+        setErrors(prev => ({
+            ...prev,
+            team: { ...prev.team, [name]: errorMsg }
+        }));
     };
 
     const handlePlayerChange = (index, e) => {
         const { name, value } = e.target;
+        let finalValue = value;
+        let errorMsg = '';
+
+        if (name === 'playerName') {
+            // Text field: do not allow numbers
+            if (/[0-9]/.test(value)) {
+                errorMsg = 'Numbers are not allowed in player name';
+            }
+            finalValue = value.replace(/[0-9]/g, '');
+        } else if (name === 'mobileNo') {
+            // Mobile Number field: only digits, max 10, must start with 6, 7, 8, 9
+            let digits = value.replace(/\D/g, '');
+            if (digits.length === 12 && digits.startsWith('91')) {
+                digits = digits.slice(2);
+            } else if (digits.length === 11 && digits.startsWith('0')) {
+                digits = digits.slice(1);
+            }
+
+            if (digits.length > 0 && !/^[6-9]/.test(digits)) {
+                errorMsg = 'Mobile number must start with 6, 7, 8, or 9';
+                setErrors(prev => {
+                    const newPlayers = [...(prev.players || [])];
+                    newPlayers[index] = { ...(newPlayers[index] || {}), [name]: errorMsg };
+                    return { ...prev, players: newPlayers };
+                });
+                return;
+            }
+            finalValue = digits.slice(0, 10);
+            if (finalValue.length === 10) {
+                errorMsg = '';
+            }
+        }
+
         const updatedPlayers = [...players];
-        updatedPlayers[index][name] = value;
+        updatedPlayers[index][name] = finalValue;
         setPlayers(updatedPlayers);
+
+        setErrors(prev => {
+            const newPlayers = [...(prev.players || [])];
+            newPlayers[index] = { ...(newPlayers[index] || {}), [name]: errorMsg };
+            return { ...prev, players: newPlayers };
+        });
+    };
+
+    const handleCoachChange = (index, e) => {
+        const { name, value } = e.target;
+        let finalValue = value;
+        let errorMsg = '';
+
+        if (name === 'name') {
+            // Text field: do not allow numbers
+            if (/[0-9]/.test(value)) {
+                errorMsg = 'Numbers are not allowed in coach name';
+            }
+            finalValue = value.replace(/[0-9]/g, '');
+        } else if (name === 'mobileNo') {
+            // Mobile Number field: only digits, max 10, must start with 6, 7, 8, 9
+            let digits = value.replace(/\D/g, '');
+            if (digits.length === 12 && digits.startsWith('91')) {
+                digits = digits.slice(2);
+            } else if (digits.length === 11 && digits.startsWith('0')) {
+                digits = digits.slice(1);
+            }
+
+            if (digits.length > 0 && !/^[6-9]/.test(digits)) {
+                errorMsg = 'Mobile number must start with 6, 7, 8, or 9';
+                setErrors(prev => {
+                    const newCoaches = [...(prev.coaches || [])];
+                    newCoaches[index] = { ...(newCoaches[index] || {}), [name]: errorMsg };
+                    return { ...prev, coaches: newCoaches };
+                });
+                return;
+            }
+            finalValue = digits.slice(0, 10);
+            if (finalValue.length === 10) {
+                errorMsg = '';
+            }
+        }
+
+        const updatedCoaches = [...coaches];
+        updatedCoaches[index][name] = finalValue;
+        setCoaches(updatedCoaches);
+
+        setErrors(prev => {
+            const newCoaches = [...(prev.coaches || [])];
+            newCoaches[index] = { ...(newCoaches[index] || {}), [name]: errorMsg };
+            return { ...prev, coaches: newCoaches };
+        });
+    };
+
+    const handleTeamBlur = (field) => {
+        if (field === 'universityContact') {
+            const val = teamDetails.universityContact;
+            if (val && val.length !== 10) {
+                setErrors(prev => ({
+                    ...prev,
+                    team: { ...prev.team, universityContact: 'Must be exactly 10 digits' }
+                }));
+            }
+        }
+    };
+
+    const handlePlayerBlur = (index, field) => {
+        if (field === 'mobileNo') {
+            const val = players[index]?.mobileNo;
+            if (val && val.length !== 10) {
+                setErrors(prev => {
+                    const newPlayers = [...(prev.players || [])];
+                    newPlayers[index] = { ...(newPlayers[index] || {}), mobileNo: 'Must be exactly 10 digits' };
+                    return { ...prev, players: newPlayers };
+                });
+            }
+        }
+    };
+
+    const handleCoachBlur = (index, field) => {
+        if (field === 'mobileNo') {
+            const val = coaches[index]?.mobileNo;
+            if (val && val.length !== 10) {
+                setErrors(prev => {
+                    const newCoaches = [...(prev.coaches || [])];
+                    newCoaches[index] = { ...(newCoaches[index] || {}), mobileNo: 'Must be exactly 10 digits' };
+                    return { ...prev, coaches: newCoaches };
+                });
+            }
+        }
     };
 
     const addPlayer = () => {
@@ -69,13 +228,6 @@ const Registration = () => {
         const updatedPlayers = [...players];
         updatedPlayers.splice(index, 1);
         setPlayers(updatedPlayers);
-    };
-
-    const handleCoachChange = (index, e) => {
-        const { name, value } = e.target;
-        const updatedCoaches = [...coaches];
-        updatedCoaches[index][name] = value;
-        setCoaches(updatedCoaches);
     };
 
     const addCoach = () => {
@@ -110,14 +262,22 @@ const Registration = () => {
         if (!teamDetails.universityName.trim()) {
             newErrors.team.universityName = 'University name is required';
             isValid = false;
+        } else if (/[0-9]/.test(teamDetails.universityName)) {
+            newErrors.team.universityName = 'Numbers are not allowed in university name';
+            isValid = false;
         }
+
         if (!teamDetails.universityContact.trim()) {
             newErrors.team.universityContact = 'University contact is required';
+            isValid = false;
+        } else if (!/^[6-9]/.test(teamDetails.universityContact)) {
+            newErrors.team.universityContact = 'Must start with 6, 7, 8, or 9';
             isValid = false;
         } else if (!/^\d{10}$/.test(teamDetails.universityContact)) {
             newErrors.team.universityContact = 'Must be exactly 10 digits';
             isValid = false;
         }
+
         if (!teamDetails.address.trim()) {
             newErrors.team.address = 'Address is required';
             isValid = false;
@@ -129,14 +289,22 @@ const Registration = () => {
             if (!player.playerName.trim()) {
                 playerErrors.playerName = 'Name is required';
                 isValid = false;
+            } else if (/[0-9]/.test(player.playerName)) {
+                playerErrors.playerName = 'Numbers are not allowed in player name';
+                isValid = false;
             }
+
             if (!player.mobileNo.trim()) {
                 playerErrors.mobileNo = 'Mobile number is required';
                 isValid = false;
+            } else if (!/^[6-9]/.test(player.mobileNo)) {
+                playerErrors.mobileNo = 'Must start with 6, 7, 8, or 9';
+                isValid = false;
             } else if (!/^\d{10}$/.test(player.mobileNo)) {
-                playerErrors.mobileNo = 'Must be 10 digits';
+                playerErrors.mobileNo = 'Must be exactly 10 digits';
                 isValid = false;
             }
+
             if (!player.gender) {
                 playerErrors.gender = 'Gender is required';
                 isValid = false;
@@ -182,14 +350,22 @@ const Registration = () => {
             if (!coach.name.trim()) {
                 coachErrors.name = 'Name is required';
                 isValid = false;
+            } else if (/[0-9]/.test(coach.name)) {
+                coachErrors.name = 'Numbers are not allowed in name';
+                isValid = false;
             }
+
             if (!coach.mobileNo.trim()) {
                 coachErrors.mobileNo = 'Mobile number is required';
                 isValid = false;
+            } else if (!/^[6-9]/.test(coach.mobileNo)) {
+                coachErrors.mobileNo = 'Must start with 6, 7, 8, or 9';
+                isValid = false;
             } else if (!/^\d{10}$/.test(coach.mobileNo)) {
-                coachErrors.mobileNo = 'Must be 10 digits';
+                coachErrors.mobileNo = 'Must be exactly 10 digits';
                 isValid = false;
             }
+
             if (!coach.mailId.trim()) {
                 coachErrors.mailId = 'Email is required';
                 isValid = false;
@@ -202,6 +378,57 @@ const Registration = () => {
                 isValid = false;
             }
             newErrors.coaches[index] = coachErrors;
+        });
+
+        // Check for duplicate mobile numbers across players & coaches within the form
+        const seenMobileIndices = new Map();
+        players.forEach((player, index) => {
+            const mob = player.mobileNo?.trim();
+            if (mob && /^\d{10}$/.test(mob)) {
+                if (seenMobileIndices.has(mob)) {
+                    newErrors.players[index].mobileNo = 'Duplicate mobile number in form';
+                    const prev = seenMobileIndices.get(mob);
+                    if (prev.type === 'player') {
+                        newErrors.players[prev.index].mobileNo = 'Duplicate mobile number in form';
+                    } else {
+                        newErrors.coaches[prev.index].mobileNo = 'Duplicate mobile number in form';
+                    }
+                    isValid = false;
+                } else {
+                    seenMobileIndices.set(mob, { type: 'player', index });
+                }
+            }
+        });
+
+        const seenEmailIndices = new Map();
+        coaches.forEach((coach, index) => {
+            const mob = coach.mobileNo?.trim();
+            if (mob && /^\d{10}$/.test(mob)) {
+                if (seenMobileIndices.has(mob)) {
+                    newErrors.coaches[index].mobileNo = 'Duplicate mobile number in form';
+                    const prev = seenMobileIndices.get(mob);
+                    if (prev.type === 'player') {
+                        newErrors.players[prev.index].mobileNo = 'Duplicate mobile number in form';
+                    } else {
+                        newErrors.coaches[prev.index].mobileNo = 'Duplicate mobile number in form';
+                    }
+                    isValid = false;
+                } else {
+                    seenMobileIndices.set(mob, { type: 'coach', index });
+                }
+            }
+
+            const email = coach.mailId?.trim().toLowerCase();
+            if (email && /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i.test(email)) {
+                if (seenEmailIndices.has(email)) {
+                    newErrors.coaches[index].mailId = 'Duplicate email address in form';
+                    const prevIdx = seenEmailIndices.get(email);
+                    newErrors.coaches[prevIdx].mailId = 'Duplicate email address in form';
+                    isValid = false;
+                } else {
+                    seenEmailIndices.set(email, index);
+                }
+            }
         });
 
         setErrors(newErrors);
@@ -278,7 +505,7 @@ const Registration = () => {
                                 <TextField fullWidth label="Name of University*" name="universityName" value={teamDetails.universityName} onChange={handleTeamChange} error={!!errors.team?.universityName} helperText={errors.team?.universityName} />
                             </Box>
                             <Box sx={{ mt: 1 }}>
-                                <TextField fullWidth label="University Contact No*" name="universityContact" type="tel" inputProps={{ maxLength: 10 }} value={teamDetails.universityContact} onChange={handleTeamChange} error={!!errors.team?.universityContact} helperText={errors.team?.universityContact} />
+                                <TextField fullWidth label="University Contact No*" name="universityContact" type="tel" inputProps={{ maxLength: 10, inputMode: 'numeric' }} value={teamDetails.universityContact} onChange={handleTeamChange} onBlur={() => handleTeamBlur('universityContact')} error={!!errors.team?.universityContact} helperText={errors.team?.universityContact} />
                             </Box>
                             <Box sx={{ mt: 1 }}>
                                 <TextField fullWidth multiline rows={1} label="Address*" name="address" value={teamDetails.address} onChange={handleTeamChange} error={!!errors.team?.address} helperText={errors.team?.address} />
@@ -305,7 +532,7 @@ const Registration = () => {
                                         <TextField fullWidth label="Player Name (as per SSC)*" name="playerName" value={player.playerName} onChange={(e) => handlePlayerChange(index, e)} error={!!errors.players[index]?.playerName} helperText={errors.players[index]?.playerName} />
                                     </Box>
                                     <Box sx={{ mt: 1 }}>
-                                        <TextField fullWidth label="Mobile No*" name="mobileNo" type="tel" inputProps={{ maxLength: 10 }} value={player.mobileNo} onChange={(e) => handlePlayerChange(index, e)} error={!!errors.players[index]?.mobileNo} helperText={errors.players[index]?.mobileNo} />
+                                        <TextField fullWidth label="Mobile No*" name="mobileNo" type="tel" inputProps={{ maxLength: 10, inputMode: 'numeric' }} value={player.mobileNo} onChange={(e) => handlePlayerChange(index, e)} onBlur={() => handlePlayerBlur(index, 'mobileNo')} error={!!errors.players[index]?.mobileNo} helperText={errors.players[index]?.mobileNo} />
                                     </Box>
                                     <Box sx={{ mt: 1 }}>
                                         <TextField select fullWidth label="Gender*" name="gender" value={player.gender} onChange={(e) => handlePlayerChange(index, e)} error={!!errors.players[index]?.gender} helperText={errors.players[index]?.gender}>
@@ -393,7 +620,7 @@ const Registration = () => {
                                         <TextField fullWidth label="Name*" name="name" value={coach.name} onChange={(e) => handleCoachChange(index, e)} error={!!errors.coaches[index]?.name} helperText={errors.coaches[index]?.name} />
                                     </Box>
                                     <Box sx={{ mt: 1 }}>
-                                        <TextField fullWidth label="Mobile No*" name="mobileNo" type="tel" inputProps={{ maxLength: 10 }} value={coach.mobileNo} onChange={(e) => handleCoachChange(index, e)} error={!!errors.coaches[index]?.mobileNo} helperText={errors.coaches[index]?.mobileNo} />
+                                        <TextField fullWidth label="Mobile No*" name="mobileNo" type="tel" inputProps={{ maxLength: 10, inputMode: 'numeric' }} value={coach.mobileNo} onChange={(e) => handleCoachChange(index, e)} onBlur={() => handleCoachBlur(index, 'mobileNo')} error={!!errors.coaches[index]?.mobileNo} helperText={errors.coaches[index]?.mobileNo} />
                                     </Box>
                                     <Box sx={{ mt: 1 }}>
                                         <TextField fullWidth label="Email Address*" name="mailId" type="email" value={coach.mailId} onChange={(e) => handleCoachChange(index, e)} error={!!errors.coaches[index]?.mailId} helperText={errors.coaches[index]?.mailId} />
