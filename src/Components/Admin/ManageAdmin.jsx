@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Box, Typography, TextField, Button, Paper, IconButton, InputAdornment, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import { Eye, EyeSlash, PencilSquare, Trash } from 'react-bootstrap-icons';
 import { toast } from 'sonner';
+import { authAPI } from '../../utils/api';
+
 
 const ManageAdmin = () => {
     const [formData, setFormData] = useState({
@@ -15,7 +17,7 @@ const ManageAdmin = () => {
 
     const fetchAdmins = async () => {
         try {
-            const response = await fetch('http://localhost:3003/api/auth/admins');
+            const response = await authAPI.getAdmins();
             const data = await response.json();
             if (response.ok) {
                 setAdmins(data);
@@ -24,6 +26,7 @@ const ManageAdmin = () => {
             console.error('Error fetching admins:', error);
         }
     };
+
 
     useEffect(() => {
         fetchAdmins();
@@ -36,15 +39,10 @@ const ManageAdmin = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const url = editId 
-                ? `http://localhost:3003/api/auth/admins/${editId}`
-                : 'http://localhost:3003/api/auth/register-admin';
-            
-            const response = await fetch(url, {
-                method: editId ? 'PUT' : 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
-            });
+            const response = editId
+                ? await authAPI.updateAdmin(editId, formData)
+                : await authAPI.registerAdmin(formData);
+
             const data = await response.json();
 
             if (response.ok) {
@@ -61,6 +59,7 @@ const ManageAdmin = () => {
         }
     };
 
+
     const handleEdit = (admin) => {
         setFormData({
             username: admin.username,
@@ -73,9 +72,7 @@ const ManageAdmin = () => {
     const handleDelete = async (id) => {
         if (window.confirm("Are you sure you want to delete this admin?")) {
             try {
-                const response = await fetch(`http://localhost:3003/api/auth/admins/${id}`, {
-                    method: 'DELETE'
-                });
+                const response = await authAPI.deleteAdmin(id);
                 if (response.ok) {
                     toast.success('Admin deleted successfully');
                     fetchAdmins();

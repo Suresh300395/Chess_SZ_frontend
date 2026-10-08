@@ -4,6 +4,8 @@ import Header from './Common/Header';
 import Tabs from './Common/Tabs';
 import CommitteeCard from './Common/CommitteeCard';
 import io from 'socket.io-client';
+import { committeeAPI, SOCKET_URL } from '../utils/api';
+
 
 const Home = () => {
     const [activeTab, setActiveTab] = useState('Live Board');
@@ -13,7 +15,7 @@ const Home = () => {
     useEffect(() => {
         const fetchMembers = async () => {
             try {
-                const res = await fetch('http://localhost:3003/api/committee');
+                const res = await committeeAPI.getAll();
                 if (res.ok) {
                     const data = await res.json();
                     setCommitteeMembers(data);
@@ -25,7 +27,8 @@ const Home = () => {
 
         fetchMembers();
 
-        const socket = io('http://localhost:3003');
+        const socket = io(SOCKET_URL);
+
         
         socket.on('connect', () => {
             console.log('Webhook connected to backend!');
@@ -43,7 +46,6 @@ const Home = () => {
 
     return (
         <Box className="home-container">
-            <Header />
             <Box component="main">
                 <Box component="section" className="hero-section">
                     <Box component="img" src="/hero.png" alt="South Zone Chess Tournament" className="hero-banner-img" />
@@ -55,10 +57,12 @@ const Home = () => {
                     </Box>
                 </Box>
 
-                <Tabs tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} />
+                <Box sx={{ mt: 5, mb: 4, display: 'flex', justifyContent: 'center' }}>
+                    <Tabs tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} />
+                </Box>
 
-                <Box component="section" className="tab-content-section">
-                    <Box className="tab-content-card">
+                <Box component="section" className="tab-content-section" sx={{ px: { xs: 2, md: 6 }, pb: 8 }}>
+                    <Box className="tab-content-card" sx={{ p: { xs: 3, md: 5 }, bgcolor: 'white', borderRadius: 4, boxShadow: '0px 4px 20px rgba(0,0,0,0.05)' }}>
                         <Box component="h2" className="tab-card-title" sx={{ mb: 1, mt: 0 }}>
                             {activeTab}
                         </Box>

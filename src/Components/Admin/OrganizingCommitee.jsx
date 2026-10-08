@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Typography, Box, TextField, Button, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Avatar, IconButton } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
-
 import io from 'socket.io-client';
+import { committeeAPI, SOCKET_URL } from '../../utils/api';
+
 
 const OrganizingCommitee = () => {
     const [formData, setFormData] = useState({
@@ -18,7 +19,8 @@ const OrganizingCommitee = () => {
     useEffect(() => {
         fetchMembers();
 
-        const socket = io('http://localhost:3003');
+        const socket = io(SOCKET_URL);
+
         socket.on('committeeUpdated', () => {
             fetchMembers();
         });
@@ -30,7 +32,8 @@ const OrganizingCommitee = () => {
 
     const fetchMembers = async () => {
         try {
-            const res = await fetch('http://localhost:3003/api/committee');
+            const res = await committeeAPI.getAll();
+
             if (res.ok) {
                 const data = await res.json();
                 setMembers(data);
@@ -42,13 +45,8 @@ const OrganizingCommitee = () => {
 
     const handleOrderUpdate = async (id, newOrder) => {
         try {
-            const response = await fetch(`http://localhost:3003/api/committee/${id}/order`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ order: newOrder })
-            });
+            const response = await committeeAPI.update(id, { order: newOrder });
+
             if (response.ok) {
                 fetchMembers(); // refresh table
             } else {
@@ -63,9 +61,8 @@ const OrganizingCommitee = () => {
         if (!window.confirm('Are you sure you want to delete this member?')) return;
 
         try {
-            const response = await fetch(`http://localhost:3003/api/committee/${id}`, {
-                method: 'DELETE'
-            });
+            const response = await committeeAPI.delete(id);
+
             if (response.ok) {
                 fetchMembers();
             } else {
@@ -131,13 +128,8 @@ const OrganizingCommitee = () => {
                 photo: photoBase64
             };
 
-            const response = await fetch('http://localhost:3003/api/committee', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(dataToSubmit)
-            });
+            const response = await committeeAPI.create(dataToSubmit);
+
 
             if (response.ok) {
                 setFormData({

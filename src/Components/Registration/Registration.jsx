@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
 import { Box, TextField, MenuItem, FormControl, FormLabel, RadioGroup, FormControlLabel, Radio, Button, Typography, Paper } from '@mui/material';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
+import { registrationAPI } from '../../utils/api';
+
 
 const Registration = () => {
+    const navigate = useNavigate();
     const [teamDetails, setTeamDetails] = useState({
         universityName: '',
         address: '',
@@ -245,22 +249,14 @@ const Registration = () => {
         };
 
         try {
-            const res = await fetch('http://localhost:3003/api/registration', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+            const res = await registrationAPI.submit(payload);
 
             if (res.ok) {
                 toast.success('Registration successful!');
-                // Reset form completely
-                setTeamDetails({ universityName: '', address: '', universityContact: '' });
-                setPlayers([{ playerName: '', mobileNo: '', gender: '', dob: '', transportMode: '', transportNumber: '', arrivalDate: '', arrivalTime: '', departureDate: '', departureTime: '', accommodation: 'Yes' }]);
-                setCoaches([{ role: 'Coach', name: '', mobileNo: '', mailId: '', gender: '', foodType: 'Veg', accommodation: 'Yes' }]);
-                setErrors({ team: {}, players: [], coaches: [] });
+                navigate('/user/dashboard');
             } else {
                 const data = await res.json();
-                toast.error(data.error || 'Failed to submit registration');
+                toast.error(data.message || data.error || 'Failed to submit registration');
             }
         } catch (error) {
             console.error('Submit error:', error);

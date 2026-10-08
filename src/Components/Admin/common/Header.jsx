@@ -25,7 +25,7 @@ const Header = ({ title }) => {
 
     const handleLogout = () => {
         localStorage.removeItem('user');
-        navigate('/admin');
+        navigate('/');
     };
 
     return (
@@ -63,7 +63,7 @@ const Header = ({ title }) => {
                 onClose={handleClose}
                 transformOrigin={{ horizontal: 'right', vertical: 'top' }}
                 anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-                PaperProps={{
+                slotProps={{ paper: {
                     elevation: 0,
                     sx: {
                         overflow: 'visible',
@@ -98,7 +98,7 @@ const Header = ({ title }) => {
                             mb: 0.5
                         }
                     },
-                }}
+                }}}
             >
                 {/* User Info Section */}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2, pb: 1.5 }}>

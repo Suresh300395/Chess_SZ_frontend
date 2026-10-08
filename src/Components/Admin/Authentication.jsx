@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
-import { Box, Link, Typography } from '@mui/material';
+import { Box, Link, Typography, TextField, Dialog, IconButton } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 import { useNavigate } from 'react-router-dom';
+import { authAPI } from '../../utils/api';
 
-const Authentication = () => {
+
+const Authentication = ({ open, onClose }) => {
     const navigate = useNavigate();
     const [credentials, setCredentials] = useState({
         username: '',
@@ -23,35 +26,56 @@ const Authentication = () => {
         e.preventDefault();
         setError('');
         setLoading(true);
-        
+
         try {
-            const response = await fetch('http://localhost:3003/api/auth/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(credentials)
-            });
+            const response = await authAPI.login(credentials.username, credentials.password);
             const data = await response.json();
-            
+
             if (response.ok) {
-                localStorage.setItem('user', JSON.stringify(data.user));
-                navigate('/admin/dashboard');
+                // Save user data + JWT token together
+                localStorage.setItem('user', JSON.stringify({ ...data.user, token: data.token }));
+                window.dispatchEvent(new Event('authChange'));
+                if (onClose) onClose();
+                if (data.user.role === 'player') {
+                    navigate('/user/dashboard');
+                } else {
+                    navigate('/admin/dashboard');
+                }
             } else {
                 setError(data.message || 'Login failed');
             }
         } catch (err) {
-            setError('Network error. Is the backend running?');
+            setError(err.message || 'Network error. Is the backend running?');
         } finally {
             setLoading(false);
         }
     };
 
+
     return (
-        <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FAF6F3', p: 2 }}>
-            <Box sx={{ maxWidth: 450, width: '100%', bgcolor: 'white', p: { xs: 4, md: 5 }, borderRadius: 2, boxShadow: '0 10px 40px rgba(11, 82, 153, 0.08)' }}>
-                <Box component="h2" className="tab-card-title" sx={{ textAlign: 'center', mb: 1, mt: 0, fontSize: 'clamp(24px, 4vw, 32px)' }}>
-                    Admin Login
+        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth slotProps={{ paper: { sx: { borderRadius: 2, m: 2, maxWidth: 450 } } }}>
+            <Box sx={{ width: '100%', bgcolor: 'white', p: { xs: 4, md: 5 }, position: 'relative' }}>
+                <IconButton 
+                    onClick={onClose} 
+                    sx={{ 
+                        position: 'absolute', 
+                        top: 8, 
+                        right: 8, 
+                        color: 'grey.500',
+                        transition: 'all 0.2s ease',
+                        '&:hover': { 
+                            bgcolor: '#ff4d4d', 
+                            color: 'white' 
+                        } 
+                    }}
+                >
+                    <CloseIcon />
+                </IconButton>
+                <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
+                    <img src="/site-logo.svg" alt="Admin Logo" style={{ maxWidth: '200px', width: '100%' }} />
+                </Box>
+                <Box component="h6" className="tab-card-title" sx={{ textAlign: 'left', mb: 3, mt: 0, fontSize: 'clamp(18px, 3vw, 24px)', fontWeight: 700 }}>
+                    Login
                 </Box>
                 {error && (
                     <Typography sx={{ color: 'red', textAlign: 'center', mb: 2, fontSize: '0.9rem' }}>
@@ -63,42 +87,38 @@ const Authentication = () => {
                 </Box> */}
 
                 <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                    <Box className="form-group">
-                        <Box component="label">Username</Box>
-                        <Box
-                            component="input"
-                            type="text"
-                            name="username"
-                            className="form-input"
-                            placeholder="Enter username"
-                            value={credentials.username}
-                            onChange={handleChange}
-                            required
-                        />
+                    <TextField
+                        fullWidth
+                        label="Username"
+                        name="username"
+                        placeholder="Enter username"
+                        value={credentials.username}
+                        onChange={handleChange}
+                        required
+                    />
+
+                    <TextField
+                        fullWidth
+                        label="Password"
+                        type="password"
+                        name="password"
+                        placeholder="Enter password"
+                        value={credentials.password}
+                        onChange={handleChange}
+                        required
+                    />
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: -2 }}>
+                        <Link href="#" underline="hover" sx={{ fontSize: '0.85rem', color: '#0b5299' }}>
+                            Forgot Password?
+                        </Link>
                     </Box>
 
-                    <Box className="form-group">
-                        <Box component="label">Password</Box>
-                        <Box
-                            component="input"
-                            type="password"
-                            name="password"
-                            className="form-input"
-                            placeholder="Enter password"
-                            value={credentials.password}
-                            onChange={handleChange}
-                            required
-                        />
-                    </Box>
-
-
-
-                    <Box component="button" type="submit" disabled={loading} className="btn-primary" sx={{ width: '100%', margin: '1rem 0 0 0', opacity: loading ? 0.7 : 1 }}>
+                    <Box component="button" type="submit" disabled={loading} className="btn-primary" sx={{ width: 'fit-content', px: 6, margin: '1rem auto 0 auto', opacity: loading ? 0.7 : 1 }}>
                         {loading ? 'Logging in...' : 'Log In'}
                     </Box>
                 </Box>
             </Box>
-        </Box>
+        </Dialog>
     );
 };
 

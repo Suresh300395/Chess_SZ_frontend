@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Typography, Box, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Chip } from '@mui/material';
 import CustomTabs from '../Common/Tabs';
+import { registrationAPI } from '../../utils/api';
+
 
 const HostelProvision = () => {
     const [accommodationList, setAccommodationList] = useState([]);
@@ -10,7 +12,8 @@ const HostelProvision = () => {
     useEffect(() => {
         const fetchRegistrations = async () => {
             try {
-                const response = await fetch('http://localhost:3003/api/registration');
+                const response = await registrationAPI.getAll();
+
                 if (response.ok) {
                     const data = await response.json();
                     let list = [];
