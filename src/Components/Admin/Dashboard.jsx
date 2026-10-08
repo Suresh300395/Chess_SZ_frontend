@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Card, CardContent, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TablePagination, Button, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
+import { Box, Typography, Card, CardContent, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TablePagination, Button, Dialog, DialogTitle, DialogContent, DialogActions, Chip } from '@mui/material';
 import GroupsIcon from '@mui/icons-material/Groups';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import FormatListNumberedIcon from '@mui/icons-material/FormatListNumbered';
@@ -70,9 +70,51 @@ const Dashboard = () => {
     };
 
     const stats = [
-        { title: 'Total Players', count: totalPlayers, icon: <GroupsIcon sx={{ fontSize: 32, color: '#0b5299' }} /> },
-        { title: 'Total Teams', count: totalTeams, icon: <EmojiEventsIcon sx={{ fontSize: 32, color: '#0b5299' }} /> },
-        { title: 'Total Rounds', count: 0, icon: <FormatListNumberedIcon sx={{ fontSize: 32, color: '#0b5299' }} /> }
+        {
+            title: 'Total Players',
+            count: totalPlayers,
+            subtitle: 'Enrolled Chess Players',
+            badge: 'Participants',
+            icon: <GroupsIcon sx={{ fontSize: 26, color: '#ffffff' }} />,
+            bgIcon: <GroupsIcon sx={{ fontSize: 90, color: '#0b5299' }} />,
+            gradient: 'linear-gradient(135deg, #0b5299 0%, #1e40af 100%)',
+            shadow: 'rgba(11, 82, 153, 0.22)',
+            bgGradient: 'linear-gradient(145deg, #ffffff 0%, #f0f7ff 100%)',
+            borderColor: '#e2e8f0',
+            hoverBorder: '#93c5fd',
+            badgeBg: '#eff6ff',
+            badgeColor: '#1d4ed8'
+        },
+        {
+            title: 'Total Teams',
+            count: totalTeams,
+            subtitle: 'Registered Universities',
+            badge: 'Institutions',
+            icon: <EmojiEventsIcon sx={{ fontSize: 26, color: '#ffffff' }} />,
+            bgIcon: <EmojiEventsIcon sx={{ fontSize: 90, color: '#d06c38' }} />,
+            gradient: 'linear-gradient(135deg, #d06c38 0%, #ea580c 100%)',
+            shadow: 'rgba(208, 108, 56, 0.22)',
+            bgGradient: 'linear-gradient(145deg, #ffffff 0%, #fffbf7 100%)',
+            borderColor: '#e2e8f0',
+            hoverBorder: '#fed7aa',
+            badgeBg: '#fff7ed',
+            badgeColor: '#c2410c'
+        },
+        {
+            title: 'Total Rounds',
+            count: 0,
+            subtitle: 'Tournament Fixtures',
+            badge: 'Matches',
+            icon: <FormatListNumberedIcon sx={{ fontSize: 26, color: '#ffffff' }} />,
+            bgIcon: <FormatListNumberedIcon sx={{ fontSize: 90, color: '#059669' }} />,
+            gradient: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+            shadow: 'rgba(5, 150, 105, 0.22)',
+            bgGradient: 'linear-gradient(145deg, #ffffff 0%, #f6fdf9 100%)',
+            borderColor: '#e2e8f0',
+            hoverBorder: '#a7f3d0',
+            badgeBg: '#ecfdf5',
+            badgeColor: '#047857'
+        }
     ];
 
     return (
@@ -84,40 +126,118 @@ const Dashboard = () => {
                 Select an option from the sidebar to view details, manage registrations and organize the tournament.
             </Typography>
 
-            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 4, width: '100%', mb: 5 }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 3, width: '100%', mb: 4 }}>
                 {stats.map((stat, index) => (
-                    <Box key={index} sx={{ flex: 1 }}>
-                        <Card sx={{
-                            borderRadius: 3,
-                            bgcolor: 'aliceblue',
-                            border: 'none',
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-                            transition: 'transform 0.2s',
+                    <Card
+                        key={index}
+                        sx={{
+                            position: 'relative',
+                            overflow: 'hidden',
+                            borderRadius: '16px',
+                            background: stat.bgGradient,
+                            border: `1px solid ${stat.borderColor}`,
+                            boxShadow: '0 2px 12px rgba(15, 23, 42, 0.04)',
+                            transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                             height: '100%',
-                            width: '100%',
-                            '&:hover': { transform: 'translateY(-4px)', boxShadow: '0 8px 24px rgba(0,0,0,0.1)' }
+                            '&:hover': {
+                                transform: 'translateY(-3px)',
+                                boxShadow: '0 10px 24px rgba(15, 23, 42, 0.08)',
+                                borderColor: stat.hoverBorder
+                            }
+                        }}
+                    >
+                        {/* Corner Category Badge (Pinned to top-right corner) */}
+                        <Chip
+                            label={stat.badge}
+                            size="small"
+                            sx={{
+                                position: 'absolute',
+                                top: 12,
+                                right: 12,
+                                bgcolor: stat.badgeBg,
+                                color: stat.badgeColor,
+                                fontWeight: 600,
+                                fontSize: '0.72rem',
+                                height: '22px',
+                                borderRadius: '6px',
+                                zIndex: 1
+                            }}
+                        />
+
+                        {/* Subtle decorative watermark icon in bottom-right corner */}
+                        <Box sx={{
+                            position: 'absolute',
+                            right: -8,
+                            bottom: -8,
+                            opacity: 0.04,
+                            pointerEvents: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
                         }}>
-                            <CardContent sx={{ display: 'flex', alignItems: 'center', p: 3 }}>
-                                <Box sx={{
-                                    p: 1.5,
-                                    borderRadius: 2,
-                                    bgcolor: 'rgba(11, 82, 153, 0.1)',
-                                    mr: 2,
-                                    display: 'flex'
-                                }}>
-                                    {stat.icon}
-                                </Box>
-                                <Box>
-                                    <Typography variant="body1" sx={{ color: '#64748b', fontWeight: 500, mb: 0.5 }}>
-                                        {stat.title}
-                                    </Typography>
-                                    <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#334155' }}>
-                                        {stat.count}
-                                    </Typography>
-                                </Box>
-                            </CardContent>
-                        </Card>
-                    </Box>
+                            {stat.bgIcon}
+                        </Box>
+
+                        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                            {/* Icon badge */}
+                            <Box sx={{
+                                width: 44,
+                                height: 44,
+                                borderRadius: '11px',
+                                background: stat.gradient,
+                                boxShadow: `0 4px 12px ${stat.shadow}`,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                mb: 1.5,
+                                transition: 'transform 0.2s',
+                                '&:hover': { transform: 'scale(1.05)' }
+                            }}>
+                                {stat.icon}
+                            </Box>
+
+                            {/* Title */}
+                            <Typography
+                                variant="caption"
+                                sx={{
+                                    color: '#64748b',
+                                    fontWeight: 600,
+                                    fontSize: '0.78rem',
+                                    letterSpacing: '0.5px',
+                                    textTransform: 'uppercase',
+                                    display: 'block'
+                                }}
+                            >
+                                {stat.title}
+                            </Typography>
+
+                            {/* Enlaraged Counter Number */}
+                            <Typography
+                                sx={{
+                                    fontWeight: 800,
+                                    color: '#0f172a',
+                                    fontSize: { xs: '2.4rem', md: '2.85rem' },
+                                    lineHeight: 1.1,
+                                    my: 0.25
+                                }}
+                            >
+                                {stat.count}
+                            </Typography>
+
+                            {/* Subtitle */}
+                            <Typography
+                                variant="caption"
+                                sx={{
+                                    color: '#94a3b8',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 500,
+                                    display: 'block'
+                                }}
+                            >
+                                {stat.subtitle}
+                            </Typography>
+                        </CardContent>
+                    </Card>
                 ))}
             </Box>
 
