@@ -106,4 +106,50 @@ export const committeeAPI = {
         apiFetch(`/committee/${id}`, { method: 'DELETE' }, true),
 };
 
+// Food Token APIs
+export const foodTokenAPI = {
+    searchPeople: (search = '') => {
+        const params = new URLSearchParams();
+        if (search) params.append('search', search);
+        return apiFetch(`/food-tokens/people?${params.toString()}`, {}, true);
+    },
+    issue: (data) =>
+        apiFetch('/food-tokens/issue', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }, true),
+    issueBulk: (data) =>
+        apiFetch('/food-tokens/issue-bulk', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }, true),
+    issueDay: (data) =>
+        apiFetch('/food-tokens/issue-day', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }, true),
+    reprint: (id) =>
+        apiFetch(`/food-tokens/${id}/reprint`, {
+            method: 'POST',
+        }, true),
+    cancel: (id, reason) =>
+        apiFetch(`/food-tokens/${id}/cancel`, {
+            method: 'POST',
+            body: JSON.stringify({ reason }),
+        }, true),
+    getAll: (params = {}) => {
+        const cleanParams = new URLSearchParams();
+        Object.entries(params).forEach(([k, v]) => {
+            if (v !== undefined && v !== null && v !== '') {
+                cleanParams.append(k, v);
+            }
+        });
+        return apiFetch(`/food-tokens?${cleanParams.toString()}`, {}, true);
+    },
+    getStats: () => {
+        return apiFetch('/food-tokens/stats', {}, true);
+    },
+};
+
 export default apiFetch;
+

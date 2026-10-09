@@ -17,7 +17,7 @@ const Header = () => {
     const navigate = useNavigate();
     const location = useLocation();
 
-    const isDashboard = location.pathname.includes('/dashboard');
+    const isDashboard = location.pathname.startsWith('/admin') || location.pathname.startsWith('/user') || location.pathname.includes('/dashboard');
 
     const handleMenuOpen = (event) => setAnchorEl(event.currentTarget);
     const handleMenuClose = () => setAnchorEl(null);

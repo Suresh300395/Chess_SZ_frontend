@@ -264,7 +264,7 @@ const ManageBlocks = () => {
     return (
         <Box sx={{ p: 3, width: '100%' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', mb: 3, fontSize: { xs: '1rem', md: '2rem' } }}>
+                <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', fontSize: '28px' }}>
                     Manage Hostel Blocks
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 2 }}>
