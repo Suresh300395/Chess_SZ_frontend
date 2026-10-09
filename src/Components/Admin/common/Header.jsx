@@ -1,19 +1,23 @@
 import React, { useState } from 'react';
 import { Box, Typography, Avatar, Menu, MenuItem, Divider } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import LogoutIcon from '@mui/icons-material/Logout';
-import PersonIcon from '@mui/icons-material/Person';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import ShieldIcon from '@mui/icons-material/Shield';
+import HomeIcon from '@mui/icons-material/Home';
+import DashboardIcon from '@mui/icons-material/Dashboard';
 
 const Header = ({ title }) => {
     const navigate = useNavigate();
+    const location = useLocation();
     const [anchorEl, setAnchorEl] = useState(null);
     const open = Boolean(anchorEl);
 
     // Get user from localStorage
     const userString = localStorage.getItem('user');
     const user = userString ? JSON.parse(userString) : { username: 'Super Admin', role: 'superadmin' };
+    const dashboardPath = user.role === 'player' ? '/user/dashboard' : '/admin/dashboard';
+    const isDashboard = location.pathname.startsWith('/admin') || location.pathname.startsWith('/user') || location.pathname.includes('/dashboard');
 
     const handleClick = (event) => {
         setAnchorEl(event.currentTarget);
@@ -25,6 +29,7 @@ const Header = ({ title }) => {
 
     const handleLogout = () => {
         localStorage.removeItem('user');
+        window.dispatchEvent(new Event('authChange'));
         navigate('/');
     };
 
@@ -135,15 +140,31 @@ const Header = ({ title }) => {
 
                 <Divider sx={{ my: 1, mx: 2, borderColor: 'rgba(0,0,0,0.06)' }} />
 
-                {/* Profile Item */}
-                <Box sx={{ px: 2, py: 1 }}>
-                    <MenuItem onClick={handleClose} sx={{ bgcolor: '#f4f7fc', borderRadius: '12px', py: 1.5, px: 2, '&:hover': { bgcolor: '#eef2f9' } }}>
-                        <PersonIcon sx={{ color: '#0b5299', mr: 2 }} />
-                        <Typography sx={{ fontWeight: 600, color: '#0f172a', flexGrow: 1, fontSize: '15px' }}>
-                            Profile
-                        </Typography>
-                        <KeyboardArrowRightIcon sx={{ color: '#64748b' }} />
-                    </MenuItem>
+                {/* Dynamic Home & Dashboard Items */}
+                <Box sx={{ px: 2, py: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    {isDashboard ? (
+                        <MenuItem 
+                            onClick={() => { handleClose(); navigate('/'); }} 
+                            sx={{ bgcolor: '#f4f7fc', borderRadius: '12px', py: 1.5, px: 2, '&:hover': { bgcolor: '#eef2f9' } }}
+                        >
+                            <HomeIcon sx={{ color: '#0b5299', mr: 2 }} />
+                            <Typography sx={{ fontWeight: 600, color: '#0f172a', flexGrow: 1, fontSize: '15px' }}>
+                                Home
+                            </Typography>
+                            <KeyboardArrowRightIcon sx={{ color: '#64748b' }} />
+                        </MenuItem>
+                    ) : (
+                        <MenuItem 
+                            onClick={() => { handleClose(); navigate(dashboardPath); }} 
+                            sx={{ bgcolor: '#f4f7fc', borderRadius: '12px', py: 1.5, px: 2, '&:hover': { bgcolor: '#eef2f9' } }}
+                        >
+                            <DashboardIcon sx={{ color: '#0b5299', mr: 2 }} />
+                            <Typography sx={{ fontWeight: 600, color: '#0f172a', flexGrow: 1, fontSize: '15px' }}>
+                                Dashboard
+                            </Typography>
+                            <KeyboardArrowRightIcon sx={{ color: '#64748b' }} />
+                        </MenuItem>
+                    )}
                 </Box>
 
                 {/* Logout Item */}
