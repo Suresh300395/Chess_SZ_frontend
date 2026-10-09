@@ -61,7 +61,7 @@ const Home = () => {
                     <Tabs tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} />
                 </Box>
 
-                <Box component="section" className="tab-content-section" sx={{ px: { xs: 2, md: 6 }, pb: 8 }}>
+                <Box component="section" className="tab-content-section" sx={{ px: { xs: 1, md: 6 }, pb: 8 }}>
                     <Box className="tab-content-card" sx={{ p: { xs: 3, md: 5 }, bgcolor: 'white', borderRadius: 4, boxShadow: '0px 4px 20px rgba(0,0,0,0.05)' }}>
                         <Box component="h2" className="tab-card-title" sx={{ mb: 1, mt: 0 }}>
                             {activeTab}

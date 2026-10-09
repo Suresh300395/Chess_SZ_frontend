@@ -80,7 +80,7 @@ const Header = () => {
     }, []);
 
     return (
-        <Box component="header" className={`main-header ${scrolled ? 'header-scrolled' : ''} ${hidden ? 'header-hidden' : ''}`}>
+        <Box component="header" className={`main-header ${scrolled ? 'header-scrolled' : ''} ${hidden ? 'header-hidden' : ''} ${isDashboard ? 'header-dashboard' : ''}`}>
             <Box className="header-container">
                 <Box className="header-logos-wrapper">
                     <Box component={Link} to="/" className="header-logo">

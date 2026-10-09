@@ -13,6 +13,7 @@ import HostelProvision from './Components/Admin/HostelProvision'
 import FoodTokens from './Components/Admin/FoodTokens'
 import CautionDeposite from './Components/Admin/CautionDeposite'
 import ManageAdmin from './Components/Admin/ManageAdmin'
+import ManageBlocks from './Components/Admin/ManageBlocks'
 import UserDashboard from './Components/User/UserDashboard'
 import FrontendLayout from './Components/FrontendLayout'
 import ProtectedRoute from './Components/Common/ProtectedRoute'
@@ -164,6 +165,7 @@ function App() {
           <Route path="/admin/food-tokens" element={<FoodTokens />} />
           <Route path="/admin/caution-deposite" element={<CautionDeposite />} />
           <Route path="/admin/manage-admin" element={<ManageAdmin />} />
+          <Route path="/admin/manage-blocks" element={<ManageBlocks />} />
         </Route>
       </Routes>
     </ThemeProvider>

@@ -1,5 +1,5 @@
 // Centralized API base URL - change this for production
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3003/api';
+export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3003/api';
 export const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3003';
 
 
@@ -67,6 +67,15 @@ export const authAPI = {
 
     deleteAdmin: (id) =>
         apiFetch(`/auth/admins/${id}`, { method: 'DELETE' }, true),
+
+    checkMobile: (mobile) =>
+        apiFetch('/auth/check-mobile', {
+            method: 'POST',
+            body: JSON.stringify({ mobile }),
+        }),
+
+    getDashboard: () => apiFetch('/auth/dashboard', {}, true),
+    getAccommodationDetails: () => apiFetch('/auth/accommodation-details', {}, true),
 };
 
 // Registration APIs

@@ -182,57 +182,61 @@ const Dashboard = () => {
                         </Box>
 
                         <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                            {/* Icon badge */}
-                            <Box sx={{
-                                width: 44,
-                                height: 44,
-                                borderRadius: '11px',
-                                background: stat.gradient,
-                                boxShadow: `0 4px 12px ${stat.shadow}`,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                mb: 1.5,
-                                transition: 'transform 0.2s',
-                                '&:hover': { transform: 'scale(1.05)' }
-                            }}>
-                                {stat.icon}
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5, mb: 1.5 }}>
+                                {/* Icon badge */}
+                                <Box sx={{
+                                    width: 52,
+                                    height: 52,
+                                    borderRadius: '12px',
+                                    background: stat.gradient,
+                                    boxShadow: `0 4px 12px ${stat.shadow}`,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexShrink: 0,
+                                    transition: 'transform 0.2s',
+                                    '&:hover': { transform: 'scale(1.05)' }
+                                }}>
+                                    {stat.icon}
+                                </Box>
+
+                                <Box>
+                                    {/* Title */}
+                                    <Typography
+                                        variant="caption"
+                                        sx={{
+                                            color: '#64748b',
+                                            fontWeight: 600,
+                                            fontSize: '0.75rem',
+                                            letterSpacing: '0.5px',
+                                            textTransform: 'uppercase',
+                                            display: 'block',
+                                            mb: 0.5
+                                        }}
+                                    >
+                                        {stat.title}
+                                    </Typography>
+
+                                    {/* Enlaraged Counter Number */}
+                                    <Typography
+                                        sx={{
+                                            fontWeight: 800,
+                                            color: '#0f172a',
+                                            fontSize: { xs: '2rem', md: '2.2rem' },
+                                            lineHeight: 1
+                                        }}
+                                    >
+                                        {stat.count}
+                                    </Typography>
+                                </Box>
                             </Box>
-
-                            {/* Title */}
-                            <Typography
-                                variant="caption"
-                                sx={{
-                                    color: '#64748b',
-                                    fontWeight: 600,
-                                    fontSize: '0.78rem',
-                                    letterSpacing: '0.5px',
-                                    textTransform: 'uppercase',
-                                    display: 'block'
-                                }}
-                            >
-                                {stat.title}
-                            </Typography>
-
-                            {/* Enlaraged Counter Number */}
-                            <Typography
-                                sx={{
-                                    fontWeight: 800,
-                                    color: '#0f172a',
-                                    fontSize: { xs: '2.4rem', md: '2.85rem' },
-                                    lineHeight: 1.1,
-                                    my: 0.25
-                                }}
-                            >
-                                {stat.count}
-                            </Typography>
 
                             {/* Subtitle */}
                             <Typography
                                 variant="caption"
                                 sx={{
                                     color: '#94a3b8',
-                                    fontSize: '0.78rem',
+                                    fontSize: '0.8rem',
                                     fontWeight: 500,
                                     display: 'block'
                                 }}
