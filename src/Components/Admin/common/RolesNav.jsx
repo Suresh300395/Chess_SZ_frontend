@@ -20,7 +20,8 @@ export const getMenusByRole = (role) => {
     if (role === 'superadmin') {
         return [
             ...commonMenus,
-            { name: "Manage Admin", path: "/admin/manage-admin", icon: <AdminPanelSettingsIcon /> }
+            { name: "Manage Admin", path: "/admin/manage-admin", icon: <AdminPanelSettingsIcon /> },
+            { name: "Manage Blocks", path: "/admin/manage-blocks", icon: <HotelIcon /> }
         ];
     }
 

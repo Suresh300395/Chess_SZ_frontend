@@ -48,28 +48,11 @@ import CustomTabs from '../Common/Tabs';
 import { registrationAPI, SOCKET_URL } from '../../utils/api';
 
 
-// Configuration for buildings, floors, and rooms (5 rooms per floor, max 4 members per room)
-const BUILDINGS = [
-    'Boys Hostel Block A',
-    'Boys Hostel Block B',
-    'Boys Hostel Block C',
-    'Boys Hostel Block D',
-    'Girls Hostel Block A',
-    'Girls Hostel Block B'
-];
-
-const FLOORS = ['Floor 1', 'Floor 2', 'Floor 3'];
-
-const FLOOR_ROOMS = {
-    'Floor 1': ['Room 101', 'Room 102', 'Room 103', 'Room 104', 'Room 105'],
-    'Floor 2': ['Room 201', 'Room 202', 'Room 203', 'Room 204', 'Room 205'],
-    'Floor 3': ['Room 301', 'Room 302', 'Room 303', 'Room 304', 'Room 305']
-};
-
 const MAX_ROOM_CAPACITY = 4;
 
 const HostelProvision = () => {
     const [accommodationList, setAccommodationList] = useState([]);
+    const [dbBlocks, setDbBlocks] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('Players');
     const tabsList = ['Players', 'Coaches / Managers'];
@@ -132,6 +115,15 @@ const HostelProvision = () => {
                 setAccommodationList(list);
             } else {
                 toast.error('Failed to load participants list');
+            }
+
+            // Fetch dynamic blocks
+            // Using API_BASE import is preferred, but using fetch from similar endpoints
+            const API_BASE = SOCKET_URL.replace(/:3001$/, ':3003') + '/api';
+            const blocksRes = await fetch(`${API_BASE}/blocks`);
+            if (blocksRes.ok) {
+                const blocksData = await blocksRes.json();
+                setDbBlocks(blocksData);
             }
         } catch (err) {
             console.error('Error fetching registrations:', err);
@@ -200,10 +192,19 @@ const HostelProvision = () => {
         return { total, requestedAcc, mappedCount, pendingCount };
     }, [tabFilteredList]);
 
-    // Available rooms for selected building & floor (Filter out full rooms >= 4 capacity)
+    const availableFloors = useMemo(() => {
+        const currentBuildingObj = dbBlocks.find(b => b.name === selectedBuilding);
+        return currentBuildingObj?.floors?.map(f => f.floorName) || [];
+    }, [selectedBuilding, dbBlocks]);
+
+    // Available rooms for selected building & floor (Filter out full rooms >= capacity)
     // "okavela aa room fill aipotey db lo manam aa room chupinchamu"
     const availableRooms = useMemo(() => {
-        const rooms = FLOOR_ROOMS[selectedFloor] || [];
+        const currentBuildingObj = dbBlocks.find(b => b.name === selectedBuilding);
+        const floorObj = currentBuildingObj?.floors?.find(f => f.floorName === selectedFloor);
+        const rooms = floorObj?.rooms || [];
+        const capacity = currentBuildingObj?.capacityPerRoom || 4;
+
         return rooms
             .map(room => {
                 const occupancy = getRoomOccupancy(selectedBuilding, selectedFloor, room, selectedPerson?.id);
@@ -215,12 +216,13 @@ const HostelProvision = () => {
                 return {
                     roomNumber: room,
                     occupancy,
-                    availableSlots: MAX_ROOM_CAPACITY - occupancy,
-                    isFull: occupancy >= MAX_ROOM_CAPACITY && !isCurrentPersonsRoom
+                    availableSlots: capacity - occupancy,
+                    isFull: occupancy >= capacity && !isCurrentPersonsRoom,
+                    capacity
                 };
             })
             .filter(r => !r.isFull); // Hide filled rooms from dropdown!
-    }, [selectedBuilding, selectedFloor, getRoomOccupancy, selectedPerson]);
+    }, [selectedBuilding, selectedFloor, getRoomOccupancy, selectedPerson, dbBlocks]);
 
     // Handle Open Map Room Modal
     const handleOpenMapDialog = (person) => {
@@ -228,16 +230,16 @@ const HostelProvision = () => {
 
         // Pre-fill building
         if (person.roomAllocation) {
-            setSelectedBuilding(person.roomAllocation.building || 'Boys Hostel Block A');
-            setSelectedFloor(person.roomAllocation.floor || 'Floor 1');
+            setSelectedBuilding(person.roomAllocation.building || (dbBlocks.length > 0 ? dbBlocks[0].name : ''));
+            setSelectedFloor(person.roomAllocation.floor || '');
             setSelectedRoom(person.roomAllocation.roomNumber || '');
         } else {
-            // Suggest default building based on gender if available
-            const defaultBuilding = person.gender?.toLowerCase() === 'female'
-                ? 'Girls Hostel Block A'
-                : 'Boys Hostel Block A';
+            // Suggest default building
+            const defaultBuilding = dbBlocks.length > 0 ? dbBlocks[0].name : '';
             setSelectedBuilding(defaultBuilding);
-            setSelectedFloor('Floor 1');
+            const defaultBuildingObj = dbBlocks.find(b => b.name === defaultBuilding);
+            const defaultFloor = defaultBuildingObj?.floors?.length > 0 ? defaultBuildingObj.floors[0].floorName : '';
+            setSelectedFloor(defaultFloor);
             setSelectedRoom('');
         }
 
@@ -344,69 +346,180 @@ const HostelProvision = () => {
 
             {/* Quick Stats Banner */}
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' }, gap: 2, mb: 3 }}>
-                <Card sx={{ bgcolor: '#ffffff', borderRadius: 2.5, boxShadow: '0 2px 10px rgba(0,0,0,0.04)', border: '1px solid #e2e8f0' }}>
-                    <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <Box>
-                                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, textTransform: 'uppercase' }}>
-                                    Total {activeTab}
-                                </Typography>
-                                <Typography variant="h5" sx={{ fontWeight: 700, color: '#0b5299', mt: 0.5 }}>
-                                    {stats.total}
-                                </Typography>
-                            </Box>
-                            <GroupsIcon sx={{ color: '#0b5299', fontSize: 32, opacity: 0.8 }} />
-                        </Box>
-                    </CardContent>
-                </Card>
+                {[
+                    {
+                        title: `Total ${activeTab}`,
+                        count: stats.total,
+                        subtitle: 'Total Enrolled',
+                        badge: 'Total',
+                        icon: <GroupsIcon sx={{ fontSize: 26, color: '#ffffff' }} />,
+                        bgIcon: <GroupsIcon sx={{ fontSize: 90, color: '#0b5299' }} />,
+                        gradient: 'linear-gradient(135deg, #0b5299 0%, #1e40af 100%)',
+                        shadow: 'rgba(11, 82, 153, 0.22)',
+                        bgGradient: 'linear-gradient(145deg, #ffffff 0%, #f0f7ff 100%)',
+                        borderColor: '#e2e8f0',
+                        hoverBorder: '#93c5fd',
+                        badgeBg: '#eff6ff',
+                        badgeColor: '#1d4ed8'
+                    },
+                    {
+                        title: 'Accommodation (Yes)',
+                        count: stats.requestedAcc,
+                        subtitle: 'Rooms Requested',
+                        badge: 'Requested',
+                        icon: <HotelIcon sx={{ fontSize: 26, color: '#ffffff' }} />,
+                        bgIcon: <HotelIcon sx={{ fontSize: 90, color: '#059669' }} />,
+                        gradient: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                        shadow: 'rgba(5, 150, 105, 0.22)',
+                        bgGradient: 'linear-gradient(145deg, #ffffff 0%, #f6fdf9 100%)',
+                        borderColor: '#e2e8f0',
+                        hoverBorder: '#a7f3d0',
+                        badgeBg: '#ecfdf5',
+                        badgeColor: '#047857'
+                    },
+                    {
+                        title: 'Rooms Mapped',
+                        count: stats.mappedCount,
+                        subtitle: 'Allocated Rooms',
+                        badge: 'Allocated',
+                        icon: <HowToRegIcon sx={{ fontSize: 26, color: '#ffffff' }} />,
+                        bgIcon: <HowToRegIcon sx={{ fontSize: 90, color: '#2563eb' }} />,
+                        gradient: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
+                        shadow: 'rgba(37, 99, 235, 0.22)',
+                        bgGradient: 'linear-gradient(145deg, #ffffff 0%, #eff6ff 100%)',
+                        borderColor: '#e2e8f0',
+                        hoverBorder: '#bfdbfe',
+                        badgeBg: '#eff6ff',
+                        badgeColor: '#1d4ed8'
+                    },
+                    {
+                        title: 'Pending Allocation',
+                        count: stats.pendingCount,
+                        subtitle: 'Yet To Be Allocated',
+                        badge: 'Pending',
+                        icon: <MeetingRoomIcon sx={{ fontSize: 26, color: '#ffffff' }} />,
+                        bgIcon: <MeetingRoomIcon sx={{ fontSize: 90, color: '#d97706' }} />,
+                        gradient: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)',
+                        shadow: 'rgba(217, 119, 6, 0.22)',
+                        bgGradient: 'linear-gradient(145deg, #ffffff 0%, #fffbeb 100%)',
+                        borderColor: '#e2e8f0',
+                        hoverBorder: '#fde68a',
+                        badgeBg: '#fffbeb',
+                        badgeColor: '#b45309'
+                    }
+                ].map((stat, index) => (
+                    <Card
+                        key={index}
+                        sx={{
+                            position: 'relative',
+                            overflow: 'hidden',
+                            borderRadius: '16px',
+                            background: stat.bgGradient,
+                            border: `1px solid ${stat.borderColor}`,
+                            boxShadow: '0 2px 12px rgba(15, 23, 42, 0.04)',
+                            transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                            height: '100%',
+                            '&:hover': {
+                                transform: 'translateY(-3px)',
+                                boxShadow: '0 10px 24px rgba(15, 23, 42, 0.08)',
+                                borderColor: stat.hoverBorder
+                            }
+                        }}
+                    >
+                        {/* Corner Category Badge (Pinned to top-right corner) */}
+                        <Chip
+                            label={stat.badge}
+                            size="small"
+                            sx={{
+                                position: 'absolute',
+                                top: 12,
+                                right: 12,
+                                bgcolor: stat.badgeBg,
+                                color: stat.badgeColor,
+                                fontWeight: 600,
+                                fontSize: '0.72rem',
+                                height: '22px',
+                                borderRadius: '6px',
+                                zIndex: 1
+                            }}
+                        />
 
-                <Card sx={{ bgcolor: '#ffffff', borderRadius: 2.5, boxShadow: '0 2px 10px rgba(0,0,0,0.04)', border: '1px solid #e2e8f0' }}>
-                    <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <Box>
-                                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, textTransform: 'uppercase' }}>
-                                    Accommodation (Yes)
-                                </Typography>
-                                <Typography variant="h5" sx={{ fontWeight: 700, color: '#059669', mt: 0.5 }}>
-                                    {stats.requestedAcc}
-                                </Typography>
-                            </Box>
-                            <HotelIcon sx={{ color: '#059669', fontSize: 32, opacity: 0.8 }} />
+                        {/* Subtle decorative watermark icon in bottom-right corner */}
+                        <Box sx={{
+                            position: 'absolute',
+                            right: -8,
+                            bottom: -8,
+                            opacity: 0.04,
+                            pointerEvents: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}>
+                            {stat.bgIcon}
                         </Box>
-                    </CardContent>
-                </Card>
 
-                <Card sx={{ bgcolor: '#ffffff', borderRadius: 2.5, boxShadow: '0 2px 10px rgba(0,0,0,0.04)', border: '1px solid #e2e8f0' }}>
-                    <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <Box>
-                                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, textTransform: 'uppercase' }}>
-                                    Rooms Mapped
-                                </Typography>
-                                <Typography variant="h5" sx={{ fontWeight: 700, color: '#2563eb', mt: 0.5 }}>
-                                    {stats.mappedCount}
-                                </Typography>
-                            </Box>
-                            <HowToRegIcon sx={{ color: '#2563eb', fontSize: 32, opacity: 0.8 }} />
-                        </Box>
-                    </CardContent>
-                </Card>
+                        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5, mb: 1.5 }}>
+                                {/* Icon badge */}
+                                <Box sx={{
+                                    width: 52,
+                                    height: 52,
+                                    borderRadius: '12px',
+                                    background: stat.gradient,
+                                    boxShadow: `0 4px 12px ${stat.shadow}`,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexShrink: 0,
+                                    transition: 'transform 0.2s',
+                                    '&:hover': { transform: 'scale(1.05)' }
+                                }}>
+                                    {stat.icon}
+                                </Box>
 
-                <Card sx={{ bgcolor: '#ffffff', borderRadius: 2.5, boxShadow: '0 2px 10px rgba(0,0,0,0.04)', border: '1px solid #e2e8f0' }}>
-                    <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <Box>
-                                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, textTransform: 'uppercase' }}>
-                                    Pending Allocation
-                                </Typography>
-                                <Typography variant="h5" sx={{ fontWeight: 700, color: '#d97706', mt: 0.5 }}>
-                                    {stats.pendingCount}
-                                </Typography>
+                                <Box>
+                                    <Typography
+                                        variant="caption"
+                                        sx={{
+                                            color: '#64748b',
+                                            fontWeight: 600,
+                                            fontSize: '0.75rem',
+                                            letterSpacing: '0.5px',
+                                            textTransform: 'uppercase',
+                                            display: 'block',
+                                            mb: 0.5
+                                        }}
+                                    >
+                                        {stat.title}
+                                    </Typography>
+                                    <Typography
+                                        sx={{
+                                            fontWeight: 800,
+                                            color: '#0f172a',
+                                            fontSize: { xs: '2rem', md: '2.2rem' },
+                                            lineHeight: 1
+                                        }}
+                                    >
+                                        {stat.count}
+                                    </Typography>
+                                </Box>
                             </Box>
-                            <MeetingRoomIcon sx={{ color: '#d97706', fontSize: 32, opacity: 0.8 }} />
-                        </Box>
-                    </CardContent>
-                </Card>
+                            
+                            {/* Subtitle */}
+                            <Typography
+                                variant="caption"
+                                sx={{
+                                    color: '#94a3b8',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 500,
+                                    display: 'block'
+                                }}
+                            >
+                                {stat.subtitle}
+                            </Typography>
+                        </CardContent>
+                    </Card>
+                ))}
             </Box>
 
             {/* Custom Tabs */}
@@ -847,9 +960,9 @@ const HostelProvision = () => {
                                         </InputAdornment>
                                     }
                                 >
-                                    {BUILDINGS.map(bldg => (
-                                        <MenuItem key={bldg} value={bldg}>
-                                            {bldg}
+                                    {dbBlocks.map(bldg => (
+                                        <MenuItem key={bldg.name} value={bldg.name}>
+                                            {bldg.name}
                                         </MenuItem>
                                     ))}
                                 </Select>
@@ -872,7 +985,7 @@ const HostelProvision = () => {
                                         </InputAdornment>
                                     }
                                 >
-                                    {FLOORS.map(fl => (
+                                    {availableFloors.map(fl => (
                                         <MenuItem key={fl} value={fl}>
                                             {fl}
                                         </MenuItem>
@@ -882,11 +995,11 @@ const HostelProvision = () => {
 
                             {/* Room Selector (Filtered by max 4 members capacity) */}
                             <FormControl fullWidth size="small">
-                                <InputLabel id="room-select-label">Room Number (Max 4 Members / Room)</InputLabel>
+                                <InputLabel id="room-select-label">Room Number</InputLabel>
                                 <Select
                                     labelId="room-select-label"
                                     value={selectedRoom}
-                                    label="Room Number (Max 4 Members / Room)"
+                                    label="Room Number"
                                     onChange={(e) => setSelectedRoom(e.target.value)}
                                     startAdornment={
                                         <InputAdornment position="start">
@@ -901,7 +1014,7 @@ const HostelProvision = () => {
                                                     {item.roomNumber}
                                                 </Typography>
                                                 <Chip
-                                                    label={`${item.occupancy}/${MAX_ROOM_CAPACITY} Occupied (${item.availableSlots} beds left)`}
+                                                    label={`${item.occupancy}/${item.capacity} Occupied (${item.availableSlots} beds left)`}
                                                     size="small"
                                                     sx={{
                                                         fontSize: '0.75rem',
@@ -918,7 +1031,7 @@ const HostelProvision = () => {
                             {/* Notice if all rooms on this floor are full */}
                             {availableRooms.length === 0 && (
                                 <Alert severity="error" sx={{ borderRadius: 2 }}>
-                                    All 5 rooms on <b>{selectedFloor}</b> of <b>{selectedBuilding}</b> are currently at maximum capacity (4/4 members each). Please select another floor or building block.
+                                    All rooms on <b>{selectedFloor}</b> of <b>{selectedBuilding}</b> are currently at maximum capacity. Please select another floor or building block.
                                 </Alert>
                             )}
 
