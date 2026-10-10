@@ -1,5 +1,6 @@
 import QRCode from 'qrcode';
 import { ORGANIZATION_NAME, EVENT_NAME, PAPER_WIDTH } from '../../../config/foodTokenConfig';
+import { formatDateDDMMYYYY } from '../../../utils/dateUtils';
 
 /**
  * Generate HTML markup for a single 80mm thermal food token receipt
@@ -19,7 +20,7 @@ const generateTokenHTML = (token, qrDataUrl) => {
             <div class="meal-section">
                 <div class="meal-badge">FOOD TOKEN</div>
                 <div class="meal-type">${(token.mealType || '').toUpperCase()}</div>
-                <div class="meal-date">${token.mealDate || ''}</div>
+                <div class="meal-date">${formatDateDDMMYYYY(token.mealDate)}</div>
             </div>
 
             <div class="details-section">

@@ -1,16 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Link, Typography, TextField, Dialog, IconButton } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../../utils/api';
+import { saveAuthSession } from '../../utils/auth';
 
 
-const Authentication = ({ open, onClose }) => {
+const Authentication = ({ open, onClose, initialUsername = '', initialPassword = '' }) => {
     const navigate = useNavigate();
     const [credentials, setCredentials] = useState({
-        username: '',
-        password: ''
+        username: initialUsername || '',
+        password: initialPassword || ''
     });
+
+    useEffect(() => {
+        if (open) {
+            setCredentials({
+                username: initialUsername || '',
+                password: initialPassword || ''
+            });
+            setError('');
+        }
+    }, [open, initialUsername, initialPassword]);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -93,11 +104,10 @@ const Authentication = ({ open, onClose }) => {
             const data = await response.json();
 
             if (response.ok) {
-                // Save user data + JWT token together
-                localStorage.setItem('user', JSON.stringify({ ...data.user, token: data.token }));
-                window.dispatchEvent(new Event('authChange'));
+                // Save user data + JWT token with inactivity tracking
+                saveAuthSession({ ...data.user, token: data.token });
                 if (onClose) onClose();
-                if (data.user.role === 'player') {
+                if (data.user.role === 'player' || data.user.role === 'coach') {
                     navigate('/user/dashboard');
                 } else {
                     navigate('/admin/dashboard');

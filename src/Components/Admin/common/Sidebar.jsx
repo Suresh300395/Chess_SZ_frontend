@@ -2,30 +2,47 @@ import React from 'react';
 import { Box, Typography } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getMenusByRole } from './RolesNav';
+import { getCurrentUser } from '../../../utils/auth';
 
-const Sidebar = () => {
+const Sidebar = ({ onNavigate }) => {
     const navigate = useNavigate();
     const location = useLocation();
 
-    const userString = localStorage.getItem('user');
-    const user = userString ? JSON.parse(userString) : { role: 'superadmin' };
+    const user = getCurrentUser() || { role: 'admin' };
     const menus = getMenusByRole(user.role);
 
+    const handleItemClick = (path) => {
+        navigate(path);
+        if (onNavigate) {
+            onNavigate();
+        }
+    };
+
     return (
-        <Box sx={{ width: '270px', backgroundColor: '#ffffff', color: '#0b5299', px: 2, py: 3, display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{
+            width: '270px',
+            height: '100%',
+            overflowY: 'auto',
+            backgroundColor: '#ffffff',
+            color: '#0b5299',
+            px: 2,
+            py: 3,
+            display: 'flex',
+            flexDirection: 'column'
+        }}>
             <Box
                 component="img"
                 src="/ADITYA LOGO2.png"
                 alt="Aditya University Logo"
                 sx={{ width: '80%', margin: '0 auto', display: 'block', mb: 2, mt: 0 }}
             />
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, pb: 4 }}>
                 {menus.map((menu, index) => {
                     const isActive = location.pathname === menu.path;
                     return (
                         <Box 
                             key={index} 
-                            onClick={() => navigate(menu.path)}
+                            onClick={() => handleItemClick(menu.path)}
                             sx={{ 
                                 display: 'flex',
                                 alignItems: 'center',

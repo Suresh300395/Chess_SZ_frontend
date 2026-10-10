@@ -42,10 +42,14 @@ import LayersIcon from '@mui/icons-material/Layers';
 import InfoIcon from '@mui/icons-material/Info';
 import GroupsIcon from '@mui/icons-material/Groups';
 import HowToRegIcon from '@mui/icons-material/HowToReg';
+import AssignmentIcon from '@mui/icons-material/Assignment';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutlineOutlined';
+import SaveIcon from '@mui/icons-material/Save';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import io from 'socket.io-client';
 import { toast } from 'sonner';
 import CustomTabs from '../Common/Tabs';
-import { registrationAPI, SOCKET_URL } from '../../utils/api';
+import { registrationAPI, blocksAPI, SOCKET_URL } from '../../utils/api';
 
 
 const MAX_ROOM_CAPACITY = 4;
@@ -72,6 +76,87 @@ const HostelProvision = () => {
     const [unassignDialogOpen, setUnassignDialogOpen] = useState(false);
     const [personToUnassign, setPersonToUnassign] = useState(null);
     const [unassigning, setUnassigning] = useState(false);
+
+    // Guidelines management state
+    const [guidelines, setGuidelines] = useState([]);
+    const [guidelinesLoading, setGuidelinesLoading] = useState(true);
+    const [guidelinesSaving, setGuidelinesSaving] = useState(false);
+    const [newPoint, setNewPoint] = useState('');
+    const [editingIndex, setEditingIndex] = useState(null);
+    const [editingText, setEditingText] = useState('');
+
+    const fetchGuidelines = async () => {
+        try {
+            setGuidelinesLoading(true);
+            const res = await blocksAPI.getGuidelines();
+            if (res.ok) {
+                const data = await res.json();
+                setGuidelines(data.points || []);
+            }
+        } catch (err) {
+            console.error('Failed to load guidelines:', err);
+        } finally {
+            setGuidelinesLoading(false);
+        }
+    };
+
+    const handleAddGuideline = () => {
+        const trimmed = newPoint.trim();
+        if (!trimmed) return;
+        setGuidelines(prev => [...prev, trimmed]);
+        setNewPoint('');
+    };
+
+    const handleDeleteGuideline = (index) => {
+        setGuidelines(prev => prev.filter((_, i) => i !== index));
+        if (editingIndex === index) {
+            setEditingIndex(null);
+            setEditingText('');
+        }
+    };
+
+    const handleStartEdit = (index, text) => {
+        setEditingIndex(index);
+        setEditingText(text);
+    };
+
+    const handleSaveEdit = (index) => {
+        const trimmed = editingText.trim();
+        if (!trimmed) return;
+        setGuidelines(prev => prev.map((pt, i) => i === index ? trimmed : pt));
+        setEditingIndex(null);
+        setEditingText('');
+    };
+
+    const handleSaveGuidelines = async () => {
+        try {
+            setGuidelinesSaving(true);
+            const res = await blocksAPI.updateGuidelines(guidelines);
+            if (res.ok) {
+                toast.success('Accommodation guidelines saved successfully!');
+            } else {
+                toast.error('Failed to save guidelines');
+            }
+        } catch (err) {
+            console.error(err);
+            toast.error('Error saving guidelines');
+        } finally {
+            setGuidelinesSaving(false);
+        }
+    };
+
+    const handleResetGuidelines = () => {
+        const DEFAULT_GUIDELINES = [
+            'Keep the room clean and maintain discipline.',
+            'Any damage to property will be charged.',
+            'Visitors are not allowed inside the hostel rooms.',
+            'Follow hostel timings strictly.',
+            'Report maintenance issues to the warden office.',
+            'Ragging is strictly prohibited.'
+        ];
+        setGuidelines(DEFAULT_GUIDELINES);
+        toast.info('Reset to default guidelines. Click "Save Guidelines" to persist.');
+    };
 
     // Fetch all registrations (fetching both accommodation Yes & No)
     const fetchRegistrations = async () => {
@@ -127,7 +212,7 @@ const HostelProvision = () => {
             }
         } catch (err) {
             console.error('Error fetching registrations:', err);
-            toast.error('Error connecting to server');
+            toast.error('Error connecting to server', { id: 'error-connecting-to-server' });
         } finally {
             setLoading(false);
         }
@@ -135,10 +220,16 @@ const HostelProvision = () => {
 
     useEffect(() => {
         fetchRegistrations();
+        fetchGuidelines();
 
         const socket = io(SOCKET_URL);
         socket.on('dataUpdated', () => {
             fetchRegistrations();
+        });
+        socket.on('accommodation_guidelines_updated', (data) => {
+            if (data && data.points) {
+                setGuidelines(data.points);
+            }
         });
 
         return () => {
@@ -333,19 +424,22 @@ const HostelProvision = () => {
     };
 
     return (
-        <Box sx={{ p: { xs: 1.5, md: 3 }, maxWidth: 1400, mx: 'auto' }}>
+        <Box sx={{ width: '100%' }}>
             {/* Page Header */}
             <Box sx={{ mb: 3 }}>
-                <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', mb: 0.5, fontSize: { xs: '1.25rem', md: '1.75rem' } }}>
-                    Accommodation Allocation
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
+                    <HotelIcon sx={{ color: '#0b5299', fontSize: { xs: 28, md: 34 } }} />
+                    <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', fontSize: { xs: '1.25rem', md: '1.75rem' } }}>
+                        Accommodation Allocation
+                    </Typography>
+                </Box>
                 <Typography sx={{ color: 'text.secondary', fontSize: '0.95rem' }}>
                     Search participants by name or university to assign hostel rooms, manage capacities, and review allocations.
                 </Typography>
             </Box>
 
             {/* Quick Stats Banner */}
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' }, gap: 2, mb: 3 }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 2, mb: 3, width: '100%' }}>
                 {[
                     {
                         title: `Total ${activeTab}`,
@@ -458,7 +552,7 @@ const HostelProvision = () => {
                             {stat.bgIcon}
                         </Box>
 
-                        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                        <CardContent sx={{ py: 2, pr: 2, pl: 1.25, '&:last-child': { pb: 2 } }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5, mb: 1.5 }}>
                                 {/* Icon badge */}
                                 <Box sx={{
@@ -550,24 +644,26 @@ const HostelProvision = () => {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder={`Type ${activeTab === 'Players' ? 'Player' : 'Coach'} name or University to search details...`}
                     variant="outlined"
-                    InputProps={{
-                        startAdornment: (
-                            <InputAdornment position="start">
-                                <SearchIcon sx={{ color: '#0b5299' }} />
-                            </InputAdornment>
-                        ),
-                        endAdornment: searchQuery ? (
-                            <InputAdornment position="end">
-                                <IconButton size="small" onClick={() => setSearchQuery('')} edge="end">
-                                    <ClearIcon fontSize="small" />
-                                </IconButton>
-                            </InputAdornment>
-                        ) : null,
-                        sx: {
-                            borderRadius: '10px',
-                            bgcolor: '#ffffff',
-                            '&:hover': { borderColor: '#0b5299' },
-                            '&.Mui-focused': { borderColor: '#0b5299' }
+                    slotProps={{
+                        input: {
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <SearchIcon sx={{ color: '#0b5299' }} />
+                                </InputAdornment>
+                            ),
+                            endAdornment: searchQuery ? (
+                                <InputAdornment position="end">
+                                    <IconButton size="small" onClick={() => setSearchQuery('')} edge="end">
+                                        <ClearIcon fontSize="small" />
+                                    </IconButton>
+                                </InputAdornment>
+                            ) : null,
+                            sx: {
+                                borderRadius: '10px',
+                                bgcolor: '#ffffff',
+                                '&:hover': { borderColor: '#0b5299' },
+                                '&.Mui-focused': { borderColor: '#0b5299' }
+                            }
                         }
                     }}
                 />
@@ -608,7 +704,7 @@ const HostelProvision = () => {
                             )}
                         </Box>
 
-                        <TableContainer component={Paper} sx={{ borderRadius: 2, border: '1px solid #e2e8f0', boxShadow: 'none' }}>
+                        <TableContainer component={Paper} sx={{ borderRadius: 2, border: '1px solid #e2e8f0', boxShadow: 'none', overflowX: 'auto', width: '100%' }}>
                             <Table sx={{ minWidth: 700 }} size="medium">
                                 <TableHead sx={{ bgcolor: '#f1f5f9' }}>
                                     <TableRow>
@@ -752,7 +848,7 @@ const HostelProvision = () => {
                     </Typography>
                 </Box>
 
-                <TableContainer component={Paper} sx={{ boxShadow: '0 4px 16px rgba(0,0,0,0.05)', borderRadius: 2.5, border: '1px solid #e2e8f0' }}>
+                <TableContainer component={Paper} sx={{ boxShadow: '0 4px 16px rgba(0,0,0,0.05)', borderRadius: 2.5, border: '1px solid #e2e8f0', overflowX: 'auto', width: '100%' }}>
                     <Table sx={{ minWidth: 700 }} aria-label="mapped accommodations table">
                         <TableHead sx={{ bgcolor: '#f8fafc' }}>
                             <TableRow>
@@ -877,6 +973,258 @@ const HostelProvision = () => {
                     </Table>
                 </TableContainer>
             </Box>
+
+            {/* Accommodation Guidelines Management Section (Below Currently Mapped Participants Table) */}
+            <Paper
+                elevation={0}
+                sx={{
+                    mt: 4,
+                    p: { xs: 2, sm: 3 },
+                    borderRadius: 2.5,
+                    border: '1px solid #e2e8f0',
+                    bgcolor: '#ffffff',
+                    boxShadow: '0 4px 16px rgba(0,0,0,0.04)'
+                }}
+            >
+                {/* Header */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2.5, flexWrap: 'wrap', gap: 1.5 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                        <Box sx={{ bgcolor: '#eff6ff', p: 1, borderRadius: 2, color: '#0b5299', display: 'flex', alignItems: 'center' }}>
+                            <AssignmentIcon sx={{ fontSize: 24 }} />
+                        </Box>
+                        <Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Typography variant="h6" sx={{ color: '#1e293b', fontWeight: 700, fontSize: { xs: '1.05rem', md: '1.2rem' } }}>
+                                    Accommodation Guidelines
+                                </Typography>
+                                <Chip
+                                    label={`${guidelines.length} Points`}
+                                    size="small"
+                                    sx={{ bgcolor: '#ecfdf5', color: '#047857', fontWeight: 600, border: '1px solid #a7f3d0' }}
+                                />
+                            </Box>
+                            <Typography variant="body2" sx={{ color: '#64748b', fontSize: { xs: '12px', sm: '13px' }, mt: 0.25 }}>
+                                Add or edit guidelines bullet points. These appear dynamically in the User Dashboard under Accommodation Details.
+                            </Typography>
+                        </Box>
+                    </Box>
+
+                    <Stack direction="row" spacing={1} sx={{ width: { xs: '100%', sm: 'auto' }, justifyContent: { xs: 'flex-start', sm: 'flex-end' } }}>
+                        <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={handleResetGuidelines}
+                            startIcon={<RestartAltIcon />}
+                            sx={{
+                                textTransform: 'none',
+                                borderRadius: 2,
+                                fontWeight: 600,
+                                color: '#64748b',
+                                borderColor: '#cbd5e1',
+                                fontSize: '12.5px'
+                            }}
+                        >
+                            Reset Defaults
+                        </Button>
+                        <Button
+                            variant="contained"
+                            size="small"
+                            onClick={handleSaveGuidelines}
+                            disabled={guidelinesSaving}
+                            startIcon={guidelinesSaving ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
+                            sx={{
+                                bgcolor: '#0b5299',
+                                textTransform: 'none',
+                                borderRadius: 2,
+                                fontWeight: 600,
+                                fontSize: '12.5px',
+                                px: 2.5,
+                                boxShadow: '0 2px 8px rgba(11, 82, 153, 0.25)',
+                                '&:hover': { bgcolor: '#09407a' }
+                            }}
+                        >
+                            {guidelinesSaving ? 'Saving...' : 'Save Guidelines'}
+                        </Button>
+                    </Stack>
+                </Box>
+
+                {/* Add New Guideline Input */}
+                <Box sx={{ display: 'flex', gap: 1.5, mb: 3, flexDirection: { xs: 'column', sm: 'row' } }}>
+                    <TextField
+                        fullWidth
+                        size="small"
+                        placeholder="Type a new accommodation guideline bullet point and press Enter or click 'Add Point'..."
+                        value={newPoint}
+                        onChange={(e) => setNewPoint(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleAddGuideline();
+                            }
+                        }}
+                        sx={{
+                            bgcolor: '#f8fafc',
+                            '& .MuiOutlinedInput-root': {
+                                borderRadius: 2,
+                                fontSize: '13.5px'
+                            }
+                        }}
+                    />
+                    <Button
+                        variant="contained"
+                        onClick={handleAddGuideline}
+                        disabled={!newPoint.trim()}
+                        startIcon={<AddCircleOutlineIcon />}
+                        sx={{
+                            bgcolor: '#0b5299',
+                            textTransform: 'none',
+                            fontWeight: 600,
+                            borderRadius: 2,
+                            px: 2.5,
+                            whiteSpace: 'nowrap',
+                            height: 40,
+                            flexShrink: 0,
+                            fontSize: '13px'
+                        }}
+                    >
+                        Add Point
+                    </Button>
+                </Box>
+
+                {/* Guidelines List */}
+                {guidelinesLoading ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                        <CircularProgress size={28} sx={{ color: '#0b5299' }} />
+                    </Box>
+                ) : guidelines.length === 0 ? (
+                    <Box sx={{ p: 3, textAlign: 'center', bgcolor: '#f8fafc', borderRadius: 2, border: '1px dashed #cbd5e1' }}>
+                        <Typography variant="body2" sx={{ color: '#64748b' }}>
+                            No guidelines entered yet. Add bullet points above or click "Reset Defaults".
+                        </Typography>
+                    </Box>
+                ) : (
+                    <Stack spacing={1.25}>
+                        {guidelines.map((point, index) => {
+                            const isEditing = editingIndex === index;
+                            return (
+                                <Box
+                                    key={index}
+                                    sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        p: { xs: 1.25, sm: 1.5 },
+                                        bgcolor: isEditing ? '#eff6ff' : '#f8fafc',
+                                        borderRadius: 2,
+                                        border: isEditing ? '1.5px solid #3b82f6' : '1px solid #e2e8f0',
+                                        gap: 1.5,
+                                        transition: 'all 0.15s ease'
+                                    }}
+                                >
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flex: 1, minWidth: 0 }}>
+                                        <Box
+                                            sx={{
+                                                width: 26,
+                                                height: 26,
+                                                borderRadius: '50%',
+                                                bgcolor: '#e0f2fe',
+                                                color: '#0369a1',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontWeight: 700,
+                                                fontSize: '12px',
+                                                flexShrink: 0
+                                            }}
+                                        >
+                                            {index + 1}
+                                        </Box>
+
+                                        {isEditing ? (
+                                            <TextField
+                                                fullWidth
+                                                size="small"
+                                                value={editingText}
+                                                onChange={(e) => setEditingText(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        e.preventDefault();
+                                                        handleSaveEdit(index);
+                                                    } else if (e.key === 'Escape') {
+                                                        setEditingIndex(null);
+                                                    }
+                                                }}
+                                                autoFocus
+                                                sx={{
+                                                    bgcolor: '#ffffff',
+                                                    '& .MuiOutlinedInput-root': {
+                                                        borderRadius: 1.5,
+                                                        fontSize: '13px'
+                                                    }
+                                                }}
+                                            />
+                                        ) : (
+                                            <Typography
+                                                sx={{
+                                                    fontSize: { xs: '12.5px', sm: '13.5px' },
+                                                    color: '#334155',
+                                                    fontWeight: 500,
+                                                    wordBreak: 'break-word',
+                                                    flex: 1
+                                                }}
+                                            >
+                                                {point}
+                                            </Typography>
+                                        )}
+                                    </Box>
+
+                                    <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0 }}>
+                                        {isEditing ? (
+                                            <>
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={() => handleSaveEdit(index)}
+                                                    sx={{ color: '#16a34a', bgcolor: '#dcfce7', '&:hover': { bgcolor: '#bbf7d0' } }}
+                                                >
+                                                    <CheckCircleIcon fontSize="small" />
+                                                </IconButton>
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={() => setEditingIndex(null)}
+                                                    sx={{ color: '#64748b', bgcolor: '#f1f5f9' }}
+                                                >
+                                                    <ClearIcon fontSize="small" />
+                                                </IconButton>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Tooltip title="Edit Point">
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => handleStartEdit(index, point)}
+                                                        sx={{ color: '#2563eb', bgcolor: '#eff6ff', '&:hover': { bgcolor: '#dbeafe' } }}
+                                                    >
+                                                        <EditIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                                <Tooltip title="Delete Point">
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => handleDeleteGuideline(index)}
+                                                        sx={{ color: '#dc2626', bgcolor: '#fef2f2', '&:hover': { bgcolor: '#fee2e2' } }}
+                                                    >
+                                                        <DeleteIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            </>
+                                        )}
+                                    </Stack>
+                                </Box>
+                            );
+                        })}
+                    </Stack>
+                )}
+            </Paper>
 
             {/* Modal: Map a Room Form */}
             <Dialog

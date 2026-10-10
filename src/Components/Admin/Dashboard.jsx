@@ -3,8 +3,10 @@ import { Box, Typography, Card, CardContent, Paper, Table, TableBody, TableCell,
 import GroupsIcon from '@mui/icons-material/Groups';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import FormatListNumberedIcon from '@mui/icons-material/FormatListNumbered';
+import DashboardIcon from '@mui/icons-material/Dashboard';
 import io from 'socket.io-client';
 import { registrationAPI, SOCKET_URL } from '../../utils/api';
+import { formatDateDDMMYYYY } from '../../utils/dateUtils';
 
 
 const Dashboard = () => {
@@ -121,15 +123,18 @@ const Dashboard = () => {
     ];
 
     return (
-        <Box sx={{ p: 1, width: '100%' }}>
-            <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', mb: 1, fontSize: { xs: '1rem', md: '2rem' } }}>
-                Welcome to Admin Dashboard
-            </Typography>
+        <Box sx={{ width: '100%' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                <DashboardIcon sx={{ color: '#0b5299', fontSize: { xs: 28, md: 34 } }} />
+                <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', fontSize: { xs: '1.25rem', md: '2rem' } }}>
+                    Welcome to Admin Dashboard
+                </Typography>
+            </Box>
             <Typography sx={{ color: 'text.secondary', mb: 4 }}>
                 Select an option from the sidebar to view details, manage registrations and organize the tournament.
             </Typography>
 
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 3, width: '100%', mb: 4 }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: { xs: 2, sm: 2.5, md: 3 }, width: '100%', mb: 4 }}>
                 {stats.map((stat, index) => (
                     <Card
                         key={index}
@@ -181,7 +186,7 @@ const Dashboard = () => {
                             {stat.bgIcon}
                         </Box>
 
-                        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                        <CardContent sx={{ py: 2, pr: 2, pl: 1.25, '&:last-child': { pb: 2 } }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5, mb: 1.5 }}>
                                 {/* Icon badge */}
                                 <Box sx={{
@@ -252,7 +257,7 @@ const Dashboard = () => {
                 Registered Teams Overview
             </Typography>
 
-            <TableContainer component={Paper} sx={{ boxShadow: '0 4px 12px rgba(0,0,0,0.05)', borderRadius: 2 }}>
+            <TableContainer component={Paper} sx={{ boxShadow: '0 4px 12px rgba(0,0,0,0.05)', borderRadius: 2, overflowX: 'auto', width: '100%' }}>
                 <Table sx={{ minWidth: 650 }} aria-label="registered teams table">
                     <TableHead sx={{ bgcolor: '#f1f5f9' }}>
                         <TableRow>
@@ -282,7 +287,7 @@ const Dashboard = () => {
                                         <TableCell>{reg.universityContact}</TableCell>
                                         <TableCell>{reg.players?.length || 0}</TableCell>
                                         <TableCell>{reg.coaches?.length || 0}</TableCell>
-                                        <TableCell>{new Date(reg.createdAt).toLocaleDateString('en-GB')}</TableCell>
+                                        <TableCell>{formatDateDDMMYYYY(reg.createdAt)}</TableCell>
                                         <TableCell>
                                             <Button variant="outlined" size="small" sx={{ borderColor: '#0b5299', color: '#0b5299' }} onClick={() => handleOpenDialog(reg)}>
                                                 View
@@ -341,10 +346,10 @@ const Dashboard = () => {
                                                     <TableCell>{player.playerName}</TableCell>
                                                     <TableCell>{player.mobileNo}</TableCell>
                                                     <TableCell>{player.gender}</TableCell>
-                                                    <TableCell>{player.dob}</TableCell>
+                                                    <TableCell>{formatDateDDMMYYYY(player.dob)}</TableCell>
                                                     <TableCell>{player.transportMode} {player.transportNumber ? `(${player.transportNumber})` : ''}</TableCell>
-                                                    <TableCell>{player.arrivalDate} <br /> <small>{player.arrivalTime}</small></TableCell>
-                                                    <TableCell>{player.departureDate} <br /> <small>{player.departureTime}</small></TableCell>
+                                                    <TableCell>{formatDateDDMMYYYY(player.arrivalDate)} <br /> <small>{player.arrivalTime}</small></TableCell>
+                                                    <TableCell>{formatDateDDMMYYYY(player.departureDate)} <br /> <small>{player.departureTime}</small></TableCell>
                                                     <TableCell>{player.accommodation}</TableCell>
                                                 </TableRow>
                                             ))}

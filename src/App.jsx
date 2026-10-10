@@ -14,9 +14,12 @@ import FoodTokens from './Components/Admin/FoodTokens'
 import CautionDeposite from './Components/Admin/CautionDeposite'
 import ManageAdmin from './Components/Admin/ManageAdmin'
 import ManageBlocks from './Components/Admin/ManageBlocks'
+import ManageLiveBoard from './Components/Admin/ManageLiveBoard'
+import RouteMapUpload from './Components/Admin/RouteMapUpload'
 import UserDashboard from './Components/User/UserDashboard'
 import FrontendLayout from './Components/FrontendLayout'
 import ProtectedRoute from './Components/Common/ProtectedRoute'
+import InactivityTracker from './Components/Common/InactivityTracker'
 
 const theme = createTheme({
   typography: {
@@ -139,7 +142,8 @@ const theme = createTheme({
 function App() {
   return (
     <ThemeProvider theme={theme}>
-      <Toaster position="top-right" richColors />
+      <Toaster position="top-right" richColors closeButton />
+      <InactivityTracker />
       <Routes>
         {/* Frontend Layout for Public and User Pages */}
         <Route element={<FrontendLayout />}>
@@ -166,6 +170,8 @@ function App() {
           <Route path="/admin/caution-deposite" element={<CautionDeposite />} />
           <Route path="/admin/manage-admin" element={<ManageAdmin />} />
           <Route path="/admin/manage-blocks" element={<ManageBlocks />} />
+          <Route path="/admin/manage-live-board" element={<ManageLiveBoard />} />
+          <Route path="/admin/route-map-upload" element={<RouteMapUpload />} />
         </Route>
       </Routes>
     </ThemeProvider>

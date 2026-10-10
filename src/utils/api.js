@@ -1,13 +1,14 @@
+import { getCurrentUser, clearAuthSession, recordActivity } from './auth';
+
 // Centralized API base URL - change this for production
 export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3003/api';
 export const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3003';
 
-
-// Get auth token from localStorage
+// Get auth token from current active session
 const getToken = () => {
     try {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
-        return user.token || null;
+        const user = getCurrentUser();
+        return user?.token || null;
     } catch {
         return null;
     }
@@ -25,6 +26,10 @@ const buildHeaders = (auth = false) => {
 
 // Generic fetch wrapper with error handling
 const apiFetch = async (path, options = {}, auth = false) => {
+    if (auth) {
+        recordActivity();
+    }
+
     const res = await fetch(`${API_BASE}${path}`, {
         ...options,
         headers: {
@@ -35,9 +40,12 @@ const apiFetch = async (path, options = {}, auth = false) => {
 
     if (res.status === 401 || res.status === 403) {
         // Token expired or unauthorized — force logout
-        localStorage.removeItem('user');
-        window.dispatchEvent(new Event('authChange'));
+        clearAuthSession(true);
         throw new Error('Session expired. Please login again.');
+    }
+
+    if (auth && res.ok) {
+        recordActivity();
     }
 
     return res;
@@ -75,7 +83,13 @@ export const authAPI = {
         }),
 
     getDashboard: () => apiFetch('/auth/dashboard', {}, true),
+    updateProfilePhoto: (photo) =>
+        apiFetch('/auth/profile-photo', {
+            method: 'PUT',
+            body: JSON.stringify({ photo }),
+        }, true),
     getAccommodationDetails: () => apiFetch('/auth/accommodation-details', {}, true),
+    getFoodTokenDetails: () => apiFetch('/auth/food-token-details', {}, true),
 };
 
 // Registration APIs
@@ -101,6 +115,11 @@ export const committeeAPI = {
         apiFetch(`/committee/${id}`, {
             method: 'PUT',
             body: JSON.stringify(data),
+        }, true),
+    updateOrder: (id, order) =>
+        apiFetch(`/committee/${id}/order`, {
+            method: 'PUT',
+            body: JSON.stringify({ order }),
         }, true),
     delete: (id) =>
         apiFetch(`/committee/${id}`, { method: 'DELETE' }, true),
@@ -149,6 +168,40 @@ export const foodTokenAPI = {
     getStats: () => {
         return apiFetch('/food-tokens/stats', {}, true);
     },
+};
+
+// Route Map APIs
+export const routeMapAPI = {
+    get: () => apiFetch('/route-map'),
+    update: (data) =>
+        apiFetch('/route-map', {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        }, true),
+    deleteImage: () =>
+        apiFetch('/route-map', {
+            method: 'DELETE',
+        }, true),
+};
+
+// Live Board APIs
+export const liveBoardAPI = {
+    get: () => apiFetch('/live-board'),
+    update: (data) =>
+        apiFetch('/live-board', {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        }, true),
+};
+
+// Blocks & Hostel APIs
+export const blocksAPI = {
+    getAll: () => apiFetch('/blocks'),
+    create: (data) => apiFetch('/blocks', { method: 'POST', body: JSON.stringify(data) }, true),
+    update: (id, data) => apiFetch(`/blocks/${id}`, { method: 'PUT', body: JSON.stringify(data) }, true),
+    delete: (id) => apiFetch(`/blocks/${id}`, { method: 'DELETE' }, true),
+    getGuidelines: () => apiFetch('/blocks/guidelines'),
+    updateGuidelines: (points) => apiFetch('/blocks/guidelines', { method: 'PUT', body: JSON.stringify({ points }) }, true),
 };
 
 export default apiFetch;
