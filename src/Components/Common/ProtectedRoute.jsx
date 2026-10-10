@@ -1,4 +1,5 @@
 import { Navigate, useLocation } from 'react-router-dom';
+import { getCurrentUser } from '../../utils/auth';
 
 /**
  * ProtectedRoute - guards routes based on auth and role
@@ -7,16 +8,9 @@ import { Navigate, useLocation } from 'react-router-dom';
  */
 const ProtectedRoute = ({ children, allowedRoles }) => {
     const location = useLocation();
+    const user = getCurrentUser();
 
-    let user = null;
-    try {
-        const userStr = localStorage.getItem('user');
-        user = userStr ? JSON.parse(userStr) : null;
-    } catch {
-        user = null;
-    }
-
-    // Not logged in → redirect to home (login modal will open)
+    // Not logged in or expired session → redirect to home (login modal will open)
     if (!user || !user.token) {
         return <Navigate to="/" state={{ from: location, requireLogin: true }} replace />;
     }

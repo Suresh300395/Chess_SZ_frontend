@@ -1,12 +1,33 @@
 import React, { useState } from 'react';
-import { Box, TextField, MenuItem, FormControl, FormLabel, RadioGroup, FormControlLabel, Radio, Button, Typography, Paper } from '@mui/material';
+import {
+    Box, TextField, MenuItem, FormControl, FormLabel, RadioGroup,
+    FormControlLabel, Radio, Button, Typography, Paper, Dialog,
+    DialogContent, DialogActions, IconButton
+} from '@mui/material';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import Authentication from '../Admin/Authentication';
 import { registrationAPI } from '../../utils/api';
 
 
 const Registration = () => {
     const navigate = useNavigate();
+    const [submitting, setSubmitting] = useState(false);
+    const [copiedField, setCopiedField] = useState('');
+    const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+    const [successModal, setSuccessModal] = useState({
+        open: false,
+        universityName: '',
+        totalPlayers: 0,
+        totalCoaches: 0,
+        sampleCredentials: {
+            name: '',
+            mobile: '',
+            password: 'Aditya@123'
+        }
+    });
     const [teamDetails, setTeamDetails] = useState({
         universityName: '',
         address: '',
@@ -110,6 +131,14 @@ const Registration = () => {
             finalValue = digits.slice(0, 10);
             if (finalValue.length === 10) {
                 errorMsg = '';
+            }
+        } else if (name === 'dob' || name === 'arrivalDate' || name === 'departureDate') {
+            if (value) {
+                const parts = value.split('-');
+                if (parts[0] && parts[0].length > 4) {
+                    parts[0] = parts[0].slice(0, 4);
+                    finalValue = parts.join('-');
+                }
             }
         }
 
@@ -312,6 +341,9 @@ const Registration = () => {
             if (!player.dob) {
                 playerErrors.dob = 'DOB is required';
                 isValid = false;
+            } else if (player.dob.split('-')[0]?.length > 4 || Number(player.dob.split('-')[0]) > 9999) {
+                playerErrors.dob = 'Year cannot exceed 4 digits';
+                isValid = false;
             }
             if (!player.transportMode) {
                 playerErrors.transportMode = 'Transport mode is required';
@@ -324,6 +356,9 @@ const Registration = () => {
             if (!player.arrivalDate) {
                 playerErrors.arrivalDate = 'Arrival date is required';
                 isValid = false;
+            } else if (player.arrivalDate.split('-')[0]?.length > 4 || Number(player.arrivalDate.split('-')[0]) > 9999) {
+                playerErrors.arrivalDate = 'Year cannot exceed 4 digits';
+                isValid = false;
             }
             if (!player.arrivalTime) {
                 playerErrors.arrivalTime = 'Arrival time is required';
@@ -331,6 +366,9 @@ const Registration = () => {
             }
             if (!player.departureDate) {
                 playerErrors.departureDate = 'Departure date is required';
+                isValid = false;
+            } else if (player.departureDate.split('-')[0]?.length > 4 || Number(player.departureDate.split('-')[0]) > 9999) {
+                playerErrors.departureDate = 'Year cannot exceed 4 digits';
                 isValid = false;
             }
             if (!player.departureTime) {
@@ -440,6 +478,14 @@ const Registration = () => {
         return isValid;
     };
 
+    const handleCopy = (text, fieldName) => {
+        if (!text) return;
+        navigator.clipboard.writeText(text);
+        setCopiedField(fieldName);
+        toast.success(`Copied ${fieldName}!`);
+        setTimeout(() => setCopiedField(''), 2000);
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         
@@ -475,19 +521,33 @@ const Registration = () => {
             }))
         };
 
+        setSubmitting(true);
         try {
             const res = await registrationAPI.submit(payload);
+            const data = await res.json();
 
             if (res.ok) {
                 toast.success('Registration successful!');
-                navigate('/user/dashboard');
+                const sampleCreds = data.summary?.sampleCredentials || {
+                    name: players[0]?.playerName || coaches[0]?.name || '',
+                    mobile: players[0]?.mobileNo || coaches[0]?.mobileNo || '',
+                    password: 'Aditya@123'
+                };
+                setSuccessModal({
+                    open: true,
+                    universityName: teamDetails.universityName,
+                    totalPlayers: data.summary?.totalPlayers ?? players.length,
+                    totalCoaches: data.summary?.totalCoaches ?? coaches.length,
+                    sampleCredentials: sampleCreds
+                });
             } else {
-                const data = await res.json();
                 toast.error(data.message || data.error || 'Failed to submit registration');
             }
         } catch (error) {
             console.error('Submit error:', error);
             toast.error('Server error, please try again.');
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -542,7 +602,22 @@ const Registration = () => {
                                         </TextField>
                                     </Box>
                                     <Box sx={{ mt: 1 }}>
-                                        <TextField fullWidth label="DOB (as per SSC)*" name="dob" type="date" InputLabelProps={{ shrink: true }} slotProps={{ inputLabel: { shrink: true } }} placeholder=" " value={player.dob} onChange={(e) => handlePlayerChange(index, e)} error={!!errors.players[index]?.dob} helperText={errors.players[index]?.dob} />
+                                        <TextField
+                                            fullWidth
+                                            label="DOB (as per SSC)*"
+                                            name="dob"
+                                            type="date"
+                                            slotProps={{
+                                                inputLabel: { shrink: true },
+                                                htmlInput: { max: "9999-12-31", min: "1900-01-01" }
+                                            }}
+                                            inputProps={{ max: "9999-12-31", min: "1900-01-01" }}
+                                            placeholder=" "
+                                            value={player.dob}
+                                            onChange={(e) => handlePlayerChange(index, e)}
+                                            error={!!errors.players[index]?.dob}
+                                            helperText={errors.players[index]?.dob}
+                                        />
                                     </Box>
                                     <Box sx={{ mt: 1 }}>
                                         <TextField select fullWidth label="Mode of Transport*" name="transportMode" value={player.transportMode} onChange={(e) => handlePlayerChange(index, e)} error={!!errors.players[index]?.transportMode} helperText={errors.players[index]?.transportMode}>
@@ -561,16 +636,46 @@ const Registration = () => {
 
                                 <Box className="form-grid">
                                     <Box sx={{ mt: 1 }}>
-                                        <TextField fullWidth label="Date of Arrival*" name="arrivalDate" type="date" InputLabelProps={{ shrink: true }} slotProps={{ inputLabel: { shrink: true } }} placeholder=" " value={player.arrivalDate} onChange={(e) => handlePlayerChange(index, e)} error={!!errors.players[index]?.arrivalDate} helperText={errors.players[index]?.arrivalDate} />
+                                        <TextField
+                                            fullWidth
+                                            label="Date of Arrival*"
+                                            name="arrivalDate"
+                                            type="date"
+                                            slotProps={{
+                                                inputLabel: { shrink: true },
+                                                htmlInput: { max: "9999-12-31", min: "1900-01-01" }
+                                            }}
+                                            inputProps={{ max: "9999-12-31", min: "1900-01-01" }}
+                                            placeholder=" "
+                                            value={player.arrivalDate}
+                                            onChange={(e) => handlePlayerChange(index, e)}
+                                            error={!!errors.players[index]?.arrivalDate}
+                                            helperText={errors.players[index]?.arrivalDate}
+                                        />
                                     </Box>
                                     <Box sx={{ mt: 1 }}>
-                                        <TextField fullWidth label="Time of Arrival*" name="arrivalTime" type="time" InputLabelProps={{ shrink: true }} slotProps={{ inputLabel: { shrink: true } }} placeholder=" " value={player.arrivalTime} onChange={(e) => handlePlayerChange(index, e)} error={!!errors.players[index]?.arrivalTime} helperText={errors.players[index]?.arrivalTime} />
+                                        <TextField fullWidth label="Time of Arrival*" name="arrivalTime" type="time" slotProps={{ inputLabel: { shrink: true } }} placeholder=" " value={player.arrivalTime} onChange={(e) => handlePlayerChange(index, e)} error={!!errors.players[index]?.arrivalTime} helperText={errors.players[index]?.arrivalTime} />
                                     </Box>
                                     <Box sx={{ mt: 1 }}>
-                                        <TextField fullWidth label="Date of Departure*" name="departureDate" type="date" InputLabelProps={{ shrink: true }} slotProps={{ inputLabel: { shrink: true } }} placeholder=" " value={player.departureDate} onChange={(e) => handlePlayerChange(index, e)} error={!!errors.players[index]?.departureDate} helperText={errors.players[index]?.departureDate} />
+                                        <TextField
+                                            fullWidth
+                                            label="Date of Departure*"
+                                            name="departureDate"
+                                            type="date"
+                                            slotProps={{
+                                                inputLabel: { shrink: true },
+                                                htmlInput: { max: "9999-12-31", min: "1900-01-01" }
+                                            }}
+                                            inputProps={{ max: "9999-12-31", min: "1900-01-01" }}
+                                            placeholder=" "
+                                            value={player.departureDate}
+                                            onChange={(e) => handlePlayerChange(index, e)}
+                                            error={!!errors.players[index]?.departureDate}
+                                            helperText={errors.players[index]?.departureDate}
+                                        />
                                     </Box>
                                     <Box sx={{ mt: 1 }}>
-                                        <TextField fullWidth label="Time of Departure*" name="departureTime" type="time" InputLabelProps={{ shrink: true }} slotProps={{ inputLabel: { shrink: true } }} placeholder=" " value={player.departureTime} onChange={(e) => handlePlayerChange(index, e)} error={!!errors.players[index]?.departureTime} helperText={errors.players[index]?.departureTime} />
+                                        <TextField fullWidth label="Time of Departure*" name="departureTime" type="time" slotProps={{ inputLabel: { shrink: true } }} placeholder=" " value={player.departureTime} onChange={(e) => handlePlayerChange(index, e)} error={!!errors.players[index]?.departureTime} helperText={errors.players[index]?.departureTime} />
                                     </Box>
                                     <Box sx={{ mt: 1 }}>
                                         <FormControl component="fieldset">
@@ -665,11 +770,212 @@ const Registration = () => {
                         </Box>
                     </Box>
 
-                    <Box component="button" type="submit" className="btn-primary">
-                        Submit
+                    <Box
+                        component="button"
+                        type="submit"
+                        className="btn-primary"
+                        disabled={submitting}
+                        sx={{ opacity: submitting ? 0.7 : 1, cursor: submitting ? 'not-allowed' : 'pointer' }}
+                    >
+                        {submitting ? 'Submitting...' : 'Submit'}
                     </Box>
                 </Box>
             </Box>
+
+            {/* Registration Success Popup Modal */}
+            <Dialog
+                open={successModal.open}
+                onClose={() => {}}
+                maxWidth="sm"
+                fullWidth
+                slotProps={{
+                    paper: {
+                        sx: {
+                            borderRadius: 4,
+                            p: { xs: 1, sm: 2 },
+                            boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+                            textAlign: 'center',
+                            position: 'relative'
+                        }
+                    }
+                }}
+            >
+                <DialogContent sx={{ pt: 3, pb: 2 }}>
+                    {/* Success Icon */}
+                    <Box sx={{
+                        width: 72,
+                        height: 72,
+                        borderRadius: '50%',
+                        bgcolor: '#dcfce7',
+                        color: '#16a34a',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        mx: 'auto',
+                        mb: 2,
+                        boxShadow: '0 8px 24px rgba(22, 163, 74, 0.2)'
+                    }}>
+                        <CheckCircleIcon sx={{ fontSize: 44 }} />
+                    </Box>
+
+                    <Typography variant="h5" fontWeight="bold" sx={{ color: '#0f172a', mb: 0.5 }}>
+                        Registration Successful! 🎉
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#64748b', mb: 3 }}>
+                        <b>{successModal.universityName}</b> team has been registered successfully.
+                    </Typography>
+
+                    {/* Example Credentials Card */}
+                    <Box sx={{
+                        bgcolor: '#f8fafc',
+                        border: '1.5px solid #e2e8f0',
+                        borderRadius: 3,
+                        p: 2.5,
+                        mb: 2.5,
+                        textAlign: 'left'
+                    }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                            <Typography variant="subtitle2" fontWeight="700" sx={{ color: '#0b5299', textTransform: 'uppercase', letterSpacing: 0.8, fontSize: '12px' }}>
+                                Example Login Credentials
+                            </Typography>
+                            {successModal.sampleCredentials.name && (
+                                <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
+                                    ({successModal.sampleCredentials.name})
+                                </Typography>
+                            )}
+                        </Box>
+
+                        {/* Username / Mobile */}
+                        <Box sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            bgcolor: '#fff',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: 2,
+                            px: 2,
+                            py: 1,
+                            mb: 1.5
+                        }}>
+                            <Box>
+                                <Typography variant="caption" sx={{ color: '#64748b', display: 'block', fontSize: '11px', fontWeight: 500 }}>
+                                    Username (Mobile No)
+                                </Typography>
+                                <Typography variant="body1" fontWeight="700" sx={{ color: '#0f172a', letterSpacing: 0.5 }}>
+                                    {successModal.sampleCredentials.mobile || '—'}
+                                </Typography>
+                            </Box>
+                            <IconButton
+                                size="small"
+                                onClick={() => handleCopy(successModal.sampleCredentials.mobile, 'Username')}
+                                title="Copy Username"
+                                sx={{ color: copiedField === 'Username' ? '#16a34a' : '#64748b' }}
+                            >
+                                <ContentCopyIcon fontSize="small" />
+                            </IconButton>
+                        </Box>
+
+                        {/* Password */}
+                        <Box sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            bgcolor: '#fff',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: 2,
+                            px: 2,
+                            py: 1
+                        }}>
+                            <Box>
+                                <Typography variant="caption" sx={{ color: '#64748b', display: 'block', fontSize: '11px', fontWeight: 500 }}>
+                                    Default Password
+                                </Typography>
+                                <Typography variant="body1" fontWeight="700" sx={{ color: '#0b5299', letterSpacing: 0.5 }}>
+                                    {successModal.sampleCredentials.password}
+                                </Typography>
+                            </Box>
+                            <IconButton
+                                size="small"
+                                onClick={() => handleCopy(successModal.sampleCredentials.password, 'Password')}
+                                title="Copy Password"
+                                sx={{ color: copiedField === 'Password' ? '#16a34a' : '#64748b' }}
+                            >
+                                <ContentCopyIcon fontSize="small" />
+                            </IconButton>
+                        </Box>
+                    </Box>
+
+                    {/* Notice for all remaining members */}
+                    <Box sx={{
+                        bgcolor: '#eff6ff',
+                        border: '1px solid #bfdbfe',
+                        borderRadius: 2.5,
+                        p: 2,
+                        textAlign: 'left'
+                    }}>
+                        <Typography variant="body2" sx={{ color: '#1e3a8a', fontWeight: 700, mb: 0.8 }}>
+                            Accounts Created for All Members:
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#1e40af', lineHeight: 1.6, display: 'block', mb: 0.4 }}>
+                            • User accounts have been created for all <b>{successModal.totalPlayers} Players</b> and <b>{successModal.totalCoaches} Coaches/Managers</b>.
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#1e40af', lineHeight: 1.6, display: 'block' }}>
+                            • Every member can log in using their own <b>Registered Mobile Number</b> and default password <b>{successModal.sampleCredentials.password}</b>.
+                        </Typography>
+                    </Box>
+                </DialogContent>
+
+                <DialogActions sx={{ p: 2, pt: 1, px: 3, display: 'flex', justifyContent: 'space-between', gap: 1.5 }}>
+                    <Button
+                        variant="outlined"
+                        onClick={() => {
+                            setSuccessModal(prev => ({ ...prev, open: false }));
+                            navigate('/');
+                        }}
+                        sx={{
+                            borderRadius: 2.5,
+                            textTransform: 'none',
+                            fontWeight: 600,
+                            color: '#64748b',
+                            borderColor: '#cbd5e1',
+                            flex: 1,
+                            py: 1
+                        }}
+                    >
+                        Done (Go to Home)
+                    </Button>
+                    <Button
+                        variant="contained"
+                        onClick={() => {
+                            setSuccessModal(prev => ({ ...prev, open: false }));
+                            setIsLoginModalOpen(true);
+                        }}
+                        sx={{
+                            borderRadius: 2.5,
+                            textTransform: 'none',
+                            fontWeight: 700,
+                            bgcolor: '#0b5299',
+                            '&:hover': { bgcolor: '#083d73' },
+                            flex: 1,
+                            py: 1,
+                            boxShadow: '0 4px 14px rgba(11,82,153,0.3)'
+                        }}
+                    >
+                        Login Now
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Login Modal opened directly from success modal */}
+            <Authentication
+                open={isLoginModalOpen}
+                onClose={() => {
+                    setIsLoginModalOpen(false);
+                    navigate('/');
+                }}
+                initialUsername={successModal.sampleCredentials.mobile}
+                initialPassword={successModal.sampleCredentials.password}
+            />
         </Box>
     );
 };

@@ -4,6 +4,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
 import DownloadIcon from '@mui/icons-material/Download';
+import HotelIcon from '@mui/icons-material/Hotel';
 import { toast } from 'sonner';
 
 // Import centralized API base URL
@@ -262,20 +263,23 @@ const ManageBlocks = () => {
     };
 
     return (
-        <Box sx={{ p: 3, width: '100%' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', fontSize: '28px' }}>
-                    Manage Hostel Blocks
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 2 }}>
-                    <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleDownloadTemplate} sx={{ color: '#0b5299', borderColor: '#0b5299' }}>
+        <Box sx={{ width: '100%' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <HotelIcon sx={{ color: '#0b5299', fontSize: { xs: 28, md: 34 } }} />
+                    <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', fontSize: { xs: '1.25rem', md: '1.75rem' } }}>
+                        Manage Hostel Blocks
+                    </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', width: { xs: '100%', sm: 'auto' } }}>
+                    <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleDownloadTemplate} sx={{ color: '#0b5299', borderColor: '#0b5299', flex: { xs: '1 1 auto', sm: 'none' } }}>
                         Template
                     </Button>
-                    <Button variant="outlined" component="label" sx={{ color: '#0b5299', borderColor: '#0b5299' }}>
+                    <Button variant="outlined" component="label" sx={{ color: '#0b5299', borderColor: '#0b5299', flex: { xs: '1 1 auto', sm: 'none' } }}>
                         Upload CSV
                         <input type="file" hidden accept=".csv" onChange={handleFileUpload} />
                     </Button>
-                    <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setEditId(null); setOpen(true); }} sx={{ bgcolor: '#0b5299', '&:hover': { bgcolor: '#083d73' } }}>
+                    <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setEditId(null); setOpen(true); }} sx={{ bgcolor: '#0b5299', '&:hover': { bgcolor: '#083d73' }, flex: { xs: '1 1 auto', sm: 'none' } }}>
                         Add Block
                     </Button>
                 </Box>
@@ -286,8 +290,8 @@ const ManageBlocks = () => {
                     <CircularProgress />
                 </Box>
             ) : (
-                <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                    <Table>
+                <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', overflowX: 'auto', width: '100%' }}>
+                    <Table sx={{ minWidth: 650 }}>
                         <TableHead sx={{ bgcolor: '#f8fafc' }}>
                             <TableRow>
                                 <TableCell><b>Category</b></TableCell>
@@ -352,7 +356,7 @@ const ManageBlocks = () => {
                         </TextField>
                         <TextField label="Block Name (e.g. Boys Hostel Block A)" name="name" value={formData.name} onChange={handleChange} required fullWidth />
 
-                        <TextField label="Number of Floors" name="floorCount" type="number" value={formData.floorCount} onChange={handleChange} fullWidth InputProps={{ inputProps: { min: 1, max: 20 } }} />
+                        <TextField label="Number of Floors" name="floorCount" type="number" value={formData.floorCount} onChange={handleChange} fullWidth slotProps={{ htmlInput: { min: 1, max: 20 } }} />
 
                         {formData.floors.map((floor, index) => (
                             <Box key={index} component="fieldset" sx={{ mt: 1, p: 2, borderRadius: 2, border: '1px solid #cbd5e1', bgcolor: '#f8fafc', width: '100%', boxSizing: 'border-box', mx: 0, minWidth: 0 }}>

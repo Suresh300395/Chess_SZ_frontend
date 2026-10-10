@@ -6,6 +6,16 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import HomeIcon from '@mui/icons-material/Home';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import Authentication from '../Admin/Authentication';
+import { getCurrentUser, clearAuthSession } from '../../utils/auth';
+import { SOCKET_URL } from '../../utils/api';
+
+const resolvePhotoUrl = (photoPath) => {
+    if (!photoPath) return null;
+    if (photoPath.startsWith('http://') || photoPath.startsWith('https://') || photoPath.startsWith('data:')) {
+        return photoPath;
+    }
+    return `${SOCKET_URL}${photoPath.startsWith('/') ? '' : '/'}${photoPath}`;
+};
 
 const Header = () => {
     const [scrolled, setScrolled] = useState(false);
@@ -23,8 +33,7 @@ const Header = () => {
     const handleMenuClose = () => setAnchorEl(null);
 
     const handleLogout = () => {
-        localStorage.removeItem('user');
-        window.dispatchEvent(new Event('authChange'));
+        clearAuthSession(false);
         setUser(null);
         handleMenuClose();
         navigate('/');
@@ -56,14 +65,8 @@ const Header = () => {
         };
 
         const checkUser = () => {
-            const userStr = localStorage.getItem('user');
-            if (userStr) {
-                try {
-                    setUser(JSON.parse(userStr));
-                } catch (e) { }
-            } else {
-                setUser(null);
-            }
+            const currentUser = getCurrentUser();
+            setUser(currentUser);
         };
 
         checkUser();
@@ -96,7 +99,7 @@ const Header = () => {
                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: 1.5, transition: 'opacity 0.2s', '&:hover': { opacity: 0.8 } }} onClick={handleMenuOpen}>
                                 <Box sx={{ p: 0.5, bgcolor: '#e3f2fd', border: '2px solid #fff', boxShadow: '0 0 0 2px #e3f2fd', borderRadius: '50%' }}>
-                                    <Avatar sx={{ bgcolor: '#0b5299', width: 35, height: 35 }}>
+                                    <Avatar sx={{ bgcolor: '#0b5299', width: 35, height: 35 }} src={resolvePhotoUrl(user?.photo)}>
                                         <PersonIcon />
                                     </Avatar>
                                 </Box>

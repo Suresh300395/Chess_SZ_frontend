@@ -1,21 +1,22 @@
 import React, { useState } from 'react';
-import { Box, Typography, Avatar, Menu, MenuItem, Divider } from '@mui/material';
+import { Box, Typography, Avatar, Menu, MenuItem, Divider, IconButton } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import LogoutIcon from '@mui/icons-material/Logout';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import ShieldIcon from '@mui/icons-material/Shield';
 import HomeIcon from '@mui/icons-material/Home';
 import DashboardIcon from '@mui/icons-material/Dashboard';
+import MenuIcon from '@mui/icons-material/Menu';
+import { getCurrentUser, clearAuthSession } from '../../../utils/auth';
 
-const Header = ({ title }) => {
+const Header = ({ title, onToggleSidebar }) => {
     const navigate = useNavigate();
     const location = useLocation();
     const [anchorEl, setAnchorEl] = useState(null);
     const open = Boolean(anchorEl);
 
-    // Get user from localStorage
-    const userString = localStorage.getItem('user');
-    const user = userString ? JSON.parse(userString) : { username: 'Super Admin', role: 'superadmin' };
+    // Get user from active session
+    const user = getCurrentUser() || { username: 'Admin', role: 'admin' };
     const dashboardPath = user.role === 'player' ? '/user/dashboard' : '/admin/dashboard';
     const isDashboard = location.pathname.startsWith('/admin') || location.pathname.startsWith('/user') || location.pathname.includes('/dashboard');
 
@@ -28,21 +29,33 @@ const Header = ({ title }) => {
     };
 
     const handleLogout = () => {
-        localStorage.removeItem('user');
-        window.dispatchEvent(new Event('authChange'));
+        clearAuthSession(false);
         navigate('/');
     };
 
     return (
         <Box sx={{
             display: 'flex',
-            justifyContent: 'flex-end',
+            justifyContent: 'space-between',
             alignItems: 'center',
             bgcolor: '#ffffff',
-            px: 3,
-            py: 1.5,
-            zIndex: 10
+            px: { xs: 2, sm: 3 },
+            py: 1.25,
+            zIndex: 10,
+            borderBottom: '1px solid #f1f5f9'
         }}>
+            {/* Left: Mobile/Tablet Branding */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Box
+                    component="img"
+                    src="/ADITYA LOGO2.png"
+                    alt="Aditya University"
+                    sx={{
+                        height: { xs: 28, sm: 32 },
+                        display: { xs: 'block', lg: 'none' }
+                    }}
+                />
+            </Box>
             <Box
                 onClick={handleClick}
                 sx={{

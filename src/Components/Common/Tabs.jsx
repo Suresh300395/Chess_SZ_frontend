@@ -53,7 +53,7 @@ const StyledTab = styled((props) => <Tab disableRipple {...props} />)({
 const Tabs = ({ tabs, activeTab, setActiveTab }) => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-    
+
     // MUI Tabs takes an index for value, so we find the index of activeTab
     const value = tabs.indexOf(activeTab) !== -1 ? tabs.indexOf(activeTab) : 0;
 
@@ -74,8 +74,8 @@ const Tabs = ({ tabs, activeTab, setActiveTab }) => {
     return (
         <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', py: 1, px: 2, gap: 1 }}>
             {isMobile && (
-                <IconButton 
-                    onClick={handlePrev} 
+                <IconButton
+                    onClick={handlePrev}
                     disabled={value === 0}
                     sx={{ bgcolor: '#ffffff', color: '#0b5299', boxShadow: '0 4px 10px rgba(11,82,153,0.1)', '&:hover': { bgcolor: '#f0f0f0' }, '&.Mui-disabled': { bgcolor: 'rgba(255,255,255,0.5)' } }}
                 >
@@ -90,9 +90,9 @@ const Tabs = ({ tabs, activeTab, setActiveTab }) => {
                 scrollButtons={false}
             >
                 {tabs.map((tab, index) => (
-                    <StyledTab 
-                        key={index} 
-                        label={tab} 
+                    <StyledTab
+                        key={index}
+                        label={tab}
                         sx={{
                             display: (isMobile && value !== index) ? 'none' : 'inline-flex'
                         }}
@@ -101,8 +101,8 @@ const Tabs = ({ tabs, activeTab, setActiveTab }) => {
             </StyledTabs>
 
             {isMobile && (
-                <IconButton 
-                    onClick={handleNext} 
+                <IconButton
+                    onClick={handleNext}
                     disabled={value === tabs.length - 1}
                     sx={{ bgcolor: '#ffffff', color: '#0b5299', boxShadow: '0 4px 10px rgba(11,82,153,0.1)', '&:hover': { bgcolor: '#f0f0f0' }, '&.Mui-disabled': { bgcolor: 'rgba(255,255,255,0.5)' } }}
                 >

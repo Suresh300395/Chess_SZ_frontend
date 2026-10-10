@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Typography, Box, TextField, Button, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Avatar, IconButton } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
+import GroupsIcon from '@mui/icons-material/Groups';
 import io from 'socket.io-client';
+import { toast } from 'sonner';
 import { committeeAPI, SOCKET_URL } from '../../utils/api';
 
 
@@ -44,16 +46,24 @@ const OrganizingCommitee = () => {
     };
 
     const handleOrderUpdate = async (id, newOrder) => {
+        const orderNum = Number(newOrder);
+        if (isNaN(orderNum)) {
+            toast.error('Order must be a valid number');
+            return;
+        }
         try {
-            const response = await committeeAPI.update(id, { order: newOrder });
+            const response = await committeeAPI.update(id, { order: orderNum });
 
             if (response.ok) {
+                toast.success('Order updated successfully');
                 fetchMembers(); // refresh table
             } else {
-                alert('Failed to update order');
+                const errData = await response.json().catch(() => ({}));
+                toast.error(errData.error || 'Failed to update order');
             }
         } catch (err) {
             console.error('Error updating order:', err);
+            toast.error('Failed to update order');
         }
     };
 
@@ -64,12 +74,14 @@ const OrganizingCommitee = () => {
             const response = await committeeAPI.delete(id);
 
             if (response.ok) {
+                toast.success('Member deleted successfully');
                 fetchMembers();
             } else {
-                alert('Failed to delete member');
+                toast.error('Failed to delete member');
             }
         } catch (err) {
             console.error('Error deleting member:', err);
+            toast.error('Failed to delete member');
         }
     };
 
@@ -83,13 +95,13 @@ const OrganizingCommitee = () => {
         if (!file) return;
 
         if (file.type !== 'image/webp') {
-            alert('Please upload only WEBP image format.');
+            toast.error('Please upload only WEBP image format.');
             e.target.value = '';
             return;
         }
 
         if (file.size > 100 * 1024) {
-            alert('Image size must be below 100KB.');
+            toast.error('Image size must be below 100KB.');
             e.target.value = '';
             return;
         }
@@ -101,7 +113,7 @@ const OrganizingCommitee = () => {
         });
 
         if (!isValidRatio) {
-            alert('Image must have a 1:1 aspect ratio (square).');
+            toast.error('Image must have a 1:1 aspect ratio (square).');
             e.target.value = '';
             return;
         }
@@ -140,27 +152,30 @@ const OrganizingCommitee = () => {
                     order: ''
                 });
                 fetchMembers();
-                alert('Member added successfully!');
+                toast.success('Member added successfully!');
             } else {
-                const errData = await response.json();
-                alert(`Failed to add member. Reason: ${errData.error || 'Unknown error'}`);
+                const errData = await response.json().catch(() => ({}));
+                toast.error(`Failed to add member: ${errData.error || 'Unknown error'}`);
             }
         } catch (error) {
             console.error('Submission error:', error);
-            alert('An error occurred while adding the member.');
+            toast.error('An error occurred while adding the member.');
         }
     };
 
     return (
-        <Box sx={{ p: 2 }}>
-            <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', mb: 1, fontSize: { xs: '1rem', md: '2rem' } }}>
-                Organizing Committee
-            </Typography>
+        <Box sx={{ width: '100%' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                <GroupsIcon sx={{ color: '#0b5299', fontSize: { xs: 28, md: 34 } }} />
+                <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', fontSize: { xs: '1.25rem', md: '2rem' } }}>
+                    Organizing Committee
+                </Typography>
+            </Box>
             <Typography sx={{ color: 'text.secondary', mb: 4 }}>
                 Manage organizing committee details here.
             </Typography>
 
-            <Paper sx={{ p: 3, width: '100%', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', borderRadius: 2, mb: 4 }}>
+            <Paper sx={{ p: { xs: 2, sm: 3 }, width: '100%', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', borderRadius: 2, mb: 4 }}>
                 <form onSubmit={handleSubmit}>
                     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }, gap: 3, alignItems: 'center' }}>
                         <Box>
@@ -208,11 +223,12 @@ const OrganizingCommitee = () => {
                     </Box>
 
                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, mt: 4 }}>
-                        <Box sx={{ display: 'flex', gap: 2 }}>
+                        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, width: { xs: '100%', sm: 'auto' } }}>
                             <Button
                                 component="label"
                                 variant="outlined"
                                 startIcon={<CloudUploadIcon />}
+                                sx={{ width: { xs: '100%', sm: 'auto' } }}
                             >
                                 UPLOAD PHOTO
                                 <input
@@ -222,11 +238,15 @@ const OrganizingCommitee = () => {
                                     onChange={handleFileChange}
                                 />
                             </Button>
-                            <Button type="submit" variant="contained" sx={{ bgcolor: '#0b5299', '&:hover': { bgcolor: '#09407a' } }}>
+                            <Button
+                                type="submit"
+                                variant="contained"
+                                sx={{ bgcolor: '#0b5299', '&:hover': { bgcolor: '#09407a' }, width: { xs: '100%', sm: 'auto' } }}
+                            >
                                 ADD MEMBER
                             </Button>
                         </Box>
-                        <Typography variant="caption" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
+                        <Typography variant="caption" sx={{ color: 'text.secondary', fontStyle: 'italic', textAlign: 'center' }}>
                             * Photo rules: Only WEBP format, Max 100KB, 1:1 Aspect Ratio (Square).
                         </Typography>
                         {formData.photo && (
@@ -239,16 +259,16 @@ const OrganizingCommitee = () => {
             </Paper>
 
             {members.length > 0 && (
-                <TableContainer component={Paper} sx={{ boxShadow: '0 4px 12px rgba(0,0,0,0.05)', borderRadius: 2 }}>
+                <TableContainer component={Paper} sx={{ boxShadow: '0 4px 12px rgba(0,0,0,0.05)', borderRadius: 2, overflowX: 'auto', width: '100%' }}>
                     <Table sx={{ minWidth: 650 }} aria-label="committee members table">
                         <TableHead sx={{ bgcolor: '#f1f5f9' }}>
                             <TableRow>
                                 <TableCell><b>S.No</b></TableCell>
-                                <TableCell><b>Order</b></TableCell>
                                 <TableCell><b>Photo</b></TableCell>
                                 <TableCell><b>Member Name</b></TableCell>
                                 <TableCell><b>Designation</b></TableCell>
                                 <TableCell><b>Position</b></TableCell>
+                                <TableCell><b>Order</b></TableCell>
                                 <TableCell><b>Actions</b></TableCell>
                             </TableRow>
                         </TableHead>
@@ -256,6 +276,12 @@ const OrganizingCommitee = () => {
                             {members.map((member, index) => (
                                 <TableRow key={member._id} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
                                     <TableCell>{index + 1}</TableCell>
+                                    <TableCell>
+                                        <Avatar src={member.photo} alt={member.memberName} />
+                                    </TableCell>
+                                    <TableCell>{member.memberName}</TableCell>
+                                    <TableCell>{member.designation}</TableCell>
+                                    <TableCell>{member.position}</TableCell>
                                     <TableCell>
                                         <TextField
                                             type="number"
@@ -269,12 +295,6 @@ const OrganizingCommitee = () => {
                                             sx={{ width: '70px' }}
                                         />
                                     </TableCell>
-                                    <TableCell>
-                                        <Avatar src={member.photo} alt={member.memberName} />
-                                    </TableCell>
-                                    <TableCell>{member.memberName}</TableCell>
-                                    <TableCell>{member.designation}</TableCell>
-                                    <TableCell>{member.position}</TableCell>
                                     <TableCell>
                                         <IconButton aria-label="delete" color="error" onClick={() => handleDelete(member._id)}>
                                             <DeleteIcon />

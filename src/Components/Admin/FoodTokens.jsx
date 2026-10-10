@@ -29,13 +29,17 @@ import {
     CircularProgress,
     Divider,
     Stack,
-    Tooltip
+    Tooltip,
+    Checkbox,
+    FormControlLabel
 } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
+import CancelIcon from '@mui/icons-material/Cancel';
 import SearchIcon from '@mui/icons-material/Search';
 import PrintIcon from '@mui/icons-material/Print';
-import CancelIcon from '@mui/icons-material/Cancel';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
 import GroupsIcon from '@mui/icons-material/Groups';
+import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined';
 import PersonIcon from '@mui/icons-material/Person';
 import DownloadIcon from '@mui/icons-material/Download';
 import WbSunnyOutlinedIcon from '@mui/icons-material/WbSunnyOutlined';
@@ -48,6 +52,7 @@ import CustomTabs from '../Common/Tabs';
 import { foodTokenAPI, SOCKET_URL } from '../../utils/api';
 import { MEAL_TYPES, EVENT_NAME, ORGANIZATION_NAME } from '../../config/foodTokenConfig';
 import { printFoodToken, printMultipleFoodTokens } from './FoodTokens/FoodTokenPrint';
+import { formatDateDDMMYYYY } from '../../utils/dateUtils';
 
 const getTodayDateString = () => {
     const d = new Date();
@@ -134,14 +139,11 @@ const formatDateCardHeader = (dateStr) => {
         if (parts.length === 3) {
             const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
             const weekday = d.toLocaleDateString('en-US', { weekday: 'short' });
-            const day = String(d.getDate()).padStart(2, '0');
-            const month = d.toLocaleDateString('en-US', { month: 'short' });
-            const year = d.getFullYear();
-            return `${weekday}, ${day} ${month}, ${year}`;
+            return `${weekday}, ${formatDateDDMMYYYY(dateStr)}`;
         }
-        return dateStr;
+        return formatDateDDMMYYYY(dateStr);
     } catch {
-        return dateStr;
+        return formatDateDDMMYYYY(dateStr);
     }
 };
 
@@ -185,6 +187,9 @@ const FoodTokens = () => {
     const [issuingDayDate, setIssuingDayDate] = useState(null); // `${date}`
     const [issuingBulk, setIssuingBulk] = useState(false);
     const [selectedCardDate, setSelectedCardDate] = useState(null);
+    const [teamDialogOpen, setTeamDialogOpen] = useState(false);
+    const [selectedTeamMeals, setSelectedTeamMeals] = useState({});
+    const [issuingTeamBulk, setIssuingTeamBulk] = useState(false);
 
     // -------------------------------------------------------------
     // TAB 2: TOKENS REPORT & STATS STATE
@@ -367,6 +372,7 @@ const FoodTokens = () => {
                 setPeopleList(prev => prev.map(p =>
                     p.personRef === selectedPerson.personRef ? updatePersonTokens(p) : p
                 ));
+                fetchStats();
             } else if (res.status === 409) {
                 toast.info(data.message || 'Token already issued. You can reprint.');
                 if (data.printPayload) {
@@ -449,6 +455,7 @@ const FoodTokens = () => {
                 setPeopleList(prev => prev.map(p =>
                     p.personRef === selectedPerson.personRef ? updatePersonTokens(p) : p
                 ));
+                fetchStats();
             } else {
                 toast.error(data.message || 'Failed to issue day tokens');
             }
@@ -475,36 +482,106 @@ const FoodTokens = () => {
         }
     };
 
-    // Bulk Issue for whole team
-    const handleBulkIssue = async () => {
+    // Open Dialog for Team Tokens with day-wise checkboxes
+    const handleOpenTeamDialog = () => {
         if (!selectedPerson || !selectedPerson.registrationId) return;
-        setIssuingBulk(true);
+        const stayDates = generateDateRange(selectedPerson.arrivalDate, selectedPerson.departureDate);
+        const initialMap = {};
+        stayDates.forEach(date => {
+            MEAL_TYPES.forEach(meal => {
+                initialMap[`${date}_${meal}`] = true;
+            });
+        });
+        setSelectedTeamMeals(initialMap);
+        setTeamDialogOpen(true);
+    };
+
+    // Toggle specific meal in team dialog
+    const handleToggleTeamMeal = (date, meal) => {
+        const key = `${date}_${meal}`;
+        setSelectedTeamMeals(prev => ({
+            ...prev,
+            [key]: !prev[key]
+        }));
+    };
+
+    // Toggle entire day in team dialog
+    const handleToggleTeamDay = (date) => {
+        setSelectedTeamMeals(prev => {
+            const next = { ...prev };
+            const allSelected = MEAL_TYPES.every(m => next[`${date}_${m}`]);
+            MEAL_TYPES.forEach(m => {
+                if (allSelected) {
+                    delete next[`${date}_${m}`];
+                } else {
+                    next[`${date}_${m}`] = true;
+                }
+            });
+            return next;
+        });
+    };
+
+    // Toggle all days and meals in team dialog
+    const handleToggleSelectAllTeamMeals = (allKeys, isAllSelected) => {
+        if (isAllSelected) {
+            setSelectedTeamMeals({});
+        } else {
+            const map = {};
+            allKeys.forEach(k => { map[k] = true; });
+            setSelectedTeamMeals(map);
+        }
+    };
+
+    // Confirm and Issue Selected Coupons for Whole Team
+    const handleConfirmTeamIssue = async () => {
+        if (!selectedPerson || !selectedPerson.registrationId) return;
+
+        const selections = [];
+        Object.entries(selectedTeamMeals).forEach(([key, isSelected]) => {
+            if (isSelected) {
+                const lastUnderscore = key.lastIndexOf('_');
+                const mealDate = key.substring(0, lastUnderscore);
+                const mealType = key.substring(lastUnderscore + 1);
+                selections.push({ mealDate, mealType });
+            }
+        });
+
+        if (selections.length === 0) {
+            toast.warning('Please select at least one coupon to issue');
+            return;
+        }
+
+        setIssuingTeamBulk(true);
         try {
-            // Bulk issue for current active meal or prompt
-            const currentMeal = MEAL_TYPES[1]; // Default to Lunch or prompt
             const res = await foodTokenAPI.issueBulk({
                 registrationId: selectedPerson.registrationId,
-                mealType: currentMeal
+                selections
             });
             const data = await res.json();
 
             if (res.ok) {
-                toast.success(data.message);
+                toast.success(data.message || 'Tokens issued successfully');
+                setTeamDialogOpen(false);
                 if (data.printPayloads && data.printPayloads.length > 0) {
                     toast.info(`Sending ${data.printPayloads.length} tokens to printer...`);
                     await printMultipleFoodTokens(data.printPayloads);
                 }
                 searchPeople(searchQuery);
+                fetchStats();
             } else {
                 toast.error(data.message || 'Failed to issue team tokens');
             }
         } catch (err) {
-            toast.error('Bulk issue failed');
+            toast.error('Bulk issue failed: ' + err.message);
         } finally {
-            setIssuingBulk(false);
+            setIssuingTeamBulk(false);
         }
     };
 
+
+    useEffect(() => {
+        fetchStats();
+    }, [fetchStats]);
 
     useEffect(() => {
         if (activeTab === 'Tokens Report') {
@@ -564,7 +641,7 @@ const FoodTokens = () => {
                 `"${t.personType || ''}"`,
                 `"${t.teamOrSport || ''}"`,
                 `"${t.mealType || ''}"`,
-                `"${t.mealDate || ''}"`,
+                `"${formatDateDDMMYYYY(t.mealDate)}"`,
                 `"${t.status || ''}"`,
                 `"${t.issuedBy || ''}"`,
                 t.printCount || 1,
@@ -583,13 +660,28 @@ const FoodTokens = () => {
         document.body.removeChild(link);
     };
 
+    // Team Dialog Calculations
+    const teamStayDates = selectedPerson ? generateDateRange(selectedPerson.arrivalDate, selectedPerson.departureDate) : [];
+    const allTeamKeys = [];
+    teamStayDates.forEach(date => {
+        MEAL_TYPES.forEach(meal => {
+            allTeamKeys.push(`${date}_${meal}`);
+        });
+    });
+    const selectedTeamCount = Object.values(selectedTeamMeals).filter(Boolean).length;
+    const isAllTeamSelected = allTeamKeys.length > 0 && allTeamKeys.every(k => selectedTeamMeals[k]);
+    const isSomeTeamSelected = allTeamKeys.some(k => selectedTeamMeals[k]) && !isAllTeamSelected;
+
     return (
         <Box sx={{ width: '100%', pb: 4 }}>
             {/* Page Header */}
             <Box sx={{ mb: 3 }}>
-                <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', fontSize: '28px', lineHeight: 1.2 }}>
-                    Food Tokens
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
+                    <RestaurantIcon sx={{ color: '#0b5299', fontSize: { xs: 28, md: 34 } }} />
+                    <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', fontSize: '28px', lineHeight: 1.2 }}>
+                        Food Tokens
+                    </Typography>
+                </Box>
                 <Typography sx={{ color: 'text.secondary', fontSize: '14px', mt: 0.5 }}>
                     Issue and thermal print food tokens for players, coaches, and managers.
                 </Typography>
@@ -709,7 +801,7 @@ const FoodTokens = () => {
 
                                                 {person.arrivalDate && (
                                                     <Typography sx={{ fontSize: '12px', color: '#0b5299', fontWeight: 600, mt: 0.5 }}>
-                                                        Stay: {person.arrivalDate} → {person.departureDate || person.arrivalDate}
+                                                        Stay: {formatDateDDMMYYYY(person.arrivalDate)} → {formatDateDDMMYYYY(person.departureDate || person.arrivalDate)}
                                                     </Typography>
                                                 )}
 
@@ -761,7 +853,7 @@ const FoodTokens = () => {
                                             </Typography>
                                             {(selectedPerson.arrivalDate || selectedPerson.departureDate) && (
                                                 <Typography sx={{ color: '#0b5299', fontSize: '13px', fontWeight: 700, mt: 0.5 }}>
-                                                    Stay Period: {selectedPerson.arrivalDate || 'N/A'} {selectedPerson.arrivalTime || ''} → {selectedPerson.departureDate || selectedPerson.arrivalDate || 'N/A'} {selectedPerson.departureTime || ''}
+                                                    Stay Period: {formatDateDDMMYYYY(selectedPerson.arrivalDate)} {selectedPerson.arrivalTime || ''} → {formatDateDDMMYYYY(selectedPerson.departureDate || selectedPerson.arrivalDate)} {selectedPerson.departureTime || ''}
                                                 </Typography>
                                             )}
                                             {selectedPerson.block && (
@@ -775,12 +867,12 @@ const FoodTokens = () => {
                                             <Button
                                                 variant="outlined"
                                                 size="small"
-                                                startIcon={issuingBulk ? <CircularProgress size={16} /> : <GroupsIcon />}
-                                                onClick={handleBulkIssue}
-                                                disabled={issuingBulk}
+                                                startIcon={issuingTeamBulk ? <CircularProgress size={16} /> : <ConfirmationNumberOutlinedIcon sx={{ fontSize: 18 }} />}
+                                                onClick={handleOpenTeamDialog}
+                                                disabled={issuingTeamBulk}
                                                 sx={{ borderColor: '#d06c38', color: '#d06c38', '&:hover': { borderColor: '#b85928', bgcolor: '#fff5f0' } }}
                                             >
-                                                Issue for Whole Team
+                                                Issue All Tokens
                                             </Button>
                                         )}
                                     </Box>
@@ -788,115 +880,55 @@ const FoodTokens = () => {
                                     {/* Multi-Day Token Sections */}
                                     {(() => {
                                         const stayDates = generateDateRange(selectedPerson.arrivalDate, selectedPerson.departureDate);
-                                        const datesToRender = selectedDateFilter === 'ALL' ? stayDates : stayDates.filter(d => d === selectedDateFilter);
-                                        const activeCardDate = selectedCardDate || datesToRender[0];
 
                                         return (
                                             <Box>
-                                                {/* Stay Duration Overview Bar & Day Filter Pills */}
-                                                <Box sx={{
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'space-between',
-                                                    flexWrap: 'wrap',
-                                                    gap: 1.5,
-                                                    p: 1.5,
-                                                    bgcolor: '#f8fafc',
-                                                    borderRadius: 2.5,
-                                                    mb: 3,
-                                                    border: '1px solid #e2e8f0'
-                                                }}>
-                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                        <Typography sx={{ fontWeight: 700, color: '#0b5299', fontSize: '14px' }}>
-                                                            Stay Duration:
-                                                        </Typography>
-                                                        <Chip
-                                                            size="small"
-                                                            label={`${stayDates.length} Day${stayDates.length > 1 ? 's' : ''} (${formatDateLabel(stayDates[0])} - ${formatDateLabel(stayDates[stayDates.length - 1])})`}
-                                                            sx={{ fontWeight: 700, bgcolor: '#e0f2fe', color: '#0369a1' }}
-                                                        />
-                                                    </Box>
-
-                                                    {stayDates.length > 1 && (
-                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                                                            <Chip
-                                                                size="small"
-                                                                label={`All Days (${stayDates.length})`}
-                                                                clickable
-                                                                color={selectedDateFilter === 'ALL' ? 'primary' : 'default'}
-                                                                onClick={() => {
-                                                                    setSelectedDateFilter('ALL');
-                                                                    setSelectedCardDate(null);
-                                                                }}
-                                                                sx={{ fontWeight: 700 }}
-                                                            />
-                                                            {stayDates.map((date, idx) => (
-                                                                <Chip
-                                                                    key={date}
-                                                                    size="small"
-                                                                    label={`Day ${idx + 1}: ${date.slice(5)}`}
-                                                                    clickable
-                                                                    color={selectedDateFilter === date || activeCardDate === date ? 'primary' : 'default'}
-                                                                    variant={selectedDateFilter === date || activeCardDate === date ? 'filled' : 'outlined'}
-                                                                    onClick={() => {
-                                                                        setSelectedDateFilter(date);
-                                                                        setSelectedCardDate(date);
-                                                                    }}
-                                                                    sx={{ fontWeight: 600 }}
-                                                                />
-                                                            ))}
-                                                        </Box>
-                                                    )}
-                                                </Box>
-
-                                                {/* Render Days in 3-Column Responsive Grid matching design */}
+                                                {/* Render Days in Responsive Grid matching design */}
                                                 <Box sx={{
                                                     display: 'grid',
                                                     gridTemplateColumns: {
                                                         xs: '1fr',
-                                                        md: 'repeat(2, 1fr)',
+                                                        sm: 'repeat(2, 1fr)',
                                                         lg: 'repeat(3, 1fr)'
                                                     },
-                                                    gap: 2.5
+                                                    gap: 2.5,
+                                                    width: '100%'
                                                 }}>
-                                                    {datesToRender.map((date, dayIndex) => {
+                                                    {stayDates.map((date, dayIndex) => {
                                                         const dateIndex = stayDates.indexOf(date);
                                                         const dayNumber = dateIndex !== -1 ? dateIndex + 1 : dayIndex + 1;
                                                         const isArrivalDay = date === normalizeDateStr(selectedPerson.arrivalDate);
                                                         const isDepartureDay = date === normalizeDateStr(selectedPerson.departureDate);
                                                         const isToday = date === getTodayDateString();
-                                                        const isSelected = activeCardDate === date;
 
                                                         const dayTokens = selectedPerson.tokensByDate?.[date] || (isToday ? selectedPerson.tokensToday : {}) || {};
                                                         const issuedCount = MEAL_TYPES.filter(m => Boolean(dayTokens[m])).length;
                                                         const allIssued = issuedCount === MEAL_TYPES.length;
                                                         const isDayLoading = issuingDayDate === date;
 
+                                                        const isCardSelected = selectedCardDate === date;
+
                                                         return (
                                                             <Paper
                                                                 key={date}
                                                                 elevation={0}
-                                                                onClick={() => setSelectedCardDate(date)}
+                                                                onClick={() => setSelectedCardDate(prev => prev === date ? null : date)}
                                                                 sx={{
                                                                     p: 2.5,
                                                                     borderRadius: 4,
                                                                     cursor: 'pointer',
-                                                                    bgcolor: isSelected ? '#f8fbff' : (isArrivalDay ? '#f8fbff' : '#ffffff'),
-                                                                    border: isSelected
-                                                                        ? '2px solid #0b5299'
-                                                                        : (isArrivalDay ? '1.5px solid #60a5fa' : '1px solid #e2e8f0'),
-                                                                    boxShadow: isSelected
-                                                                        ? '0 0 0 2px rgba(11, 82, 153, 0.15), 0 8px 24px rgba(11, 82, 153, 0.1)'
-                                                                        : (isArrivalDay
-                                                                            ? '0 0 0 1px #60a5fa, 0 4px 14px rgba(59, 130, 246, 0.08)'
-                                                                            : '0 1px 3px rgba(0,0,0,0.02)'),
+                                                                    bgcolor: '#ffffff',
+                                                                    border: isCardSelected ? '1.5px solid #0b5299' : '1px solid #e2e8f0',
+                                                                    boxShadow: isCardSelected
+                                                                        ? '0 4px 16px rgba(11, 82, 153, 0.08)'
+                                                                        : '0 1px 3px rgba(0,0,0,0.02)',
                                                                     display: 'flex',
                                                                     flexDirection: 'column',
                                                                     justifyContent: 'space-between',
                                                                     transition: 'all 0.2s ease',
                                                                     '&:hover': {
                                                                         boxShadow: '0 6px 20px rgba(0,0,0,0.06)',
-                                                                        borderColor: isSelected ? '#0b5299' : '#94a3b8'
+                                                                        borderColor: isCardSelected ? '#0b5299' : '#94a3b8'
                                                                     }
                                                                 }}
                                                             >
@@ -1092,133 +1124,45 @@ const FoodTokens = () => {
                                                                     })}
                                                                 </Box>
 
-                                                                {/* Bottom of Day Card: Print All 4 Coupons Button */}
-                                                                <Box sx={{ mt: 'auto', pt: 1 }}>
-                                                                    <Divider sx={{ mb: 1.5, borderColor: isSelected ? '#bae6fd' : '#f1f5f9' }} />
-                                                                    <Button
-                                                                        fullWidth
-                                                                        variant={allIssued ? 'outlined' : 'contained'}
-                                                                        size="medium"
-                                                                        disabled={isDayLoading || Boolean(issuingKey)}
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            setSelectedCardDate(date);
-                                                                            handleIssueDay(date);
-                                                                        }}
-                                                                        startIcon={isDayLoading ? <CircularProgress size={16} color="inherit" /> : <PrintIcon sx={{ fontSize: 18 }} />}
-                                                                        sx={{
-                                                                            bgcolor: allIssued ? 'transparent' : '#0b5299',
-                                                                            color: allIssued ? '#0b5299' : '#ffffff',
-                                                                            borderColor: '#0b5299',
-                                                                            fontWeight: 700,
-                                                                            fontSize: '13px',
-                                                                            textTransform: 'none',
-                                                                            borderRadius: '10px',
-                                                                            py: 0.9,
-                                                                            boxShadow: 'none',
-                                                                            '&:hover': {
-                                                                                bgcolor: allIssued ? '#f0f7ff' : '#083d73',
-                                                                                borderColor: '#083d73',
-                                                                                boxShadow: 'none'
-                                                                            }
-                                                                        }}
-                                                                    >
-                                                                        {isDayLoading ? 'Printing 4 Coupons...' : (allIssued ? 'Print All 4 Coupons' : 'Issue & Print All 4 Coupons')}
-                                                                    </Button>
-                                                                </Box>
+                                                                {/* Bottom of Day Card: Print All 4 Coupons Button - only visible when card is clicked */}
+                                                                {isCardSelected && (
+                                                                    <Box sx={{ mt: 'auto', pt: 1 }}>
+                                                                        <Divider sx={{ mb: 1.5, borderColor: '#f1f5f9' }} />
+                                                                        <Button
+                                                                            fullWidth
+                                                                            variant={allIssued ? 'outlined' : 'contained'}
+                                                                            size="medium"
+                                                                            disabled={isDayLoading || Boolean(issuingKey)}
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                handleIssueDay(date);
+                                                                            }}
+                                                                            startIcon={isDayLoading ? <CircularProgress size={16} color="inherit" /> : <PrintIcon sx={{ fontSize: 18 }} />}
+                                                                            sx={{
+                                                                                bgcolor: allIssued ? 'transparent' : '#0b5299',
+                                                                                color: allIssued ? '#0b5299' : '#ffffff',
+                                                                                borderColor: '#0b5299',
+                                                                                fontWeight: 700,
+                                                                                fontSize: '13px',
+                                                                                textTransform: 'none',
+                                                                                borderRadius: '10px',
+                                                                                py: 0.9,
+                                                                                boxShadow: 'none',
+                                                                                '&:hover': {
+                                                                                    bgcolor: allIssued ? '#f0f7ff' : '#083d73',
+                                                                                    borderColor: '#083d73',
+                                                                                    boxShadow: 'none'
+                                                                                }
+                                                                            }}
+                                                                        >
+                                                                            {isDayLoading ? 'Printing 4 Coupons...' : (allIssued ? 'Print All 4 Coupons' : 'Issue & Print All 4 Coupons')}
+                                                                        </Button>
+                                                                    </Box>
+                                                                )}
                                                             </Paper>
                                                         );
                                                     })}
                                                 </Box>
-
-                                                {/* Bottom Action Bar for Selected Day ("kinda") */}
-                                                {activeCardDate && (
-                                                    <Paper
-                                                        elevation={0}
-                                                        sx={{
-                                                            mt: 3.5,
-                                                            p: 2.5,
-                                                            borderRadius: 3.5,
-                                                            bgcolor: '#f8fafc',
-                                                            border: '2px solid #0b5299',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'space-between',
-                                                            flexWrap: 'wrap',
-                                                            gap: 2,
-                                                            boxShadow: '0 4px 16px rgba(11, 82, 153, 0.08)'
-                                                        }}
-                                                    >
-                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                                            <Box sx={{
-                                                                width: 48,
-                                                                height: 48,
-                                                                borderRadius: 2.5,
-                                                                bgcolor: '#0b5299',
-                                                                color: '#ffffff',
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                justifyContent: 'center',
-                                                                flexShrink: 0
-                                                            }}>
-                                                                <PrintIcon sx={{ fontSize: 26 }} />
-                                                            </Box>
-                                                            <Box>
-                                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                                                                    <Typography sx={{ fontWeight: 800, fontSize: '17px', color: '#0f172a' }}>
-                                                                        {formatDateCardHeader(activeCardDate)}
-                                                                    </Typography>
-                                                                    <Chip
-                                                                        size="small"
-                                                                        label={`Day ${stayDates.indexOf(activeCardDate) + 1}`}
-                                                                        sx={{ bgcolor: '#0b5299', color: '#ffffff', fontWeight: 700, fontSize: '11px', height: 22 }}
-                                                                    />
-                                                                    {(() => {
-                                                                        const actTokens = selectedPerson.tokensByDate?.[activeCardDate] || (activeCardDate === getTodayDateString() ? selectedPerson.tokensToday : {}) || {};
-                                                                        const actCount = MEAL_TYPES.filter(m => Boolean(actTokens[m])).length;
-                                                                        const isActAll = actCount === MEAL_TYPES.length;
-                                                                        return (
-                                                                            <Chip
-                                                                                size="small"
-                                                                                label={`${actCount}/${MEAL_TYPES.length} Issued`}
-                                                                                color={isActAll ? 'success' : actCount > 0 ? 'info' : 'default'}
-                                                                                sx={{ fontWeight: 700, fontSize: '11px', height: 22 }}
-                                                                            />
-                                                                        );
-                                                                    })()}
-                                                                </Box>
-                                                                <Typography sx={{ fontSize: '13px', color: '#64748b', mt: 0.25 }}>
-                                                                    Click button to print all 4 coupons (Breakfast, Lunch, Snacks, Dinner) for this day
-                                                                </Typography>
-                                                            </Box>
-                                                        </Box>
-
-                                                        <Button
-                                                            variant="contained"
-                                                            size="large"
-                                                            disabled={issuingDayDate === activeCardDate || Boolean(issuingKey)}
-                                                            onClick={() => handleIssueDay(activeCardDate)}
-                                                            startIcon={issuingDayDate === activeCardDate ? <CircularProgress size={18} color="inherit" /> : <PrintIcon sx={{ fontSize: 20 }} />}
-                                                            sx={{
-                                                                bgcolor: '#d06c38',
-                                                                color: '#ffffff',
-                                                                fontWeight: 800,
-                                                                fontSize: '14.5px',
-                                                                textTransform: 'none',
-                                                                borderRadius: '12px',
-                                                                px: 3.5,
-                                                                py: 1.2,
-                                                                boxShadow: 'none',
-                                                                '&:hover': {
-                                                                    bgcolor: '#b85928',
-                                                                    boxShadow: 'none'
-                                                                }
-                                                            }}
-                                                        >
-                                                            {issuingDayDate === activeCardDate ? 'Printing 4 Coupons...' : 'Print All 4 Coupons'}
-                                                        </Button>
-                                                    </Paper>
-                                                )}
                                             </Box>
                                         );
                                     })()}
@@ -1245,60 +1189,319 @@ const FoodTokens = () => {
             {activeTab === 'Tokens Report' && (
                 <Box>
                     {/* Stats Summary Cards */}
+                    {/* Stats Summary Card (Full Width - Dashboard Style) */}
                     {stats && (
-                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 2, mb: 3 }}>
-                            <Paper sx={{ p: 2, borderRadius: 2.5, borderLeft: '4px solid #0b5299' }}>
-                                <Typography sx={{ color: 'text.secondary', fontSize: '13px', fontWeight: 600 }}>Total Tokens Issued</Typography>
-                                <Typography variant="h4" sx={{ fontWeight: 800, color: '#0b5299', mt: 0.5 }}>
-                                    {stats.overall?.totalIssued || 0}
-                                </Typography>
-                            </Paper>
-                            <Paper sx={{ p: 2, borderRadius: 2.5, borderLeft: '4px solid #10b981' }}>
-                                <Typography sx={{ color: 'text.secondary', fontSize: '13px', fontWeight: 600 }}>Active Valid Tokens</Typography>
-                                <Typography variant="h4" sx={{ fontWeight: 800, color: '#10b981', mt: 0.5 }}>
-                                    {stats.overall?.totalActive ?? ((stats.overall?.totalIssued || 0) - (stats.overall?.totalCancelled || 0))}
-                                </Typography>
-                            </Paper>
-                            <Paper sx={{ p: 2, borderRadius: 2.5, borderLeft: '4px solid #ef4444' }}>
-                                <Typography sx={{ color: 'text.secondary', fontSize: '13px', fontWeight: 600 }}>Cancelled Tokens</Typography>
-                                <Typography variant="h4" sx={{ fontWeight: 800, color: '#ef4444', mt: 0.5 }}>
-                                    {stats.overall?.totalCancelled || 0}
-                                </Typography>
-                            </Paper>
+                        <Box sx={{ width: '100%', mb: 3 }}>
+                            <Card
+                                sx={{
+                                    position: 'relative',
+                                    overflow: 'hidden',
+                                    borderRadius: '16px',
+                                    background: 'linear-gradient(145deg, #ffffff 0%, #f0f7ff 100%)',
+                                    border: '1px solid #e2e8f0',
+                                    boxShadow: '0 2px 12px rgba(15, 23, 42, 0.04)',
+                                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    width: '100%',
+                                    '&:hover': {
+                                        transform: 'translateY(-2px)',
+                                        boxShadow: '0 10px 24px rgba(15, 23, 42, 0.08)',
+                                        borderColor: '#93c5fd'
+                                    }
+                                }}
+                            >
+                                {/* Corner Category Badge */}
+                                <Chip
+                                    label="Total"
+                                    size="small"
+                                    sx={{
+                                        position: 'absolute',
+                                        top: 14,
+                                        right: 14,
+                                        bgcolor: '#eff6ff',
+                                        color: '#1d4ed8',
+                                        fontWeight: 600,
+                                        fontSize: '0.72rem',
+                                        height: '22px',
+                                        borderRadius: '6px',
+                                        zIndex: 1
+                                    }}
+                                />
+
+                                {/* Subtle decorative watermark icon in bottom-right corner */}
+                                <Box sx={{
+                                    position: 'absolute',
+                                    right: -8,
+                                    bottom: -8,
+                                    opacity: 0.04,
+                                    pointerEvents: 'none',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}>
+                                    <ConfirmationNumberOutlinedIcon sx={{ fontSize: 90, color: '#0b5299' }} />
+                                </Box>
+
+                                <CardContent sx={{ py: 2, pr: 2, pl: 1.25, '&:last-child': { pb: 2 } }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5, mb: 1.5 }}>
+                                        {/* Icon badge */}
+                                        <Box sx={{
+                                            width: 52,
+                                            height: 52,
+                                            borderRadius: '12px',
+                                            background: 'linear-gradient(135deg, #0b5299 0%, #1e40af 100%)',
+                                            boxShadow: '0 4px 12px rgba(11, 82, 153, 0.22)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            flexShrink: 0,
+                                            transition: 'transform 0.2s',
+                                            '&:hover': { transform: 'scale(1.05)' }
+                                        }}>
+                                            <ConfirmationNumberOutlinedIcon sx={{ fontSize: 26, color: '#ffffff' }} />
+                                        </Box>
+
+                                        <Box>
+                                            <Typography
+                                                variant="caption"
+                                                sx={{
+                                                    color: '#64748b',
+                                                    fontWeight: 600,
+                                                    fontSize: '0.75rem',
+                                                    letterSpacing: '0.5px',
+                                                    textTransform: 'uppercase',
+                                                    display: 'block',
+                                                    mb: 0.5
+                                                }}
+                                            >
+                                                TOTAL TOKENS ISSUED
+                                            </Typography>
+                                            <Typography
+                                                sx={{
+                                                    fontWeight: 800,
+                                                    color: '#0f172a',
+                                                    fontSize: { xs: '2rem', md: '2.2rem' },
+                                                    lineHeight: 1
+                                                }}
+                                            >
+                                                {stats.overall?.totalIssued || 0}
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+
+                                    {/* Subtitle */}
+                                    <Typography
+                                        variant="caption"
+                                        sx={{
+                                            color: '#94a3b8',
+                                            fontSize: '0.8rem',
+                                            fontWeight: 500,
+                                            display: 'block'
+                                        }}
+                                    >
+                                        Total Active Food Coupons
+                                    </Typography>
+                                </CardContent>
+                            </Card>
                         </Box>
                     )}
 
-                    {/* Breakdown by Meal Type */}
+                    {/* Breakdown by Meal Type (Dashboard Style) */}
                     {stats?.byMeal && (
-                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' }, gap: 2, mb: 3 }}>
-                            {MEAL_TYPES.map(meal => {
-                                const m = stats.byMeal[meal] || { issued: 0, cancelled: 0 };
-                                return (
-                                    <Card elevation={0} sx={{ p: 1.5, borderRadius: 2, bgcolor: '#ffffff', border: '1px solid #e2e8f0' }} key={meal}>
-                                        <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>{meal}</Typography>
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1, fontSize: '12px' }}>
-                                            <span style={{ color: '#0b5299' }}>Issued: <b>{m.issued}</b></span>
-                                            <span style={{ color: '#ef4444' }}>Cancelled: <b>{m.cancelled || 0}</b></span>
+                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 2, mb: 3, width: '100%' }}>
+                            {[
+                                {
+                                    mealKey: 'Breakfast',
+                                    title: 'BREAKFAST',
+                                    count: stats.byMeal?.['Breakfast']?.issued || 0,
+                                    subtitle: 'Morning Meal Tokens',
+                                    badge: 'Morning',
+                                    icon: <WbSunnyOutlinedIcon sx={{ fontSize: 26, color: '#ffffff' }} />,
+                                    bgIcon: <WbSunnyOutlinedIcon sx={{ fontSize: 90, color: '#d97706' }} />,
+                                    gradient: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)',
+                                    shadow: 'rgba(217, 119, 6, 0.22)',
+                                    bgGradient: 'linear-gradient(145deg, #ffffff 0%, #fffbeb 100%)',
+                                    borderColor: '#e2e8f0',
+                                    hoverBorder: '#fde68a',
+                                    badgeBg: '#fffbeb',
+                                    badgeColor: '#b45309'
+                                },
+                                {
+                                    mealKey: 'Lunch',
+                                    title: 'LUNCH',
+                                    count: stats.byMeal?.['Lunch']?.issued || 0,
+                                    subtitle: 'Afternoon Meal Tokens',
+                                    badge: 'Afternoon',
+                                    icon: <RestaurantOutlinedIcon sx={{ fontSize: 26, color: '#ffffff' }} />,
+                                    bgIcon: <RestaurantOutlinedIcon sx={{ fontSize: 90, color: '#059669' }} />,
+                                    gradient: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                                    shadow: 'rgba(5, 150, 105, 0.22)',
+                                    bgGradient: 'linear-gradient(145deg, #ffffff 0%, #f6fdf9 100%)',
+                                    borderColor: '#e2e8f0',
+                                    hoverBorder: '#a7f3d0',
+                                    badgeBg: '#ecfdf5',
+                                    badgeColor: '#047857'
+                                },
+                                {
+                                    mealKey: 'Snacks',
+                                    title: 'SNACKS',
+                                    count: stats.byMeal?.['Snacks']?.issued || 0,
+                                    subtitle: 'Evening Refreshments',
+                                    badge: 'Evening',
+                                    icon: <CoffeeOutlinedIcon sx={{ fontSize: 26, color: '#ffffff' }} />,
+                                    bgIcon: <CoffeeOutlinedIcon sx={{ fontSize: 90, color: '#d06c38' }} />,
+                                    gradient: 'linear-gradient(135deg, #d06c38 0%, #ea580c 100%)',
+                                    shadow: 'rgba(208, 108, 56, 0.22)',
+                                    bgGradient: 'linear-gradient(145deg, #ffffff 0%, #fffbf7 100%)',
+                                    borderColor: '#e2e8f0',
+                                    hoverBorder: '#fed7aa',
+                                    badgeBg: '#fff7ed',
+                                    badgeColor: '#c2410c'
+                                },
+                                {
+                                    mealKey: 'Dinner',
+                                    title: 'DINNER',
+                                    count: stats.byMeal?.['Dinner']?.issued || 0,
+                                    subtitle: 'Night Meal Tokens',
+                                    badge: 'Night',
+                                    icon: <DarkModeOutlinedIcon sx={{ fontSize: 26, color: '#ffffff' }} />,
+                                    bgIcon: <DarkModeOutlinedIcon sx={{ fontSize: 90, color: '#0b5299' }} />,
+                                    gradient: 'linear-gradient(135deg, #0b5299 0%, #1e40af 100%)',
+                                    shadow: 'rgba(11, 82, 153, 0.22)',
+                                    bgGradient: 'linear-gradient(145deg, #ffffff 0%, #f0f7ff 100%)',
+                                    borderColor: '#e2e8f0',
+                                    hoverBorder: '#93c5fd',
+                                    badgeBg: '#eff6ff',
+                                    badgeColor: '#1d4ed8'
+                                }
+                            ].map((stat, idx) => (
+                                <Card
+                                    key={idx}
+                                    sx={{
+                                        position: 'relative',
+                                        overflow: 'hidden',
+                                        borderRadius: '16px',
+                                        background: stat.bgGradient,
+                                        border: `1px solid ${stat.borderColor}`,
+                                        boxShadow: '0 2px 12px rgba(15, 23, 42, 0.04)',
+                                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                                        height: '100%',
+                                        '&:hover': {
+                                            transform: 'translateY(-3px)',
+                                            boxShadow: '0 10px 24px rgba(15, 23, 42, 0.08)',
+                                            borderColor: stat.hoverBorder
+                                        }
+                                    }}
+                                >
+                                    {/* Corner Category Badge */}
+                                    <Chip
+                                        label={stat.badge}
+                                        size="small"
+                                        sx={{
+                                            position: 'absolute',
+                                            top: 12,
+                                            right: 12,
+                                            bgcolor: stat.badgeBg,
+                                            color: stat.badgeColor,
+                                            fontWeight: 600,
+                                            fontSize: '0.72rem',
+                                            height: '22px',
+                                            borderRadius: '6px',
+                                            zIndex: 1
+                                        }}
+                                    />
+
+                                    {/* Subtle decorative watermark icon in bottom-right corner */}
+                                    <Box sx={{
+                                        position: 'absolute',
+                                        right: -8,
+                                        bottom: -8,
+                                        opacity: 0.04,
+                                        pointerEvents: 'none',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                    }}>
+                                        {stat.bgIcon}
+                                    </Box>
+
+                                    <CardContent sx={{ py: 2, pr: 2, pl: 1.25, '&:last-child': { pb: 2 } }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5, mb: 1.5 }}>
+                                            {/* Icon badge */}
+                                            <Box sx={{
+                                                width: 52,
+                                                height: 52,
+                                                borderRadius: '12px',
+                                                background: stat.gradient,
+                                                boxShadow: `0 4px 12px ${stat.shadow}`,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                flexShrink: 0,
+                                                transition: 'transform 0.2s',
+                                                '&:hover': { transform: 'scale(1.05)' }
+                                            }}>
+                                                {stat.icon}
+                                            </Box>
+
+                                            <Box>
+                                                <Typography
+                                                    variant="caption"
+                                                    sx={{
+                                                        color: '#64748b',
+                                                        fontWeight: 600,
+                                                        fontSize: '0.75rem',
+                                                        letterSpacing: '0.5px',
+                                                        textTransform: 'uppercase',
+                                                        display: 'block',
+                                                        mb: 0.5
+                                                    }}
+                                                >
+                                                    {stat.title}
+                                                </Typography>
+                                                <Typography
+                                                    sx={{
+                                                        fontWeight: 800,
+                                                        color: '#0f172a',
+                                                        fontSize: { xs: '2rem', md: '2.2rem' },
+                                                        lineHeight: 1
+                                                    }}
+                                                >
+                                                    {stat.count}
+                                                </Typography>
+                                            </Box>
                                         </Box>
-                                    </Card>
-                                );
-                            })}
+
+                                        {/* Subtitle */}
+                                        <Typography
+                                            variant="caption"
+                                            sx={{
+                                                color: '#94a3b8',
+                                                fontSize: '0.8rem',
+                                                fontWeight: 500,
+                                                display: 'block'
+                                            }}
+                                        >
+                                            {stat.subtitle}
+                                        </Typography>
+                                    </CardContent>
+                                </Card>
+                            ))}
                         </Box>
                     )}
 
                     {/* Table Filters & Actions */}
                     <Paper sx={{ p: 2.5, borderRadius: 3, mb: 3 }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
-                            <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', flex: 1 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' }, mb: 2, flexWrap: 'wrap', gap: 2 }}>
+                            <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', flex: 1, width: '100%' }}>
                                 <TextField
                                     size="small"
                                     placeholder="Search code, name, team..."
                                     value={filterSearch}
                                     onChange={(e) => setFilterSearch(e.target.value)}
-                                    sx={{ minWidth: 220 }}
+                                    sx={{ minWidth: { xs: '100%', sm: 180, md: 220 }, flex: { xs: '1 1 100%', sm: '1 1 auto' } }}
                                 />
 
-                                <FormControl size="small" sx={{ minWidth: 140 }}>
+                                <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 120 }, flex: { xs: '1 1 100%', sm: '1 1 auto' } }}>
                                     <InputLabel>Meal Type</InputLabel>
                                     <Select value={filterMeal} label="Meal Type" onChange={(e) => setFilterMeal(e.target.value)}>
                                         <MenuItem value="">All Meals</MenuItem>
@@ -1306,16 +1509,15 @@ const FoodTokens = () => {
                                     </Select>
                                 </FormControl>
 
-                                <FormControl size="small" sx={{ minWidth: 140 }}>
+                                <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 120 }, flex: { xs: '1 1 100%', sm: '1 1 auto' } }}>
                                     <InputLabel>Status</InputLabel>
                                     <Select value={filterStatus} label="Status" onChange={(e) => setFilterStatus(e.target.value)}>
                                         <MenuItem value="">All Statuses</MenuItem>
                                         <MenuItem value="ISSUED">Issued</MenuItem>
-                                        <MenuItem value="CANCELLED">Cancelled</MenuItem>
                                     </Select>
                                 </FormControl>
 
-                                <FormControl size="small" sx={{ minWidth: 140 }}>
+                                <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 120 }, flex: { xs: '1 1 100%', sm: '1 1 auto' } }}>
                                     <InputLabel>Role / Type</InputLabel>
                                     <Select value={filterPersonType} label="Role / Type" onChange={(e) => setFilterPersonType(e.target.value)}>
                                         <MenuItem value="">All Roles</MenuItem>
@@ -1330,15 +1532,15 @@ const FoodTokens = () => {
                                 variant="outlined"
                                 startIcon={<DownloadIcon />}
                                 onClick={handleExportCSV}
-                                sx={{ color: '#0b5299', borderColor: '#0b5299' }}
+                                sx={{ color: '#0b5299', borderColor: '#0b5299', width: { xs: '100%', sm: 'auto' } }}
                             >
                                 Export CSV
                             </Button>
                         </Box>
 
                         {/* Tokens Data Table */}
-                        <TableContainer>
-                            <Table size="small">
+                        <TableContainer sx={{ overflowX: 'auto', width: '100%' }}>
+                            <Table size="small" sx={{ minWidth: 650 }}>
                                 <TableHead sx={{ bgcolor: '#f8fafc' }}>
                                     <TableRow>
                                         <TableCell sx={{ fontWeight: 700 }}>Token Code</TableCell>
@@ -1373,43 +1575,29 @@ const FoodTokens = () => {
                                                 <TableCell sx={{ fontWeight: 600 }}>{token.name}</TableCell>
                                                 <TableCell sx={{ color: '#475569' }}>{token.teamOrSport}</TableCell>
                                                 <TableCell sx={{ fontWeight: 600 }}>{token.mealType}</TableCell>
-                                                <TableCell>{token.mealDate}</TableCell>
+                                                <TableCell sx={{ fontWeight: 600 }}>{formatDateDDMMYYYY(token.mealDate)}</TableCell>
                                                 <TableCell>
-                                                        <Chip
-                                                            size="small"
-                                                            label={token.status}
-                                                            color={token.status === 'ISSUED' ? 'success' : 'error'}
-                                                            sx={{ fontWeight: 700, fontSize: '11px' }}
-                                                        />
+                                                    <Chip
+                                                        size="small"
+                                                        label={token.status}
+                                                        color={token.status === 'ISSUED' ? 'success' : 'error'}
+                                                        sx={{ fontWeight: 700, fontSize: '11px' }}
+                                                    />
                                                 </TableCell>
                                                 <TableCell>{token.printCount || 1}</TableCell>
                                                 <TableCell sx={{ textAlign: 'right' }}>
-                                                    <Stack direction="row" spacing={1} justifyContent="flex-end">
-                                                        <Tooltip title="Reprint token receipt">
-                                                            <span>
-                                                                <IconButton
-                                                                    size="small"
-                                                                    disabled={token.status !== 'ISSUED'}
-                                                                    onClick={() => handleReprint(token._id)}
-                                                                    sx={{ color: '#0b5299' }}
-                                                                >
-                                                                    <PrintIcon fontSize="small" />
-                                                                </IconButton>
-                                                            </span>
-                                                        </Tooltip>
-                                                        <Tooltip title="Cancel token">
-                                                            <span>
-                                                                <IconButton
-                                                                    size="small"
-                                                                    disabled={token.status !== 'ISSUED'}
-                                                                    onClick={() => handleOpenCancelDialog(token)}
-                                                                    sx={{ color: '#ef4444' }}
-                                                                >
-                                                                    <CancelIcon fontSize="small" />
-                                                                </IconButton>
-                                                            </span>
-                                                        </Tooltip>
-                                                    </Stack>
+                                                    <Tooltip title="Reprint token receipt">
+                                                        <span>
+                                                            <IconButton
+                                                                size="small"
+                                                                disabled={token.status !== 'ISSUED'}
+                                                                onClick={() => handleReprint(token._id)}
+                                                                sx={{ color: '#0b5299' }}
+                                                            >
+                                                                <PrintIcon fontSize="small" />
+                                                            </IconButton>
+                                                        </span>
+                                                    </Tooltip>
                                                 </TableCell>
                                             </TableRow>
                                         ))
@@ -1431,37 +1619,331 @@ const FoodTokens = () => {
                 </Box>
             )}
 
-            {/* Cancel Confirmation Dialog */}
-            <Dialog open={cancelDialogOpen} onClose={() => setCancelDialogOpen(false)} maxWidth="xs" fullWidth>
-                <DialogTitle sx={{ fontWeight: 700, color: '#ef4444' }}>
-                    Cancel Food Token
-                </DialogTitle>
-                <DialogContent>
-                    <Typography sx={{ fontSize: '14px', mb: 2 }}>
-                        Are you sure you want to cancel token <b>{tokenToCancel?.code}</b> issued to <b>{tokenToCancel?.name}</b> for {tokenToCancel?.mealType}?
-                    </Typography>
-                    <TextField
-                        fullWidth
+            {/* Issue Team Food Tokens Dialog */}
+            <Dialog
+                open={teamDialogOpen}
+                onClose={() => !issuingTeamBulk && setTeamDialogOpen(false)}
+                maxWidth="md"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        borderRadius: 3,
+                        boxShadow: '0 20px 40px rgba(0,0,0,0.15)'
+                    }
+                }}
+            >
+                <DialogTitle
+                    sx={{
+                        p: 2.5,
+                        pb: 1.5,
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        justifyContent: 'space-between',
+                        borderBottom: '1px solid #e2e8f0'
+                    }}
+                >
+                    <Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
+                            <Box
+                                sx={{
+                                    width: 38,
+                                    height: 38,
+                                    borderRadius: '50%',
+                                    bgcolor: '#fff5f0',
+                                    color: '#d06c38',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}
+                            >
+                                <ConfirmationNumberOutlinedIcon fontSize="medium" />
+                            </Box>
+                            <Box>
+                                <Typography sx={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>
+                                    Issue Food Tokens for Whole Team
+                                </Typography>
+                                <Typography sx={{ fontSize: '13px', color: '#64748b', mt: 0.25 }}>
+                                    {selectedPerson?.teamOrSport ? `${selectedPerson.teamOrSport} • ` : ''}
+                                    Stay: {formatDateDDMMYYYY(selectedPerson?.arrivalDate)} → {formatDateDDMMYYYY(selectedPerson?.departureDate || selectedPerson?.arrivalDate)} ({teamStayDates.length} {teamStayDates.length === 1 ? 'Day' : 'Days'})
+                                </Typography>
+                            </Box>
+                        </Box>
+                    </Box>
+                    <IconButton
                         size="small"
-                        label="Cancellation Reason *"
-                        placeholder="e.g. Lost token, participant departed early"
-                        value={cancelReason}
-                        onChange={(e) => setCancelReason(e.target.value)}
-                        required
-                    />
-                </DialogContent>
-                <DialogActions sx={{ p: 2 }}>
-                    <Button onClick={() => setCancelDialogOpen(false)} disabled={cancelling}>
-                        Close
-                    </Button>
-                    <Button
-                        variant="contained"
-                        color="error"
-                        onClick={handleConfirmCancel}
-                        disabled={cancelling || !cancelReason.trim()}
+                        onClick={() => setTeamDialogOpen(false)}
+                        disabled={issuingTeamBulk}
+                        sx={{ color: '#64748b', '&:hover': { bgcolor: '#f1f5f9' } }}
                     >
-                        {cancelling ? 'Cancelling...' : 'Confirm Cancel'}
-                    </Button>
+                        <CloseIcon fontSize="small" />
+                    </IconButton>
+                </DialogTitle>
+
+                <DialogContent sx={{ p: 2.5, bgcolor: '#f8fafc' }}>
+                    {/* Top Control Bar: Select All & Counters */}
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 1.75,
+                            px: 2,
+                            mb: 2.5,
+                            borderRadius: 2,
+                            border: '1px solid #cbd5e1',
+                            bgcolor: '#ffffff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexWrap: 'wrap',
+                            gap: 1.5
+                        }}
+                    >
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={isAllTeamSelected}
+                                    indeterminate={isSomeTeamSelected}
+                                    onChange={() => handleToggleSelectAllTeamMeals(allTeamKeys, isAllTeamSelected)}
+                                    color="primary"
+                                    sx={{
+                                        color: '#0b5299',
+                                        '&.Mui-checked': { color: '#0b5299' },
+                                        '&.MuiCheckbox-indeterminate': { color: '#0b5299' }
+                                    }}
+                                />
+                            }
+                            label={
+                                <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#1e293b' }}>
+                                    Select All Coupons (All Days & Meals)
+                                </Typography>
+                            }
+                        />
+
+                        <Stack direction="row" spacing={1} alignItems="center">
+                            <Chip
+                                size="small"
+                                label={`${selectedTeamCount} / ${allTeamKeys.length} Coupons Selected`}
+                                sx={{
+                                    fontWeight: 700,
+                                    fontSize: '12px',
+                                    bgcolor: selectedTeamCount > 0 ? '#eff6ff' : '#f1f5f9',
+                                    color: selectedTeamCount > 0 ? '#1d4ed8' : '#64748b',
+                                    border: selectedTeamCount > 0 ? '1px solid #bfdbfe' : '1px solid #e2e8f0'
+                                }}
+                            />
+                            {selectedTeamCount > 0 && (
+                                <Button
+                                    size="small"
+                                    variant="text"
+                                    onClick={() => setSelectedTeamMeals({})}
+                                    disabled={issuingTeamBulk}
+                                    sx={{ fontSize: '12px', color: '#64748b', minWidth: 'auto', p: '2px 8px' }}
+                                >
+                                    Deselect All
+                                </Button>
+                            )}
+                        </Stack>
+                    </Paper>
+
+                    {/* Day-wise Coupon Groups */}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {teamStayDates.map((date, dayIdx) => {
+                            const isDayAll = MEAL_TYPES.every(m => selectedTeamMeals[`${date}_${m}`]);
+                            const isDaySome = MEAL_TYPES.some(m => selectedTeamMeals[`${date}_${m}`]) && !isDayAll;
+                            const daySelectedCount = MEAL_TYPES.filter(m => selectedTeamMeals[`${date}_${m}`]).length;
+
+                            return (
+                                <Paper
+                                    key={date}
+                                    elevation={0}
+                                    sx={{
+                                        borderRadius: 2,
+                                        border: daySelectedCount > 0 ? '1.5px solid #0b5299' : '1px solid #e2e8f0',
+                                        bgcolor: '#ffffff',
+                                        overflow: 'hidden',
+                                        transition: 'all 0.15s ease'
+                                    }}
+                                >
+                                    {/* Day Header */}
+                                    <Box
+                                        sx={{
+                                            px: 2,
+                                            py: 1.25,
+                                            bgcolor: daySelectedCount > 0 ? '#f0f7ff' : '#f8fafc',
+                                            borderBottom: '1px solid #e2e8f0',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between'
+                                        }}
+                                    >
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                            <Chip
+                                                size="small"
+                                                label={`Day ${dayIdx + 1}`}
+                                                sx={{
+                                                    height: 22,
+                                                    fontSize: '11px',
+                                                    fontWeight: 700,
+                                                    bgcolor: '#0b5299',
+                                                    color: '#ffffff'
+                                                }}
+                                            />
+                                            <Typography sx={{ fontSize: '14px', fontWeight: 600, color: '#1e293b' }}>
+                                                {formatDateCardHeader(date)}
+                                            </Typography>
+                                        </Box>
+
+                                        <FormControlLabel
+                                            control={
+                                                <Checkbox
+                                                    size="small"
+                                                    checked={isDayAll}
+                                                    indeterminate={isDaySome}
+                                                    onChange={() => handleToggleTeamDay(date)}
+                                                    sx={{
+                                                        color: '#0b5299',
+                                                        '&.Mui-checked': { color: '#0b5299' }
+                                                    }}
+                                                />
+                                            }
+                                            label={
+                                                <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>
+                                                    Select Day
+                                                </Typography>
+                                            }
+                                            sx={{ m: 0 }}
+                                        />
+                                    </Box>
+
+                                    {/* Meals Checkboxes Grid */}
+                                    <Box
+                                        sx={{
+                                            p: 2,
+                                            display: 'grid',
+                                            gridTemplateColumns: { xs: '1fr 1fr', sm: '1fr 1fr 1fr 1fr' },
+                                            gap: 1.5
+                                        }}
+                                    >
+                                        {MEAL_TYPES.map(meal => {
+                                            const cfg = MEAL_CONFIG[meal] || {};
+                                            const IconComponent = cfg.icon || RestaurantIcon;
+                                            const key = `${date}_${meal}`;
+                                            const isChecked = !!selectedTeamMeals[key];
+
+                                            return (
+                                                <Box
+                                                    key={meal}
+                                                    onClick={() => handleToggleTeamMeal(date, meal)}
+                                                    sx={{
+                                                        p: 1.5,
+                                                        borderRadius: 2,
+                                                        border: isChecked ? '1.5px solid #0b5299' : '1px solid #e2e8f0',
+                                                        bgcolor: isChecked ? '#f8fafc' : '#ffffff',
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'space-between',
+                                                        transition: 'all 0.15s ease',
+                                                        userSelect: 'none',
+                                                        '&:hover': {
+                                                            borderColor: '#0b5299',
+                                                            bgcolor: '#f8fafc'
+                                                        }
+                                                    }}
+                                                >
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                                                        <Box
+                                                            sx={{
+                                                                width: 32,
+                                                                height: 32,
+                                                                borderRadius: 1.5,
+                                                                bgcolor: cfg.bgColor || '#f1f5f9',
+                                                                color: cfg.iconColor || '#475569',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center'
+                                                            }}
+                                                        >
+                                                            <IconComponent sx={{ fontSize: 18 }} />
+                                                        </Box>
+                                                        <Box>
+                                                            <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#1e293b' }}>
+                                                                {meal}
+                                                            </Typography>
+                                                            <Typography sx={{ fontSize: '11px', color: '#64748b' }}>
+                                                                Coupon
+                                                            </Typography>
+                                                        </Box>
+                                                    </Box>
+
+                                                    <Checkbox
+                                                        size="small"
+                                                        checked={isChecked}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        onChange={() => handleToggleTeamMeal(date, meal)}
+                                                        sx={{
+                                                            p: 0.5,
+                                                            color: '#94a3b8',
+                                                            '&.Mui-checked': { color: '#0b5299' }
+                                                        }}
+                                                    />
+                                                </Box>
+                                            );
+                                        })}
+                                    </Box>
+                                </Paper>
+                            );
+                        })}
+                    </Box>
+                </DialogContent>
+
+                <DialogActions
+                    sx={{
+                        p: 2,
+                        px: { xs: 2, sm: 3 },
+                        borderTop: '1px solid #e2e8f0',
+                        display: 'flex',
+                        flexDirection: { xs: 'column', sm: 'row' },
+                        alignItems: { xs: 'stretch', sm: 'center' },
+                        gap: 1.5,
+                        justifyContent: 'space-between',
+                        bgcolor: '#ffffff'
+                    }}
+                >
+                    <Typography sx={{ fontSize: '13px', color: '#64748b', fontWeight: 500, textAlign: { xs: 'center', sm: 'left' } }}>
+                        {selectedTeamCount > 0 ? (
+                            <span><b>{selectedTeamCount}</b> coupon type(s) selected for issuance</span>
+                        ) : (
+                            <span style={{ color: '#ef4444' }}>Please select at least one coupon</span>
+                        )}
+                    </Typography>
+
+                    <Stack direction="row" spacing={1.5} sx={{ justifyContent: { xs: 'flex-end', sm: 'flex-start' } }}>
+                        <Button
+                            onClick={() => setTeamDialogOpen(false)}
+                            disabled={issuingTeamBulk}
+                            sx={{ color: '#64748b', textTransform: 'none', fontWeight: 600 }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="contained"
+                            onClick={handleConfirmTeamIssue}
+                            disabled={issuingTeamBulk || selectedTeamCount === 0}
+                            startIcon={issuingTeamBulk ? <CircularProgress size={16} color="inherit" /> : <PrintIcon />}
+                            sx={{
+                                bgcolor: '#0b5299',
+                                '&:hover': { bgcolor: '#083d73' },
+                                textTransform: 'none',
+                                fontWeight: 600,
+                                px: 2.5,
+                                py: 1,
+                                borderRadius: 1.5,
+                                boxShadow: '0 2px 8px rgba(11, 82, 153, 0.25)'
+                            }}
+                        >
+                            {issuingTeamBulk ? 'Issuing & Printing...' : 'Issue & Print'}
+                        </Button>
+                    </Stack>
                 </DialogActions>
             </Dialog>
         </Box>

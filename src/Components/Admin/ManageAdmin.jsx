@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, TextField, Button, Paper, IconButton, InputAdornment, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import { Eye, EyeSlash, PencilSquare, Trash } from 'react-bootstrap-icons';
 import { toast } from 'sonner';
 import { authAPI } from '../../utils/api';
@@ -88,12 +89,15 @@ const ManageAdmin = () => {
     };
 
     return (
-        <Box sx={{ p: 1 }}>
-            <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', mb: 3, fontSize: { xs: '1rem', md: '2rem' } }}>
-                Manage Admin
-            </Typography>
+        <Box sx={{ width: '100%' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+                <AdminPanelSettingsIcon sx={{ color: '#0b5299', fontSize: { xs: 28, md: 34 } }} />
+                <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', fontSize: { xs: '1.25rem', md: '2rem' } }}>
+                    Manage Admin
+                </Typography>
+            </Box>
 
-            <Paper elevation={0} sx={{ p: 3, width: '100%', borderRadius: 3, border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}>
+            <Paper elevation={0} sx={{ p: { xs: 2, sm: 3 }, width: '100%', borderRadius: 3, border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}>
                 <Typography variant="h6" sx={{ mb: 3, color: '#334155', fontWeight: 700 }}>
                     Create New Admin
                 </Typography>
@@ -140,20 +144,6 @@ const ManageAdmin = () => {
                                         )
                                     }
                                 }}
-                                InputProps={{
-                                    endAdornment: (
-                                        <InputAdornment position="end">
-                                            <IconButton
-                                                aria-label="toggle password visibility"
-                                                onClick={() => setShowPassword(!showPassword)}
-                                                onMouseDown={(e) => e.preventDefault()}
-                                                edge="end"
-                                            >
-                                                {showPassword ? <EyeSlash size={20} color="#0b5299" /> : <Eye size={20} color="#0b5299" />}
-                                            </IconButton>
-                                        </InputAdornment>
-                                    )
-                                }}
                                 sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1 } }}
                             />
                         </Box>
@@ -172,7 +162,7 @@ const ManageAdmin = () => {
                             />
                         </Box>
                     </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'flex-end', gap: 2 }}>
                         {editId && (
                             <Button
                                 variant="outlined"
@@ -180,7 +170,7 @@ const ManageAdmin = () => {
                                     setEditId(null);
                                     setFormData({ username: '', password: 'Aditya@123', mobile: '' });
                                 }}
-                                sx={{ mr: 2, py: 1.5, px: 4, borderRadius: 1, fontSize: '1rem', fontWeight: 'bold', textTransform: 'none' }}
+                                sx={{ py: 1.5, px: 4, borderRadius: 1, fontSize: '1rem', fontWeight: 'bold', textTransform: 'none' }}
                             >
                                 Cancel
                             </Button>
@@ -209,12 +199,12 @@ const ManageAdmin = () => {
                 </Box>
             </Paper>
 
-            <Paper elevation={0} sx={{ p: 3, width: '100%', mt: 4, borderRadius: 3, border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}>
+            <Paper elevation={0} sx={{ p: { xs: 2, sm: 3 }, width: '100%', mt: 4, borderRadius: 3, border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}>
                 <Typography variant="h6" sx={{ mb: 3, color: '#334155', fontWeight: 700 }}>
                     Admin List
                 </Typography>
-                <TableContainer>
-                    <Table>
+                <TableContainer sx={{ overflowX: 'auto', width: '100%' }}>
+                    <Table sx={{ minWidth: 500 }}>
                         <TableHead>
                             <TableRow sx={{ backgroundColor: '#f8fafc' }}>
                                 <TableCell sx={{ fontWeight: 'bold', color: '#64748b' }}>Username</TableCell>
