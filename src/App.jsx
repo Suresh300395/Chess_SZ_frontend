@@ -136,6 +136,39 @@ const theme = createTheme({
         },
       },
     },
+    MuiModal: {
+      defaultProps: {
+        closeAfterTransition: false,
+        disableRestoreFocus: true,
+      },
+    },
+    MuiPopover: {
+      defaultProps: {
+        disableRestoreFocus: true,
+      },
+    },
+    MuiMenu: {
+      defaultProps: {
+        disableAutoFocusItem: true,
+        autoFocus: false,
+        disableRestoreFocus: true,
+      },
+    },
+    MuiSelect: {
+      defaultProps: {
+        MenuProps: {
+          disableRestoreFocus: true,
+          disableAutoFocusItem: true,
+          autoFocus: false,
+        },
+      },
+    },
+    MuiDialog: {
+      defaultProps: {
+        closeAfterTransition: false,
+        disableRestoreFocus: true,
+      },
+    },
   },
 });
 

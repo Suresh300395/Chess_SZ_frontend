@@ -37,6 +37,8 @@ import CloseIcon from '@mui/icons-material/Close';
 import CancelIcon from '@mui/icons-material/Cancel';
 import SearchIcon from '@mui/icons-material/Search';
 import PrintIcon from '@mui/icons-material/Print';
+import GridViewRoundedIcon from '@mui/icons-material/GridViewRounded';
+import TableRowsRoundedIcon from '@mui/icons-material/TableRowsRounded';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
 import GroupsIcon from '@mui/icons-material/Groups';
 import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined';
@@ -191,6 +193,13 @@ const FoodTokens = () => {
     const [selectedTeamMeals, setSelectedTeamMeals] = useState({});
     const [issuingTeamBulk, setIssuingTeamBulk] = useState(false);
 
+    // Multi-Selection and University Bulk Issue State
+    const [selectedPeopleRefs, setSelectedPeopleRefs] = useState([]);
+    const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+    const [bulkDialogPeople, setBulkDialogPeople] = useState([]);
+    const [bulkDialogMeals, setBulkDialogMeals] = useState({});
+    const [issuingMultiBulk, setIssuingMultiBulk] = useState(false);
+
     // -------------------------------------------------------------
     // TAB 2: TOKENS REPORT & STATS STATE
     // -------------------------------------------------------------
@@ -205,6 +214,7 @@ const FoodTokens = () => {
     const [filterStatus, setFilterStatus] = useState('');
     const [filterPersonType, setFilterPersonType] = useState('');
     const [filterSearch, setFilterSearch] = useState('');
+    const [tokensViewMode, setTokensViewMode] = useState('table');
 
     // Cancel Dialog
     const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
@@ -317,6 +327,7 @@ const FoodTokens = () => {
 
     // Debounce search query - only runs when search query is typed
     useEffect(() => {
+        setSelectedPeopleRefs([]);
         if (!searchQuery.trim()) {
             setPeopleList([]);
             return;
@@ -578,6 +589,157 @@ const FoodTokens = () => {
         }
     };
 
+    // -------------------------------------------------------------
+    // MULTI-SELECTION & UNIVERSITY BULK ISSUE HANDLERS
+    // -------------------------------------------------------------
+    const handleTogglePersonSelect = (personRef) => {
+        setSelectedPeopleRefs(prev => {
+            if (prev.includes(personRef)) {
+                return prev.filter(id => id !== personRef);
+            } else {
+                return [...prev, personRef];
+            }
+        });
+    };
+
+    const handleToggleSelectAllPeople = () => {
+        if (selectedPeopleRefs.length === peopleList.length) {
+            setSelectedPeopleRefs([]);
+        } else {
+            setSelectedPeopleRefs(peopleList.map(p => p.personRef));
+        }
+    };
+
+    const getPeopleStayDates = (people) => {
+        if (!people || people.length === 0) return [getTodayDateString()];
+        const allDates = new Set();
+        people.forEach(p => {
+            const range = generateDateRange(p.arrivalDate, p.departureDate);
+            range.forEach(d => allDates.add(d));
+        });
+        const sorted = Array.from(allDates).sort();
+        return sorted.length > 0 ? sorted : [getTodayDateString()];
+    };
+
+    const handleOpenBulkDialog = (customPeople = null) => {
+        const targetPeople = customPeople || (
+            selectedPeopleRefs.length > 0
+                ? peopleList.filter(p => selectedPeopleRefs.includes(p.personRef))
+                : peopleList
+        );
+
+        if (!targetPeople || targetPeople.length === 0) {
+            toast.warning('Please select at least one person to issue tokens');
+            return;
+        }
+
+        const dates = getPeopleStayDates(targetPeople);
+        const initialMap = {};
+        dates.forEach(date => {
+            MEAL_TYPES.forEach(meal => {
+                initialMap[`${date}_${meal}`] = true;
+            });
+        });
+
+        setBulkDialogPeople(targetPeople);
+        setBulkDialogMeals(initialMap);
+        setBulkDialogOpen(true);
+    };
+
+    const handleToggleBulkMeal = (date, meal) => {
+        const key = `${date}_${meal}`;
+        setBulkDialogMeals(prev => ({
+            ...prev,
+            [key]: !prev[key]
+        }));
+    };
+
+    const handleToggleBulkDay = (date) => {
+        setBulkDialogMeals(prev => {
+            const next = { ...prev };
+            const allSelected = MEAL_TYPES.every(m => next[`${date}_${m}`]);
+            MEAL_TYPES.forEach(m => {
+                if (allSelected) {
+                    delete next[`${date}_${m}`];
+                } else {
+                    next[`${date}_${m}`] = true;
+                }
+            });
+            return next;
+        });
+    };
+
+    const handleToggleSelectAllBulkMeals = (allKeys, isAllSelected) => {
+        if (isAllSelected) {
+            setBulkDialogMeals({});
+        } else {
+            const map = {};
+            allKeys.forEach(k => { map[k] = true; });
+            setBulkDialogMeals(map);
+        }
+    };
+
+    const handleSetBulkTodayOnly = () => {
+        const today = getTodayDateString();
+        const map = {};
+        MEAL_TYPES.forEach(m => {
+            map[`${today}_${m}`] = true;
+        });
+        setBulkDialogMeals(map);
+    };
+
+    const handleSetBulkAllDays = (allKeys) => {
+        const map = {};
+        allKeys.forEach(k => { map[k] = true; });
+        setBulkDialogMeals(map);
+    };
+
+    const handleConfirmMultiBulkIssue = async () => {
+        if (!bulkDialogPeople || bulkDialogPeople.length === 0) return;
+
+        const selections = [];
+        Object.entries(bulkDialogMeals).forEach(([key, isSelected]) => {
+            if (isSelected) {
+                const lastUnderscore = key.lastIndexOf('_');
+                const mealDate = key.substring(0, lastUnderscore);
+                const mealType = key.substring(lastUnderscore + 1);
+                selections.push({ mealDate, mealType });
+            }
+        });
+
+        if (selections.length === 0) {
+            toast.warning('Please select at least one coupon to issue');
+            return;
+        }
+
+        setIssuingMultiBulk(true);
+        try {
+            const personRefs = bulkDialogPeople.map(p => p.personRef);
+            const res = await foodTokenAPI.issueBulk({
+                personRefs,
+                selections
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                toast.success(data.message || `Tokens issued successfully for ${bulkDialogPeople.length} people!`);
+                setBulkDialogOpen(false);
+                if (data.printPayloads && data.printPayloads.length > 0) {
+                    toast.info(`Sending ${data.printPayloads.length} tokens to printer...`);
+                    await printMultipleFoodTokens(data.printPayloads);
+                }
+                searchPeople(searchQuery);
+                fetchStats();
+            } else {
+                toast.error(data.message || 'Failed to issue tokens');
+            }
+        } catch (err) {
+            toast.error('Bulk issue failed: ' + err.message);
+        } finally {
+            setIssuingMultiBulk(false);
+        }
+    };
+
 
     useEffect(() => {
         fetchStats();
@@ -672,6 +834,18 @@ const FoodTokens = () => {
     const isAllTeamSelected = allTeamKeys.length > 0 && allTeamKeys.every(k => selectedTeamMeals[k]);
     const isSomeTeamSelected = allTeamKeys.some(k => selectedTeamMeals[k]) && !isAllTeamSelected;
 
+    // Bulk Dialog Calculations
+    const bulkStayDates = bulkDialogPeople.length > 0 ? getPeopleStayDates(bulkDialogPeople) : [];
+    const allBulkKeys = [];
+    bulkStayDates.forEach(date => {
+        MEAL_TYPES.forEach(meal => {
+            allBulkKeys.push(`${date}_${meal}`);
+        });
+    });
+    const selectedBulkCount = Object.values(bulkDialogMeals).filter(Boolean).length;
+    const isAllBulkSelected = allBulkKeys.length > 0 && allBulkKeys.every(k => bulkDialogMeals[k]);
+    const isSomeBulkSelected = allBulkKeys.some(k => bulkDialogMeals[k]) && !isAllBulkSelected;
+
     return (
         <Box sx={{ width: '100%', pb: 4 }}>
             {/* Page Header */}
@@ -748,79 +922,231 @@ const FoodTokens = () => {
                                     <Typography variant="body2">No matching players, coaches, or managers found for "{searchQuery}".</Typography>
                                 </Box>
                             ) : (
-                                <Box sx={{
-                                    display: 'grid',
-                                    gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: 'repeat(3, 1fr)' },
-                                    gap: 1.5,
-                                    maxHeight: '320px',
-                                    overflowY: 'auto',
-                                    pr: 0.5
-                                }}>
-                                    {peopleList.map((person) => {
-                                        const isSelected = selectedPerson?.personRef === person.personRef;
-                                        const issuedCount = Object.keys(person.tokensToday || {}).length;
+                                <Box>
+                                    {/* University / Multi-Selection Action Toolbar */}
+                                    {(() => {
+                                        const isAllSelected = peopleList.length > 0 && selectedPeopleRefs.length === peopleList.length;
+                                        const isSomeSelected = selectedPeopleRefs.length > 0 && !isAllSelected;
+                                        const detectedUniv = peopleList[0]?.teamOrSport || '';
+                                        const isUniformUniv = peopleList.every(p => p.teamOrSport === detectedUniv);
 
                                         return (
-                                            <Box
-                                                key={`${person.personType}-${person.personRef}`}
-                                                onClick={() => {
-                                                    setSelectedPerson(person);
-                                                    setSelectedDateFilter('ALL');
-                                                    setSelectedCardDate(null);
-                                                }}
+                                            <Paper
+                                                elevation={0}
                                                 sx={{
                                                     p: 1.5,
-                                                    mb: 1.5,
-                                                    borderRadius: 2,
-                                                    cursor: 'pointer',
-                                                    border: isSelected ? '2px solid #0b5299' : '1px solid #e2e8f0',
-                                                    bgcolor: isSelected ? '#f0f7ff' : '#ffffff',
-                                                    transition: 'all 0.2s',
-                                                    '&:hover': { bgcolor: isSelected ? '#f0f7ff' : '#f8fafc', borderColor: '#0b5299' }
+                                                    px: 2,
+                                                    mb: 2,
+                                                    borderRadius: 2.5,
+                                                    border: '1px solid #bfdbfe',
+                                                    background: 'linear-gradient(135deg, #f0f7ff 0%, #e8f2ff 100%)',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    flexWrap: 'wrap',
+                                                    gap: 1.5
                                                 }}
                                             >
-                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                                    <Typography sx={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>
-                                                        {person.name}
-                                                    </Typography>
+                                                {/* Left: Checkbox & Info */}
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                                                    <FormControlLabel
+                                                        control={
+                                                            <Checkbox
+                                                                size="small"
+                                                                checked={isAllSelected}
+                                                                indeterminate={isSomeSelected}
+                                                                onChange={handleToggleSelectAllPeople}
+                                                                sx={{
+                                                                    color: '#0b5299',
+                                                                    '&.Mui-checked': { color: '#0b5299' },
+                                                                    '&.MuiCheckbox-indeterminate': { color: '#0b5299' }
+                                                                }}
+                                                            />
+                                                        }
+                                                        label={
+                                                            <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
+                                                                Select All ({peopleList.length})
+                                                            </Typography>
+                                                        }
+                                                        sx={{ mr: 0 }}
+                                                    />
+
+                                                    {isUniformUniv && detectedUniv && (
+                                                        <Chip
+                                                            size="small"
+                                                            icon={<GroupsIcon sx={{ fontSize: '16px !important' }} />}
+                                                            label={detectedUniv}
+                                                            sx={{
+                                                                fontWeight: 700,
+                                                                fontSize: '12px',
+                                                                bgcolor: '#ffffff',
+                                                                color: '#0b5299',
+                                                                border: '1px solid #93c5fd'
+                                                            }}
+                                                        />
+                                                    )}
+
                                                     <Chip
                                                         size="small"
-                                                        label={person.roleLabel}
+                                                        label={`${selectedPeopleRefs.length} Selected`}
                                                         sx={{
-                                                            fontSize: '11px',
                                                             fontWeight: 600,
-                                                            bgcolor: person.personType === 'MANAGER' ? '#f3e8ff' : person.personType === 'COACH' ? '#dcfce7' : '#e0f2fe',
-                                                            color: person.personType === 'MANAGER' ? '#7e22ce' : person.personType === 'COACH' ? '#15803d' : '#0369a1'
+                                                            fontSize: '12px',
+                                                            bgcolor: selectedPeopleRefs.length > 0 ? '#0b5299' : '#e2e8f0',
+                                                            color: selectedPeopleRefs.length > 0 ? '#ffffff' : '#64748b'
                                                         }}
                                                     />
+
+                                                    {selectedPeopleRefs.length > 0 && (
+                                                        <Button
+                                                            size="small"
+                                                            variant="text"
+                                                            onClick={() => setSelectedPeopleRefs([])}
+                                                            sx={{ fontSize: '12px', color: '#64748b', textTransform: 'none', p: 0, minWidth: 'auto' }}
+                                                        >
+                                                            Clear
+                                                        </Button>
+                                                    )}
                                                 </Box>
 
-                                                <Typography sx={{ fontSize: '13px', color: '#475569', mt: 0.5 }}>
-                                                    {person.teamOrSport}
-                                                </Typography>
+                                                {/* Right: Actions */}
+                                                <Stack direction="row" spacing={1.5} alignItems="center">
+                                                    {selectedPeopleRefs.length > 0 && selectedPeopleRefs.length < peopleList.length && (
+                                                        <Button
+                                                            variant="contained"
+                                                            size="small"
+                                                            startIcon={<ConfirmationNumberOutlinedIcon sx={{ fontSize: 18 }} />}
+                                                            onClick={() => handleOpenBulkDialog()}
+                                                            sx={{
+                                                                bgcolor: '#0b5299',
+                                                                '&:hover': { bgcolor: '#083d73' },
+                                                                textTransform: 'none',
+                                                                fontWeight: 700,
+                                                                fontSize: '13px',
+                                                                borderRadius: 2,
+                                                                px: 2,
+                                                                boxShadow: '0 2px 8px rgba(11, 82, 153, 0.25)'
+                                                            }}
+                                                        >
+                                                            Issue Selected ({selectedPeopleRefs.length})
+                                                        </Button>
+                                                    )}
 
-                                                {person.arrivalDate && (
-                                                    <Typography sx={{ fontSize: '12px', color: '#0b5299', fontWeight: 600, mt: 0.5 }}>
-                                                        Stay: {formatDateDDMMYYYY(person.arrivalDate)} → {formatDateDDMMYYYY(person.departureDate || person.arrivalDate)}
-                                                    </Typography>
-                                                )}
-
-                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
-                                                    <Typography sx={{ fontSize: '12px', color: '#64748b' }}>
-                                                        {person.identifier}
-                                                        {person.block ? ` • ${person.block} (${person.room})` : ''}
-                                                    </Typography>
-                                                    <Chip
+                                                    <Button
+                                                        variant="contained"
                                                         size="small"
-                                                        label={person.tokensByDate ? `${Object.values(person.tokensByDate).reduce((acc, meals) => acc + Object.keys(meals).length, 0)} Total Tokens` : `${issuedCount}/4 Today`}
-                                                        color="primary"
-                                                        variant="outlined"
-                                                        sx={{ fontSize: '10px', height: 20, fontWeight: 700 }}
-                                                    />
-                                                </Box>
-                                            </Box>
+                                                        startIcon={<PrintIcon sx={{ fontSize: 18 }} />}
+                                                        onClick={() => handleOpenBulkDialog(peopleList)}
+                                                        sx={{
+                                                            bgcolor: '#d06c38',
+                                                            '&:hover': { bgcolor: '#b85928' },
+                                                            textTransform: 'none',
+                                                            fontWeight: 700,
+                                                            fontSize: '13px',
+                                                            borderRadius: 2,
+                                                            px: 2,
+                                                            boxShadow: '0 2px 8px rgba(208, 108, 56, 0.25)'
+                                                        }}
+                                                    >
+                                                        Issue All ({peopleList.length} People)
+                                                    </Button>
+                                                </Stack>
+                                            </Paper>
                                         );
-                                    })}
+                                    })()}
+
+                                    {/* People Cards Grid */}
+                                    <Box sx={{
+                                        display: 'grid',
+                                        gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: 'repeat(3, 1fr)' },
+                                        gap: 1.5,
+                                        maxHeight: '320px',
+                                        overflowY: 'auto',
+                                        pr: 0.5
+                                    }}>
+                                        {peopleList.map((person) => {
+                                            const isSelected = selectedPerson?.personRef === person.personRef;
+                                            const isChecked = selectedPeopleRefs.includes(person.personRef);
+                                            const issuedCount = Object.keys(person.tokensToday || {}).length;
+
+                                            return (
+                                                <Box
+                                                    key={`${person.personType}-${person.personRef}`}
+                                                    onClick={() => {
+                                                        setSelectedPerson(person);
+                                                        setSelectedDateFilter('ALL');
+                                                        setSelectedCardDate(null);
+                                                    }}
+                                                    sx={{
+                                                        p: 1.5,
+                                                        mb: 1.5,
+                                                        borderRadius: 2,
+                                                        cursor: 'pointer',
+                                                        border: isSelected ? '2px solid #0b5299' : isChecked ? '2px solid #3b82f6' : '1px solid #e2e8f0',
+                                                        bgcolor: isSelected ? '#f0f7ff' : isChecked ? '#f8fafc' : '#ffffff',
+                                                        boxShadow: isChecked || isSelected ? '0 2px 8px rgba(11, 82, 153, 0.08)' : 'none',
+                                                        transition: 'all 0.2s',
+                                                        '&:hover': { bgcolor: isSelected ? '#f0f7ff' : '#f8fafc', borderColor: '#0b5299' }
+                                                    }}
+                                                >
+                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                            <Checkbox
+                                                                size="small"
+                                                                checked={isChecked}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleTogglePersonSelect(person.personRef);
+                                                                }}
+                                                                sx={{
+                                                                    p: 0,
+                                                                    color: '#94a3b8',
+                                                                    '&.Mui-checked': { color: '#0b5299' }
+                                                                }}
+                                                            />
+                                                            <Typography sx={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>
+                                                                {person.name}
+                                                            </Typography>
+                                                        </Box>
+                                                        <Chip
+                                                            size="small"
+                                                            label={person.roleLabel}
+                                                            sx={{
+                                                                fontSize: '11px',
+                                                                fontWeight: 600,
+                                                                bgcolor: person.personType === 'MANAGER' ? '#f3e8ff' : person.personType === 'COACH' ? '#dcfce7' : '#e0f2fe',
+                                                                color: person.personType === 'MANAGER' ? '#7e22ce' : person.personType === 'COACH' ? '#15803d' : '#0369a1'
+                                                            }}
+                                                        />
+                                                    </Box>
+
+                                                    <Typography sx={{ fontSize: '13px', color: '#475569', mt: 0.5, pl: 3.5 }}>
+                                                        {person.teamOrSport}
+                                                    </Typography>
+
+                                                    {person.arrivalDate && (
+                                                        <Typography sx={{ fontSize: '12px', color: '#0b5299', fontWeight: 600, mt: 0.5, pl: 3.5 }}>
+                                                            Stay: {formatDateDDMMYYYY(person.arrivalDate)} → {formatDateDDMMYYYY(person.departureDate || person.arrivalDate)}
+                                                        </Typography>
+                                                    )}
+
+                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1, pl: 3.5 }}>
+                                                        <Typography sx={{ fontSize: '12px', color: '#64748b' }}>
+                                                            {person.identifier}
+                                                            {person.block ? ` • ${person.block} (${person.room})` : ''}
+                                                        </Typography>
+                                                        <Chip
+                                                            size="small"
+                                                            label={person.tokensByDate ? `${Object.values(person.tokensByDate).reduce((acc, meals) => acc + Object.keys(meals).length, 0)} Total Tokens` : `${issuedCount}/4 Today`}
+                                                            color="primary"
+                                                            variant="outlined"
+                                                            sx={{ fontSize: '10px', height: 20, fontWeight: 700 }}
+                                                        />
+                                                    </Box>
+                                                </Box>
+                                            );
+                                        })}
+                                    </Box>
                                 </Box>
                             )}
                         </Paper>
@@ -1528,17 +1854,154 @@ const FoodTokens = () => {
                                 </FormControl>
                             </Box>
 
-                            <Button
-                                variant="outlined"
-                                startIcon={<DownloadIcon />}
-                                onClick={handleExportCSV}
-                                sx={{ color: '#0b5299', borderColor: '#0b5299', width: { xs: '100%', sm: 'auto' } }}
-                            >
-                                Export CSV
-                            </Button>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: { xs: '100%', sm: 'auto' }, justifyContent: { xs: 'space-between', sm: 'flex-end' } }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, bgcolor: '#ffffff', p: 0.4, borderRadius: 2, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                                    <Tooltip title="Cards View">
+                                        <IconButton
+                                            size="small"
+                                            onClick={() => setTokensViewMode('cards')}
+                                            sx={{
+                                                p: 0.6,
+                                                borderRadius: 1.5,
+                                                bgcolor: tokensViewMode === 'cards' ? '#0b5299' : 'transparent',
+                                                color: tokensViewMode === 'cards' ? '#ffffff' : '#64748b',
+                                                boxShadow: tokensViewMode === 'cards' ? '0 1px 3px rgba(11,82,153,0.3)' : 'none',
+                                                '&:hover': {
+                                                    bgcolor: tokensViewMode === 'cards' ? '#0b5299' : 'rgba(0,0,0,0.06)',
+                                                    color: tokensViewMode === 'cards' ? '#ffffff' : '#0b5299'
+                                                }
+                                            }}
+                                        >
+                                            <GridViewRoundedIcon sx={{ fontSize: 18 }} />
+                                        </IconButton>
+                                    </Tooltip>
+                                    <Tooltip title="Table View">
+                                        <IconButton
+                                            size="small"
+                                            onClick={() => setTokensViewMode('table')}
+                                            sx={{
+                                                p: 0.6,
+                                                borderRadius: 1.5,
+                                                bgcolor: tokensViewMode === 'table' ? '#0b5299' : 'transparent',
+                                                color: tokensViewMode === 'table' ? '#ffffff' : '#64748b',
+                                                boxShadow: tokensViewMode === 'table' ? '0 1px 3px rgba(11,82,153,0.3)' : 'none',
+                                                '&:hover': {
+                                                    bgcolor: tokensViewMode === 'table' ? '#0b5299' : 'rgba(0,0,0,0.06)',
+                                                    color: tokensViewMode === 'table' ? '#ffffff' : '#0b5299'
+                                                }
+                                            }}
+                                        >
+                                            <TableRowsRoundedIcon sx={{ fontSize: 18 }} />
+                                        </IconButton>
+                                    </Tooltip>
+                                </Box>
+
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<DownloadIcon />}
+                                    onClick={handleExportCSV}
+                                    sx={{ color: '#0b5299', borderColor: '#0b5299', flex: { xs: 1, sm: 'none' } }}
+                                >
+                                    Export CSV
+                                </Button>
+                            </Box>
                         </Box>
 
-                        {/* Tokens Data Table */}
+                        {/* Tokens Data Cards or Table */}
+                        {tokensViewMode === 'cards' ? (
+                            <Box sx={{ p: { xs: 1, sm: 2 } }}>
+                                {loadingTokens ? (
+                                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+                                        <CircularProgress size={32} sx={{ color: '#0b5299' }} />
+                                    </Box>
+                                ) : tokensList.length === 0 ? (
+                                    <Box sx={{ textAlign: 'center', py: 6, color: 'text.secondary' }}>
+                                        No food tokens found for the selected criteria.
+                                    </Box>
+                                ) : (
+                                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 2 }}>
+                                        {tokensList.map((token) => (
+                                            <Card
+                                                key={token._id}
+                                                variant="outlined"
+                                                sx={{
+                                                    borderRadius: 2.5,
+                                                    border: '1px solid #e2e8f0',
+                                                    boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                                                    transition: 'all 0.2s ease',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    '&:hover': {
+                                                        boxShadow: '0 6px 16px rgba(11,82,153,0.1)',
+                                                        borderColor: '#93c5fd'
+                                                    }
+                                                }}
+                                            >
+                                                <CardContent sx={{ p: 2, flex: 1, display: 'flex', flexDirection: 'column', gap: 1.5, '&:last-child': { pb: 2 } }}>
+                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                        <Typography sx={{ fontFamily: 'monospace', fontWeight: 800, color: '#0b5299', fontSize: '0.95rem', bgcolor: '#eff6ff', px: 1, py: 0.3, borderRadius: 1 }}>
+                                                            {token.code}
+                                                        </Typography>
+                                                        <Chip
+                                                            size="small"
+                                                            label={token.status}
+                                                            color={token.status === 'ISSUED' ? 'success' : 'error'}
+                                                            sx={{ fontWeight: 700, fontSize: '11px' }}
+                                                        />
+                                                    </Box>
+
+                                                    <Box>
+                                                        <Typography sx={{ fontWeight: 700, color: '#0f172a', fontSize: '1rem', lineHeight: 1.3 }}>
+                                                            {token.name}
+                                                        </Typography>
+                                                        <Typography variant="body2" sx={{ color: '#64748b', mt: 0.3, fontSize: '0.85rem' }}>
+                                                            {token.teamOrSport || 'No University/Team'}
+                                                        </Typography>
+                                                    </Box>
+
+                                                    <Box sx={{ bgcolor: '#f8fafc', p: 1.2, borderRadius: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                        <Box>
+                                                            <Typography variant="caption" sx={{ color: '#64748b', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                                                Meal & Date
+                                                            </Typography>
+                                                            <Typography sx={{ fontWeight: 600, color: '#1e293b', fontSize: '0.85rem' }}>
+                                                                {token.mealType} • {formatDateDDMMYYYY(token.mealDate)}
+                                                            </Typography>
+                                                        </Box>
+                                                        <Chip
+                                                            size="small"
+                                                            label={`Prints: ${token.printCount || 1}`}
+                                                            variant="outlined"
+                                                            sx={{ fontSize: '0.75rem', height: 22 }}
+                                                        />
+                                                    </Box>
+
+                                                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', pt: 0.5, borderTop: '1px solid #f1f5f9' }}>
+                                                        <Button
+                                                            size="small"
+                                                            variant="outlined"
+                                                            startIcon={<PrintIcon fontSize="small" />}
+                                                            disabled={token.status !== 'ISSUED'}
+                                                            onClick={() => handleReprint(token._id)}
+                                                            sx={{
+                                                                color: '#0b5299',
+                                                                borderColor: '#bfdbfe',
+                                                                textTransform: 'none',
+                                                                fontWeight: 600,
+                                                                fontSize: '0.82rem',
+                                                                '&:hover': { borderColor: '#0b5299', bgcolor: '#eff6ff' }
+                                                            }}
+                                                        >
+                                                            Reprint Token
+                                                        </Button>
+                                                    </Box>
+                                                </CardContent>
+                                            </Card>
+                                        ))}
+                                    </Box>
+                                )}
+                            </Box>
+                        ) : (
                         <TableContainer sx={{ overflowX: 'auto', width: '100%' }}>
                             <Table size="small" sx={{ minWidth: 650 }}>
                                 <TableHead sx={{ bgcolor: '#f8fafc' }}>
@@ -1605,6 +2068,7 @@ const FoodTokens = () => {
                                 </TableBody>
                             </Table>
                         </TableContainer>
+                        )}
 
                         <TablePagination
                             rowsPerPageOptions={[10, 20, 50]}
@@ -1614,6 +2078,38 @@ const FoodTokens = () => {
                             page={page}
                             onPageChange={(e, newPage) => setPage(newPage)}
                             onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
+                            labelRowsPerPage={
+                                <Box component="span" sx={{ fontSize: 'inherit' }}>
+                                    <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>Rows per page:</Box>
+                                    <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>Rows:</Box>
+                                </Box>
+                            }
+                            sx={{
+                                borderTop: '1px solid #f1f5f9',
+                                '& .MuiTablePagination-toolbar': {
+                                    px: { xs: 1, sm: 2 },
+                                    minHeight: { xs: 48, sm: 52 },
+                                    justifyContent: { xs: 'space-between', sm: 'flex-end' },
+                                    gap: { xs: 0.5, sm: 1 }
+                                },
+                                '& .MuiTablePagination-selectLabel': {
+                                    m: 0,
+                                    fontSize: { xs: '12px', sm: '14px' }
+                                },
+                                '& .MuiTablePagination-input': {
+                                    m: { xs: '0 4px 0 2px', sm: '0 16px' }
+                                },
+                                '& .MuiTablePagination-displayedRows': {
+                                    m: { xs: '0 4px', sm: '0 16px' },
+                                    fontSize: { xs: '12px', sm: '14px' }
+                                },
+                                '& .MuiTablePagination-actions': {
+                                    ml: { xs: 0.5, sm: 2 },
+                                    '& .MuiIconButton-root': {
+                                        p: { xs: 0.5, sm: 1 }
+                                    }
+                                }
+                            }}
                         />
                     </Paper>
                 </Box>
@@ -1625,10 +2121,13 @@ const FoodTokens = () => {
                 onClose={() => !issuingTeamBulk && setTeamDialogOpen(false)}
                 maxWidth="md"
                 fullWidth
-                PaperProps={{
-                    sx: {
-                        borderRadius: 3,
-                        boxShadow: '0 20px 40px rgba(0,0,0,0.15)'
+                disableRestoreFocus
+                slotProps={{
+                    paper: {
+                        sx: {
+                            borderRadius: 3,
+                            boxShadow: '0 20px 40px rgba(0,0,0,0.15)'
+                        }
                     }
                 }}
             >
@@ -1942,6 +2441,385 @@ const FoodTokens = () => {
                             }}
                         >
                             {issuingTeamBulk ? 'Issuing & Printing...' : 'Issue & Print'}
+                        </Button>
+                    </Stack>
+                </DialogActions>
+            </Dialog>
+
+            {/* Issue Bulk Food Tokens for University / Selected Participants Dialog */}
+            <Dialog
+                open={bulkDialogOpen}
+                onClose={() => !issuingMultiBulk && setBulkDialogOpen(false)}
+                maxWidth="md"
+                fullWidth
+                disableRestoreFocus
+                slotProps={{
+                    paper: {
+                        sx: {
+                            borderRadius: 3,
+                            boxShadow: '0 20px 40px rgba(0,0,0,0.15)'
+                        }
+                    }
+                }}
+            >
+                <DialogTitle
+                    sx={{
+                        p: 2.5,
+                        pb: 1.5,
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        justifyContent: 'space-between',
+                        borderBottom: '1px solid #e2e8f0'
+                    }}
+                >
+                    <Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
+                            <Box
+                                sx={{
+                                    width: 38,
+                                    height: 38,
+                                    borderRadius: '50%',
+                                    bgcolor: '#fff5f0',
+                                    color: '#d06c38',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}
+                            >
+                                <GroupsIcon fontSize="medium" />
+                            </Box>
+                            <Box>
+                                <Typography sx={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>
+                                    Issue Food Tokens — {bulkDialogPeople[0]?.teamOrSport || 'Selected Participants'}
+                                </Typography>
+                                <Typography sx={{ fontSize: '13px', color: '#64748b', mt: 0.25 }}>
+                                    {bulkDialogPeople.length} People Selected • Stay Dates: {formatDateDDMMYYYY(bulkStayDates[0])} → {formatDateDDMMYYYY(bulkStayDates[bulkStayDates.length - 1])} ({bulkStayDates.length} {bulkStayDates.length === 1 ? 'Day' : 'Days'})
+                                </Typography>
+                            </Box>
+                        </Box>
+                    </Box>
+                    <IconButton
+                        size="small"
+                        onClick={() => setBulkDialogOpen(false)}
+                        disabled={issuingMultiBulk}
+                        sx={{ color: '#64748b', '&:hover': { bgcolor: '#f1f5f9' } }}
+                    >
+                        <CloseIcon fontSize="small" />
+                    </IconButton>
+                </DialogTitle>
+
+                <DialogContent sx={{ p: 2.5, bgcolor: '#f8fafc' }}>
+                    {/* Selected Participants Chips Bar */}
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 1.5,
+                            mb: 2,
+                            borderRadius: 2,
+                            border: '1px solid #e2e8f0',
+                            bgcolor: '#ffffff'
+                        }}
+                    >
+                        <Typography sx={{ fontSize: '12px', fontWeight: 700, color: '#475569', mb: 1, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                            Participants Included ({bulkDialogPeople.length}):
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, maxHeight: '90px', overflowY: 'auto' }}>
+                            {bulkDialogPeople.map(p => (
+                                <Chip
+                                    key={p.personRef}
+                                    size="small"
+                                    label={`${p.name} (${p.roleLabel})`}
+                                    sx={{
+                                        fontSize: '11px',
+                                        fontWeight: 600,
+                                        bgcolor: p.personType === 'MANAGER' ? '#f3e8ff' : p.personType === 'COACH' ? '#dcfce7' : '#e0f2fe',
+                                        color: p.personType === 'MANAGER' ? '#7e22ce' : p.personType === 'COACH' ? '#15803d' : '#0369a1'
+                                    }}
+                                />
+                            ))}
+                        </Box>
+                    </Paper>
+
+                    {/* Top Control Bar: Select All, Presets & Counters */}
+                    <Paper
+                        elevation={0}
+                        sx={{
+                            p: 1.75,
+                            px: 2,
+                            mb: 2.5,
+                            borderRadius: 2,
+                            border: '1px solid #cbd5e1',
+                            bgcolor: '#ffffff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexWrap: 'wrap',
+                            gap: 1.5
+                        }}
+                    >
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={isAllBulkSelected}
+                                    indeterminate={isSomeBulkSelected}
+                                    onChange={() => handleToggleSelectAllBulkMeals(allBulkKeys, isAllBulkSelected)}
+                                    color="primary"
+                                    sx={{
+                                        color: '#0b5299',
+                                        '&.Mui-checked': { color: '#0b5299' },
+                                        '&.MuiCheckbox-indeterminate': { color: '#0b5299' }
+                                    }}
+                                />
+                            }
+                            label={
+                                <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#1e293b' }}>
+                                    Select All Coupons (All Days & Meals)
+                                </Typography>
+                            }
+                        />
+
+                        <Stack direction="row" spacing={1} alignItems="center">
+                            <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => handleSetBulkAllDays(allBulkKeys)}
+                                disabled={issuingMultiBulk}
+                                sx={{ fontSize: '12px', textTransform: 'none', borderColor: '#bfdbfe', color: '#0b5299', py: 0.25 }}
+                            >
+                                All Stay Days
+                            </Button>
+                            <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={handleSetBulkTodayOnly}
+                                disabled={issuingMultiBulk}
+                                sx={{ fontSize: '12px', textTransform: 'none', borderColor: '#bfdbfe', color: '#0b5299', py: 0.25 }}
+                            >
+                                Today Only
+                            </Button>
+                            <Chip
+                                size="small"
+                                label={`${selectedBulkCount} / ${allBulkKeys.length} Meals Selected`}
+                                sx={{
+                                    fontWeight: 700,
+                                    fontSize: '12px',
+                                    bgcolor: selectedBulkCount > 0 ? '#eff6ff' : '#f1f5f9',
+                                    color: selectedBulkCount > 0 ? '#1d4ed8' : '#64748b',
+                                    border: selectedBulkCount > 0 ? '1px solid #bfdbfe' : '1px solid #e2e8f0'
+                                }}
+                            />
+                            {selectedBulkCount > 0 && (
+                                <Button
+                                    size="small"
+                                    variant="text"
+                                    onClick={() => setBulkDialogMeals({})}
+                                    disabled={issuingMultiBulk}
+                                    sx={{ fontSize: '12px', color: '#64748b', minWidth: 'auto', p: '2px 8px' }}
+                                >
+                                    Deselect All
+                                </Button>
+                            )}
+                        </Stack>
+                    </Paper>
+
+                    {/* Day-wise Coupon Groups */}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {bulkStayDates.map((date, dayIdx) => {
+                            const isDayAll = MEAL_TYPES.every(m => bulkDialogMeals[`${date}_${m}`]);
+                            const isDaySome = MEAL_TYPES.some(m => bulkDialogMeals[`${date}_${m}`]) && !isDayAll;
+                            const daySelectedCount = MEAL_TYPES.filter(m => bulkDialogMeals[`${date}_${m}`]).length;
+
+                            return (
+                                <Paper
+                                    key={date}
+                                    elevation={0}
+                                    sx={{
+                                        borderRadius: 2,
+                                        border: daySelectedCount > 0 ? '1.5px solid #0b5299' : '1px solid #e2e8f0',
+                                        bgcolor: '#ffffff',
+                                        overflow: 'hidden',
+                                        transition: 'all 0.15s ease'
+                                    }}
+                                >
+                                    {/* Day Header */}
+                                    <Box
+                                        sx={{
+                                            px: 2,
+                                            py: 1.25,
+                                            bgcolor: daySelectedCount > 0 ? '#f0f7ff' : '#f8fafc',
+                                            borderBottom: '1px solid #e2e8f0',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between'
+                                        }}
+                                    >
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                            <Chip
+                                                size="small"
+                                                label={`Day ${dayIdx + 1}`}
+                                                sx={{
+                                                    height: 22,
+                                                    fontSize: '11px',
+                                                    fontWeight: 700,
+                                                    bgcolor: '#0b5299',
+                                                    color: '#ffffff'
+                                                }}
+                                            />
+                                            <Typography sx={{ fontSize: '14px', fontWeight: 600, color: '#1e293b' }}>
+                                                {formatDateCardHeader(date)}
+                                            </Typography>
+                                        </Box>
+
+                                        <FormControlLabel
+                                            control={
+                                                <Checkbox
+                                                    size="small"
+                                                    checked={isDayAll}
+                                                    indeterminate={isDaySome}
+                                                    onChange={() => handleToggleBulkDay(date)}
+                                                    sx={{
+                                                        color: '#0b5299',
+                                                        '&.Mui-checked': { color: '#0b5299' }
+                                                    }}
+                                                />
+                                            }
+                                            label={
+                                                <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>
+                                                    Select Day
+                                                </Typography>
+                                            }
+                                            sx={{ m: 0 }}
+                                        />
+                                    </Box>
+
+                                    {/* Meals Checkboxes Grid */}
+                                    <Box
+                                        sx={{
+                                            p: 2,
+                                            display: 'grid',
+                                            gridTemplateColumns: { xs: '1fr 1fr', sm: '1fr 1fr 1fr 1fr' },
+                                            gap: 1.5
+                                        }}
+                                    >
+                                        {MEAL_TYPES.map(meal => {
+                                            const cfg = MEAL_CONFIG[meal] || {};
+                                            const IconComponent = cfg.icon || RestaurantIcon;
+                                            const key = `${date}_${meal}`;
+                                            const isChecked = !!bulkDialogMeals[key];
+
+                                            return (
+                                                <Box
+                                                    key={meal}
+                                                    onClick={() => handleToggleBulkMeal(date, meal)}
+                                                    sx={{
+                                                        p: 1.5,
+                                                        borderRadius: 2,
+                                                        border: isChecked ? '1.5px solid #0b5299' : '1px solid #e2e8f0',
+                                                        bgcolor: isChecked ? '#f8fafc' : '#ffffff',
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'space-between',
+                                                        transition: 'all 0.15s ease',
+                                                        userSelect: 'none',
+                                                        '&:hover': {
+                                                            borderColor: '#0b5299',
+                                                            bgcolor: '#f8fafc'
+                                                        }
+                                                    }}
+                                                >
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                                                        <Box
+                                                            sx={{
+                                                                width: 32,
+                                                                height: 32,
+                                                                borderRadius: 1.5,
+                                                                bgcolor: cfg.bgColor || '#f1f5f9',
+                                                                color: cfg.iconColor || '#475569',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center'
+                                                            }}
+                                                        >
+                                                            <IconComponent sx={{ fontSize: 18 }} />
+                                                        </Box>
+                                                        <Box>
+                                                            <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#1e293b' }}>
+                                                                {meal}
+                                                            </Typography>
+                                                            <Typography sx={{ fontSize: '11px', color: '#64748b' }}>
+                                                                Coupon
+                                                            </Typography>
+                                                        </Box>
+                                                    </Box>
+
+                                                    <Checkbox
+                                                        size="small"
+                                                        checked={isChecked}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        onChange={() => handleToggleBulkMeal(date, meal)}
+                                                        sx={{
+                                                            p: 0.5,
+                                                            color: '#94a3b8',
+                                                            '&.Mui-checked': { color: '#0b5299' }
+                                                        }}
+                                                    />
+                                                </Box>
+                                            );
+                                        })}
+                                    </Box>
+                                </Paper>
+                            );
+                        })}
+                    </Box>
+                </DialogContent>
+
+                <DialogActions
+                    sx={{
+                        p: 2,
+                        px: { xs: 2, sm: 3 },
+                        borderTop: '1px solid #e2e8f0',
+                        display: 'flex',
+                        flexDirection: { xs: 'column', sm: 'row' },
+                        alignItems: { xs: 'stretch', sm: 'center' },
+                        gap: 1.5,
+                        justifyContent: 'space-between',
+                        bgcolor: '#ffffff'
+                    }}
+                >
+                    <Typography sx={{ fontSize: '13px', color: '#64748b', fontWeight: 500, textAlign: { xs: 'center', sm: 'left' } }}>
+                        {selectedBulkCount > 0 ? (
+                            <span><b>{bulkDialogPeople.length}</b> people × <b>{selectedBulkCount}</b> meal coupons = up to <b>{bulkDialogPeople.length * selectedBulkCount}</b> tokens</span>
+                        ) : (
+                            <span style={{ color: '#ef4444' }}>Please select at least one coupon</span>
+                        )}
+                    </Typography>
+
+                    <Stack direction="row" spacing={1.5} sx={{ justifyContent: { xs: 'flex-end', sm: 'flex-start' } }}>
+                        <Button
+                            onClick={() => setBulkDialogOpen(false)}
+                            disabled={issuingMultiBulk}
+                            sx={{ color: '#64748b', textTransform: 'none', fontWeight: 600 }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="contained"
+                            onClick={handleConfirmMultiBulkIssue}
+                            disabled={issuingMultiBulk || selectedBulkCount === 0}
+                            startIcon={issuingMultiBulk ? <CircularProgress size={16} color="inherit" /> : <PrintIcon />}
+                            sx={{
+                                bgcolor: '#0b5299',
+                                '&:hover': { bgcolor: '#083d73' },
+                                textTransform: 'none',
+                                fontWeight: 600,
+                                px: 2.5,
+                                py: 1,
+                                borderRadius: 1.5,
+                                boxShadow: '0 2px 8px rgba(11, 82, 153, 0.25)'
+                            }}
+                        >
+                            {issuingMultiBulk ? 'Issuing & Printing...' : 'Issue & Print'}
                         </Button>
                     </Stack>
                 </DialogActions>

@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import {
     Box, Typography, TextField, Button, Paper, MenuItem,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-    IconButton, Chip, CircularProgress, Alert
+    IconButton, Chip, CircularProgress, Alert, Card, CardContent, Tooltip
 } from '@mui/material';
+import GridViewRoundedIcon from '@mui/icons-material/GridViewRounded';
+import TableRowsRoundedIcon from '@mui/icons-material/TableRowsRounded';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import SaveIcon from '@mui/icons-material/Save';
@@ -15,6 +17,7 @@ import { liveBoardAPI } from '../../utils/api';
 const ManageLiveBoard = () => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [viewMode, setViewMode] = useState('table');
     const [formData, setFormData] = useState({
         title: 'South Zone Inter-University Chess Championship - Live Board',
         currentRound: 'Round 1',
@@ -254,28 +257,168 @@ const ManageLiveBoard = () => {
                                 Display live board match pairings, university names, and results.
                             </Typography>
                         </Box>
-                        <Button
-                            variant="outlined"
-                            size="small"
-                            startIcon={<AddIcon />}
-                            onClick={handleAddMatch}
-                            sx={{
-                                textTransform: 'none',
-                                borderColor: '#0b5299',
-                                color: '#0b5299',
-                                borderRadius: 2,
-                                fontWeight: 600,
-                                alignSelf: { xs: 'flex-start', sm: 'center' }
-                            }}
-                        >
-                            Add Match Board
-                        </Button>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, bgcolor: '#ffffff', p: 0.4, borderRadius: 2, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                                <Tooltip title="Cards View">
+                                    <IconButton
+                                        size="small"
+                                        onClick={() => setViewMode('cards')}
+                                        sx={{
+                                            p: 0.6,
+                                            borderRadius: 1.5,
+                                            bgcolor: viewMode === 'cards' ? '#0b5299' : 'transparent',
+                                            color: viewMode === 'cards' ? '#ffffff' : '#64748b',
+                                            boxShadow: viewMode === 'cards' ? '0 1px 3px rgba(11,82,153,0.3)' : 'none',
+                                            '&:hover': {
+                                                bgcolor: viewMode === 'cards' ? '#0b5299' : 'rgba(0,0,0,0.06)',
+                                                color: viewMode === 'cards' ? '#ffffff' : '#0b5299'
+                                            }
+                                        }}
+                                    >
+                                        <GridViewRoundedIcon sx={{ fontSize: 18 }} />
+                                    </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Table View">
+                                    <IconButton
+                                        size="small"
+                                        onClick={() => setViewMode('table')}
+                                        sx={{
+                                            p: 0.6,
+                                            borderRadius: 1.5,
+                                            bgcolor: viewMode === 'table' ? '#0b5299' : 'transparent',
+                                            color: viewMode === 'table' ? '#ffffff' : '#64748b',
+                                            boxShadow: viewMode === 'table' ? '0 1px 3px rgba(11,82,153,0.3)' : 'none',
+                                            '&:hover': {
+                                                bgcolor: viewMode === 'table' ? '#0b5299' : 'rgba(0,0,0,0.06)',
+                                                color: viewMode === 'table' ? '#ffffff' : '#0b5299'
+                                            }
+                                        }}
+                                    >
+                                        <TableRowsRoundedIcon sx={{ fontSize: 18 }} />
+                                    </IconButton>
+                                </Tooltip>
+                            </Box>
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={<AddIcon />}
+                                onClick={handleAddMatch}
+                                sx={{
+                                    textTransform: 'none',
+                                    borderColor: '#0b5299',
+                                    color: '#0b5299',
+                                    borderRadius: 2,
+                                    fontWeight: 600,
+                                    alignSelf: { xs: 'flex-start', sm: 'center' }
+                                }}
+                            >
+                                Add Match Board
+                            </Button>
+                        </Box>
                     </Box>
 
                     {formData.matches.length === 0 ? (
                         <Alert severity="info" sx={{ borderRadius: 2 }}>
                             No match boards added yet. Click <b>"Add Match Board"</b> above to show board-by-board pairings on the home page, or rely on the Embed URL.
                         </Alert>
+                    ) : viewMode === 'cards' ? (
+                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 2 }}>
+                            {formData.matches.map((match, index) => (
+                                <Card
+                                    key={index}
+                                    variant="outlined"
+                                    sx={{
+                                        borderRadius: 2.5,
+                                        border: '1px solid #e2e8f0',
+                                        boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                                        transition: 'all 0.2s ease',
+                                        '&:hover': {
+                                            boxShadow: '0 6px 16px rgba(11,82,153,0.1)',
+                                            borderColor: '#93c5fd'
+                                        }
+                                    }}
+                                >
+                                    <CardContent sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5, '&:last-child': { pb: 2 } }}>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <Typography sx={{ fontWeight: 700, color: '#0b5299', fontSize: '0.9rem' }}>
+                                                    Board
+                                                </Typography>
+                                                <TextField
+                                                    size="small"
+                                                    value={match.boardNumber}
+                                                    onChange={(e) => handleMatchChange(index, 'boardNumber', e.target.value)}
+                                                    sx={{ width: 65 }}
+                                                    slotProps={{ htmlInput: { style: { fontWeight: 700, textAlign: 'center', padding: '4px 8px' } } }}
+                                                />
+                                            </Box>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <TextField
+                                                    select
+                                                    size="small"
+                                                    value={match.result}
+                                                    onChange={(e) => handleMatchChange(index, 'result', e.target.value)}
+                                                    sx={{ minWidth: 120 }}
+                                                    slotProps={{ select: { style: { padding: '4px 8px', fontSize: '0.85rem', fontWeight: 600 } } }}
+                                                >
+                                                    <MenuItem value="*">Ongoing (*)</MenuItem>
+                                                    <MenuItem value="1 - 0">1 - 0</MenuItem>
+                                                    <MenuItem value="0 - 1">0 - 1</MenuItem>
+                                                    <MenuItem value="½ - ½">½ - ½ (Draw)</MenuItem>
+                                                    <MenuItem value="Upcoming">Upcoming</MenuItem>
+                                                </TextField>
+                                                <IconButton
+                                                    color="error"
+                                                    size="small"
+                                                    onClick={() => handleRemoveMatch(index)}
+                                                    sx={{ bgcolor: '#fef2f2', '&:hover': { bgcolor: '#fee2e2' } }}
+                                                >
+                                                    <DeleteIcon fontSize="small" />
+                                                </IconButton>
+                                            </Box>
+                                        </Box>
+
+                                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1.5, bgcolor: '#f8fafc', p: 1.5, borderRadius: 2 }}>
+                                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                                <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>
+                                                    ⚪ White Player
+                                                </Typography>
+                                                <TextField
+                                                    size="small"
+                                                    placeholder="Player Name"
+                                                    value={match.whitePlayer}
+                                                    onChange={(e) => handleMatchChange(index, 'whitePlayer', e.target.value)}
+                                                />
+                                                <TextField
+                                                    size="small"
+                                                    placeholder="University"
+                                                    value={match.whiteUniversity}
+                                                    onChange={(e) => handleMatchChange(index, 'whiteUniversity', e.target.value)}
+                                                />
+                                            </Box>
+
+                                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                                <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>
+                                                    ⚫ Black Player
+                                                </Typography>
+                                                <TextField
+                                                    size="small"
+                                                    placeholder="Player Name"
+                                                    value={match.blackPlayer}
+                                                    onChange={(e) => handleMatchChange(index, 'blackPlayer', e.target.value)}
+                                                />
+                                                <TextField
+                                                    size="small"
+                                                    placeholder="University"
+                                                    value={match.blackUniversity}
+                                                    onChange={(e) => handleMatchChange(index, 'blackUniversity', e.target.value)}
+                                                />
+                                            </Box>
+                                        </Box>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </Box>
                     ) : (
                         <TableContainer sx={{ borderRadius: 2, border: '1px solid #e2e8f0', overflowX: 'auto', width: '100%' }}>
                             <Table size="small" sx={{ minWidth: 650 }}>

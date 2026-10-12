@@ -135,10 +135,10 @@ const MobileBottomBar = () => {
                                     height: { xs: 52, sm: 54 },
                                     borderRadius: '14px',
                                     background: active
-                                        ? 'linear-gradient(135deg, #0b5299 0%, #1e88e5 100%)'
+                                        ? 'linear-gradient(135deg, #0D233B 0%, #0b5299 100%)'
                                         : 'transparent',
                                     border: active ? '3.5px solid #ffffff' : '3.5px solid transparent',
-                                    boxShadow: 'none',
+                                    boxShadow: active ? '0 8px 20px rgba(13, 35, 59, 0.35)' : 'none',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',

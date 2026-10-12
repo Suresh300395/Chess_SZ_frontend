@@ -17,16 +17,19 @@ const StyledTabs = styled(MuiTabs)({
     },
     '& .MuiTabs-flexContainer': {
         gap: '4px',
+        width: '100%',
+        justifyContent: 'center',
     },
     '@media (max-width: 768px)': {
+        flex: 1,
         width: '100%',
-        maxWidth: '280px',
+        maxWidth: '100%',
     }
 });
 
 const StyledTab = styled((props) => <Tab disableRipple {...props} />)({
     textTransform: 'none',
-    fontWeight: 500,
+    fontWeight: 600,
     fontSize: '16px',
     color: '#0b5299', // var(--color-navy)
     minHeight: '40px',
@@ -43,10 +46,11 @@ const StyledTab = styled((props) => <Tab disableRipple {...props} />)({
         color: '#d06c38',
     },
     '@media (max-width: 768px)': {
-        fontSize: '14px',
-        padding: '6px 12px',
-        minWidth: '200px',
+        fontSize: '15px',
+        padding: '8px 16px',
+        minWidth: 'unset',
         width: '100%',
+        flex: 1,
     }
 });
 
@@ -72,12 +76,30 @@ const Tabs = ({ tabs, activeTab, setActiveTab }) => {
     };
 
     return (
-        <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', py: 1, px: 2, gap: 1 }}>
+        <Box sx={{
+            width: '100%',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            py: 0.5,
+            px: 0,
+            gap: { xs: 0.75, sm: 1 },
+            boxSizing: 'border-box'
+        }}>
             {isMobile && (
                 <IconButton
                     onClick={handlePrev}
                     disabled={value === 0}
-                    sx={{ bgcolor: '#ffffff', color: '#0b5299', boxShadow: '0 4px 10px rgba(11,82,153,0.1)', '&:hover': { bgcolor: '#f0f0f0' }, '&.Mui-disabled': { bgcolor: 'rgba(255,255,255,0.5)' } }}
+                    sx={{
+                        bgcolor: '#ffffff',
+                        color: '#0b5299',
+                        boxShadow: '0 4px 10px rgba(11,82,153,0.1)',
+                        flexShrink: 0,
+                        width: { xs: 38, sm: 40 },
+                        height: { xs: 38, sm: 40 },
+                        '&:hover': { bgcolor: '#f0f0f0' },
+                        '&.Mui-disabled': { bgcolor: 'rgba(255,255,255,0.5)' }
+                    }}
                 >
                     <ChevronLeftIcon />
                 </IconButton>
@@ -104,7 +126,16 @@ const Tabs = ({ tabs, activeTab, setActiveTab }) => {
                 <IconButton
                     onClick={handleNext}
                     disabled={value === tabs.length - 1}
-                    sx={{ bgcolor: '#ffffff', color: '#0b5299', boxShadow: '0 4px 10px rgba(11,82,153,0.1)', '&:hover': { bgcolor: '#f0f0f0' }, '&.Mui-disabled': { bgcolor: 'rgba(255,255,255,0.5)' } }}
+                    sx={{
+                        bgcolor: '#ffffff',
+                        color: '#0b5299',
+                        boxShadow: '0 4px 10px rgba(11,82,153,0.1)',
+                        flexShrink: 0,
+                        width: { xs: 38, sm: 40 },
+                        height: { xs: 38, sm: 40 },
+                        '&:hover': { bgcolor: '#f0f0f0' },
+                        '&.Mui-disabled': { bgcolor: 'rgba(255,255,255,0.5)' }
+                    }}
                 >
                     <ChevronRightIcon />
                 </IconButton>

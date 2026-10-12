@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Button, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, CircularProgress, MenuItem, Grid } from '@mui/material';
+import { Box, Typography, Button, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Dialog, DialogTitle, DialogContent, DialogActions, IconButton, CircularProgress, MenuItem, Grid, Card, CardContent, Chip, Tooltip } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
 import DownloadIcon from '@mui/icons-material/Download';
 import HotelIcon from '@mui/icons-material/Hotel';
+import GridViewRoundedIcon from '@mui/icons-material/GridViewRounded';
+import TableRowsRoundedIcon from '@mui/icons-material/TableRowsRounded';
 import { toast } from 'sonner';
 
 // Import centralized API base URL
@@ -13,6 +15,7 @@ import { API_BASE } from '../../utils/api';
 const ManageBlocks = () => {
     const [blocks, setBlocks] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [viewMode, setViewMode] = useState('table');
     const [open, setOpen] = useState(false);
     const [editId, setEditId] = useState(null);
     const [formData, setFormData] = useState({
@@ -264,22 +267,109 @@ const ManageBlocks = () => {
 
     return (
         <Box sx={{ width: '100%' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mb: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    <HotelIcon sx={{ color: '#0b5299', fontSize: { xs: 28, md: 34 } }} />
-                    <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', fontSize: { xs: '1.25rem', md: '1.75rem' } }}>
-                        Manage Hostel Blocks
-                    </Typography>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', md: 'center' }, gap: 2, mb: 3 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: { xs: '100%', md: 'auto' }, gap: 1.5 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 1.5 } }}>
+                        <HotelIcon sx={{ color: '#0b5299', fontSize: { xs: 26, sm: 30, md: 34 } }} />
+                        <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', fontSize: { xs: '1.15rem', sm: '1.4rem', md: '1.75rem' } }}>
+                            Manage Hostel Blocks
+                        </Typography>
+                    </Box>
+
+                    {/* On mobile: View Toggle stays in the SAME ROW as heading */}
+                    <Box sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center', gap: 0.5, bgcolor: '#ffffff', p: 0.4, borderRadius: 2, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', flexShrink: 0 }}>
+                        <Tooltip title="Cards View">
+                            <IconButton
+                                size="small"
+                                onClick={() => setViewMode('cards')}
+                                sx={{
+                                    p: 0.6,
+                                    borderRadius: 1.5,
+                                    bgcolor: viewMode === 'cards' ? '#0b5299' : 'transparent',
+                                    color: viewMode === 'cards' ? '#ffffff' : '#64748b',
+                                    boxShadow: viewMode === 'cards' ? '0 1px 3px rgba(11,82,153,0.3)' : 'none',
+                                    '&:hover': {
+                                        bgcolor: viewMode === 'cards' ? '#0b5299' : 'rgba(0,0,0,0.06)',
+                                        color: viewMode === 'cards' ? '#ffffff' : '#0b5299'
+                                    }
+                                }}
+                            >
+                                <GridViewRoundedIcon sx={{ fontSize: 18 }} />
+                            </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Table View">
+                            <IconButton
+                                size="small"
+                                onClick={() => setViewMode('table')}
+                                sx={{
+                                    p: 0.6,
+                                    borderRadius: 1.5,
+                                    bgcolor: viewMode === 'table' ? '#0b5299' : 'transparent',
+                                    color: viewMode === 'table' ? '#ffffff' : '#64748b',
+                                    boxShadow: viewMode === 'table' ? '0 1px 3px rgba(11,82,153,0.3)' : 'none',
+                                    '&:hover': {
+                                        bgcolor: viewMode === 'table' ? '#0b5299' : 'rgba(0,0,0,0.06)',
+                                        color: viewMode === 'table' ? '#ffffff' : '#0b5299'
+                                    }
+                                }}
+                            >
+                                <TableRowsRoundedIcon sx={{ fontSize: 18 }} />
+                            </IconButton>
+                        </Tooltip>
+                    </Box>
                 </Box>
-                <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', width: { xs: '100%', sm: 'auto' } }}>
-                    <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleDownloadTemplate} sx={{ color: '#0b5299', borderColor: '#0b5299', flex: { xs: '1 1 auto', sm: 'none' } }}>
+
+                <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center', width: { xs: '100%', md: 'auto' } }}>
+                    {/* On desktop: View Toggle inline with actions */}
+                    <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 0.5, bgcolor: '#ffffff', p: 0.4, borderRadius: 2, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                        <Tooltip title="Cards View">
+                            <IconButton
+                                size="small"
+                                onClick={() => setViewMode('cards')}
+                                sx={{
+                                    p: 0.6,
+                                    borderRadius: 1.5,
+                                    bgcolor: viewMode === 'cards' ? '#0b5299' : 'transparent',
+                                    color: viewMode === 'cards' ? '#ffffff' : '#64748b',
+                                    boxShadow: viewMode === 'cards' ? '0 1px 3px rgba(11,82,153,0.3)' : 'none',
+                                    '&:hover': {
+                                        bgcolor: viewMode === 'cards' ? '#0b5299' : 'rgba(0,0,0,0.06)',
+                                        color: viewMode === 'cards' ? '#ffffff' : '#0b5299'
+                                    }
+                                }}
+                            >
+                                <GridViewRoundedIcon sx={{ fontSize: 18 }} />
+                            </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Table View">
+                            <IconButton
+                                size="small"
+                                onClick={() => setViewMode('table')}
+                                sx={{
+                                    p: 0.6,
+                                    borderRadius: 1.5,
+                                    bgcolor: viewMode === 'table' ? '#0b5299' : 'transparent',
+                                    color: viewMode === 'table' ? '#ffffff' : '#64748b',
+                                    boxShadow: viewMode === 'table' ? '0 1px 3px rgba(11,82,153,0.3)' : 'none',
+                                    '&:hover': {
+                                        bgcolor: viewMode === 'table' ? '#0b5299' : 'rgba(0,0,0,0.06)',
+                                        color: viewMode === 'table' ? '#ffffff' : '#0b5299'
+                                    }
+                                }}
+                            >
+                                <TableRowsRoundedIcon sx={{ fontSize: 18 }} />
+                            </IconButton>
+                        </Tooltip>
+                    </Box>
+
+                    <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleDownloadTemplate} sx={{ color: '#0b5299', borderColor: '#0b5299', flex: { xs: '1 1 auto', md: 'none' } }}>
                         Template
                     </Button>
-                    <Button variant="outlined" component="label" sx={{ color: '#0b5299', borderColor: '#0b5299', flex: { xs: '1 1 auto', sm: 'none' } }}>
+                    <Button variant="outlined" component="label" sx={{ color: '#0b5299', borderColor: '#0b5299', flex: { xs: '1 1 auto', md: 'none' } }}>
                         Upload CSV
                         <input type="file" hidden accept=".csv" onChange={handleFileUpload} />
                     </Button>
-                    <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setEditId(null); setOpen(true); }} sx={{ bgcolor: '#0b5299', '&:hover': { bgcolor: '#083d73' }, flex: { xs: '1 1 auto', sm: 'none' } }}>
+                    <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setEditId(null); setOpen(true); }} sx={{ bgcolor: '#0b5299', '&:hover': { bgcolor: '#083d73' }, flex: { xs: '1 1 auto', md: 'none' } }}>
                         Add Block
                     </Button>
                 </Box>
@@ -288,6 +378,101 @@ const ManageBlocks = () => {
             {loading ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', mt: 5 }}>
                     <CircularProgress />
+                </Box>
+            ) : viewMode === 'cards' ? (
+                <Box>
+                    {blocks.length === 0 ? (
+                        <Paper sx={{ py: 6, textAlign: 'center', color: '#64748b', borderRadius: 2.5, border: '1px solid #e2e8f0', boxShadow: 'none' }}>
+                            <HotelIcon sx={{ fontSize: 48, color: '#cbd5e1', mb: 1 }} />
+                            <Typography sx={{ fontWeight: 600, color: '#475569' }}>
+                                No blocks found. Add one to get started.
+                            </Typography>
+                        </Paper>
+                    ) : (
+                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 2.5 }}>
+                            {blocks.map((b) => {
+                                const totalRooms = b.floors ? b.floors.reduce((acc, f) => acc + f.roomCount, 0) : b.totalRooms || 0;
+                                const floorCount = b.floors ? b.floors.length : 0;
+                                return (
+                                    <Card
+                                        key={b._id}
+                                        variant="outlined"
+                                        sx={{
+                                            borderRadius: 2.5,
+                                            border: '1px solid #e2e8f0',
+                                            boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                                            transition: 'all 0.2s ease',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            '&:hover': {
+                                                boxShadow: '0 8px 20px rgba(11,82,153,0.1)',
+                                                borderColor: '#93c5fd'
+                                            }
+                                        }}
+                                    >
+                                        <CardContent sx={{ p: 2.5, flex: 1, display: 'flex', flexDirection: 'column', gap: 1.5, '&:last-child': { pb: 2.5 } }}>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
+                                                <Box>
+                                                    <Typography sx={{ fontWeight: 700, color: '#0f172a', fontSize: '1.05rem', lineHeight: 1.3 }}>
+                                                        {b.name}
+                                                    </Typography>
+                                                    <Chip
+                                                        label={b.block}
+                                                        size="small"
+                                                        sx={{
+                                                            mt: 0.8,
+                                                            fontWeight: 600,
+                                                            fontSize: '0.75rem',
+                                                            bgcolor: b.block === 'Boys Hostel' ? '#eff6ff' : b.block === 'Girls Hostel' ? '#fdf2f8' : '#f8fafc',
+                                                            color: b.block === 'Boys Hostel' ? '#1d4ed8' : b.block === 'Girls Hostel' ? '#be185d' : '#334155',
+                                                            border: '1px solid',
+                                                            borderColor: b.block === 'Boys Hostel' ? '#bfdbfe' : b.block === 'Girls Hostel' ? '#fbcfe8' : '#cbd5e1'
+                                                        }}
+                                                    />
+                                                </Box>
+                                                <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                                    <IconButton size="small" color="primary" onClick={() => handleEdit(b)} sx={{ bgcolor: '#eff6ff', '&:hover': { bgcolor: '#dbeafe' } }}>
+                                                        <EditIcon sx={{ fontSize: 18 }} />
+                                                    </IconButton>
+                                                    <IconButton size="small" color="error" onClick={() => handleDelete(b._id)} sx={{ bgcolor: '#fef2f2', '&:hover': { bgcolor: '#fee2e2' } }}>
+                                                        <DeleteIcon sx={{ fontSize: 18 }} />
+                                                    </IconButton>
+                                                </Box>
+                                            </Box>
+
+                                            <Box sx={{ bgcolor: '#f8fafc', p: 1.5, borderRadius: 2, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
+                                                <Box>
+                                                    <Typography variant="caption" sx={{ color: '#64748b', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                                        Floors
+                                                    </Typography>
+                                                    <Typography sx={{ fontWeight: 700, color: '#1e293b', fontSize: '1rem' }}>
+                                                        {floorCount}
+                                                    </Typography>
+                                                </Box>
+                                                <Box>
+                                                    <Typography variant="caption" sx={{ color: '#64748b', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                                        Total Rooms
+                                                    </Typography>
+                                                    <Typography sx={{ fontWeight: 700, color: '#0b5299', fontSize: '1rem' }}>
+                                                        {totalRooms}
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+
+                                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.6, fontSize: '0.85rem', pt: 0.5, borderTop: '1px solid #f1f5f9' }}>
+                                                <Typography variant="body2" sx={{ color: '#475569', display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                    <strong style={{ color: '#1e293b' }}>Warden:</strong> {b.warden || 'N/A'}
+                                                </Typography>
+                                                <Typography variant="body2" sx={{ color: '#475569', display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                    <strong style={{ color: '#1e293b' }}>Contact:</strong> {b.wardenContact || 'N/A'}
+                                                </Typography>
+                                            </Box>
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })}
+                        </Box>
+                    )}
                 </Box>
             ) : (
                 <TableContainer component={Paper} sx={{ borderRadius: 2, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', overflowX: 'auto', width: '100%' }}>

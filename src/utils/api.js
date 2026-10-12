@@ -38,8 +38,8 @@ const apiFetch = async (path, options = {}, auth = false) => {
         },
     });
 
-    if (res.status === 401 || res.status === 403) {
-        // Token expired or unauthorized — force logout
+    if (auth && (res.status === 401 || res.status === 403)) {
+        // Token expired or unauthorized on protected requests — force logout
         clearAuthSession(true);
         throw new Error('Session expired. Please login again.');
     }

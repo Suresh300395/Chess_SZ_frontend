@@ -712,7 +712,8 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   border-radius: 24px;
   padding: 1.5rem 3rem 3rem 3rem;
   box-shadow: 0 10px 40px rgba(11, 82, 153, 0.05);
-  min-height: 400px;
+  min-height: auto;
+  height: auto;
 }
 
 .tab-card-title {
