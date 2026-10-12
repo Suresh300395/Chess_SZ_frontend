@@ -30,7 +30,12 @@ const Header = () => {
     const isDashboard = location.pathname.startsWith('/admin') || location.pathname.startsWith('/user') || location.pathname.includes('/dashboard');
 
     const handleMenuOpen = (event) => setAnchorEl(event.currentTarget);
-    const handleMenuClose = () => setAnchorEl(null);
+    const handleMenuClose = () => {
+        if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+        }
+        setAnchorEl(null);
+    };
 
     const handleLogout = () => {
         clearAuthSession(false);
@@ -116,6 +121,9 @@ const Header = () => {
                                 anchorEl={anchorEl}
                                 open={Boolean(anchorEl)}
                                 onClose={handleMenuClose}
+                                disableRestoreFocus
+                                disableAutoFocusItem
+                                autoFocus={false}
                                 slotProps={{
                                     paper: {
                                         elevation: 0,

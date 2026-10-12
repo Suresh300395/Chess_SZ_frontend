@@ -46,6 +46,8 @@ import AssignmentIcon from '@mui/icons-material/Assignment';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutlineOutlined';
 import SaveIcon from '@mui/icons-material/Save';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import GridViewRoundedIcon from '@mui/icons-material/GridViewRounded';
+import TableRowsRoundedIcon from '@mui/icons-material/TableRowsRounded';
 import io from 'socket.io-client';
 import { toast } from 'sonner';
 import CustomTabs from '../Common/Tabs';
@@ -55,6 +57,8 @@ import { registrationAPI, blocksAPI, SOCKET_URL } from '../../utils/api';
 const MAX_ROOM_CAPACITY = 4;
 
 const HostelProvision = () => {
+    const [mappedViewMode, setMappedViewMode] = useState('table');
+    const [searchViewMode, setSearchViewMode] = useState('table');
     const [accommodationList, setAccommodationList] = useState([]);
     const [dbBlocks, setDbBlocks] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -299,6 +303,7 @@ const HostelProvision = () => {
         return rooms
             .map(room => {
                 const occupancy = getRoomOccupancy(selectedBuilding, selectedFloor, room, selectedPerson?.id);
+                const actualTotalOccupancy = getRoomOccupancy(selectedBuilding, selectedFloor, room, null);
                 const isCurrentPersonsRoom =
                     selectedPerson?.roomAllocation?.building === selectedBuilding &&
                     selectedPerson?.roomAllocation?.floor === selectedFloor &&
@@ -307,6 +312,8 @@ const HostelProvision = () => {
                 return {
                     roomNumber: room,
                     occupancy,
+                    actualTotalOccupancy,
+                    isCurrentPersonsRoom,
                     availableSlots: capacity - occupancy,
                     isFull: occupancy >= capacity && !isCurrentPersonsRoom,
                     capacity
@@ -317,6 +324,9 @@ const HostelProvision = () => {
 
     // Handle Open Map Room Modal
     const handleOpenMapDialog = (person) => {
+        if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+        }
         setSelectedPerson(person);
 
         // Pre-fill building
@@ -383,6 +393,9 @@ const HostelProvision = () => {
 
     // Handle Open Unassign Dialog
     const handleOpenUnassignDialog = (person) => {
+        if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+        }
         setPersonToUnassign(person);
         setUnassignDialogOpen(true);
     };
@@ -668,42 +681,203 @@ const HostelProvision = () => {
                     }}
                 />
 
-                {/* Initial State Helper or Search Results */}
-                {searchQuery.trim() === '' ? (
-                    <Box
-                        sx={{
-                            mt: 2,
-                            p: 2.5,
-                            borderRadius: 2,
-                            bgcolor: '#f1f5f9',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 1.5,
-                            border: '1px dashed #cbd5e1'
-                        }}
-                    >
-                        <InfoIcon sx={{ color: '#64748b' }} />
-                        <Typography sx={{ color: '#475569', fontSize: '0.9rem' }}>
-                            <b>Initial View:</b> Full participant table is hidden by default. Enter a <b>Name</b> or <b>University</b> in the search box above to find individuals and assign hostel rooms.
-                        </Typography>
-                    </Box>
-                ) : (
-                    /* Search Results Table */
+                {/* Search Results Table / Cards */}
+                {searchQuery.trim() !== '' && (
                     <Box sx={{ mt: 3 }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-                            <Typography sx={{ fontWeight: 600, color: '#1e293b', fontSize: '0.95rem' }}>
-                                Search Results for "{searchQuery}" ({searchResults.length} found)
-                            </Typography>
-                            {searchResults.length > 0 && (
-                                <Chip
-                                    label={`${searchResults.length} Match${searchResults.length === 1 ? '' : 'es'}`}
-                                    size="small"
-                                    color="primary"
-                                    sx={{ bgcolor: '#0b5299' }}
-                                />
-                            )}
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Typography sx={{ fontWeight: 600, color: '#1e293b', fontSize: '0.95rem' }}>
+                                    Search Results for "{searchQuery}" ({searchResults.length} found)
+                                </Typography>
+                                {searchResults.length > 0 && (
+                                    <Chip
+                                        label={`${searchResults.length} Match${searchResults.length === 1 ? '' : 'es'}`}
+                                        size="small"
+                                        color="primary"
+                                        sx={{ bgcolor: '#0b5299' }}
+                                    />
+                                )}
+                            </Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, bgcolor: '#ffffff', p: 0.4, borderRadius: 2, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                                <Tooltip title="Cards View">
+                                    <IconButton
+                                        size="small"
+                                        onClick={() => setSearchViewMode('cards')}
+                                        sx={{
+                                            p: 0.6,
+                                            borderRadius: 1.5,
+                                            bgcolor: searchViewMode === 'cards' ? '#0b5299' : 'transparent',
+                                            color: searchViewMode === 'cards' ? '#ffffff' : '#64748b',
+                                            boxShadow: searchViewMode === 'cards' ? '0 1px 3px rgba(11,82,153,0.3)' : 'none',
+                                            '&:hover': {
+                                                bgcolor: searchViewMode === 'cards' ? '#0b5299' : 'rgba(0,0,0,0.06)',
+                                                color: searchViewMode === 'cards' ? '#ffffff' : '#0b5299'
+                                            }
+                                        }}
+                                    >
+                                        <GridViewRoundedIcon sx={{ fontSize: 18 }} />
+                                    </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Table View">
+                                    <IconButton
+                                        size="small"
+                                        onClick={() => setSearchViewMode('table')}
+                                        sx={{
+                                            p: 0.6,
+                                            borderRadius: 1.5,
+                                            bgcolor: searchViewMode === 'table' ? '#0b5299' : 'transparent',
+                                            color: searchViewMode === 'table' ? '#ffffff' : '#64748b',
+                                            boxShadow: searchViewMode === 'table' ? '0 1px 3px rgba(11,82,153,0.3)' : 'none',
+                                            '&:hover': {
+                                                bgcolor: searchViewMode === 'table' ? '#0b5299' : 'rgba(0,0,0,0.06)',
+                                                color: searchViewMode === 'table' ? '#ffffff' : '#0b5299'
+                                            }
+                                        }}
+                                    >
+                                        <TableRowsRoundedIcon sx={{ fontSize: 18 }} />
+                                    </IconButton>
+                                </Tooltip>
+                            </Box>
                         </Box>
 
+                        {searchViewMode === 'cards' ? (
+                            <Box>
+                                {searchResults.length === 0 ? (
+                                    <Paper sx={{ py: 4, textAlign: 'center', color: '#64748b', borderRadius: 2, border: '1px solid #e2e8f0', boxShadow: 'none' }}>
+                                        <Typography sx={{ color: 'text.secondary' }}>
+                                            No {activeTab.toLowerCase()} requesting accommodation found matching "{searchQuery}".
+                                        </Typography>
+                                    </Paper>
+                                ) : (
+                                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 2 }}>
+                                        {searchResults.map((person, index) => (
+                                            <Card
+                                                key={person.id}
+                                                variant="outlined"
+                                                sx={{
+                                                    borderRadius: 2.5,
+                                                    border: '1px solid #e2e8f0',
+                                                    boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                                                    transition: 'all 0.2s ease',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    '&:hover': {
+                                                        boxShadow: '0 6px 16px rgba(11,82,153,0.1)',
+                                                        borderColor: '#93c5fd'
+                                                    }
+                                                }}
+                                            >
+                                                <CardContent sx={{ p: 2, flex: 1, display: 'flex', flexDirection: 'column', gap: 1.5, '&:last-child': { pb: 2 } }}>
+                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                            <Avatar sx={{ width: 34, height: 34, bgcolor: '#e0f2fe', color: '#0b5299', fontSize: '0.85rem', fontWeight: 700 }}>
+                                                                {person.name ? person.name.charAt(0).toUpperCase() : '#'}
+                                                            </Avatar>
+                                                            <Box>
+                                                                <Typography sx={{ fontWeight: 700, color: '#0f172a', fontSize: '0.95rem', lineHeight: 1.2 }}>
+                                                                    {person.name}
+                                                                </Typography>
+                                                                <Typography variant="caption" sx={{ color: '#64748b' }}>
+                                                                    #{index + 1}
+                                                                </Typography>
+                                                            </Box>
+                                                        </Box>
+                                                        <Chip
+                                                            label={person.role}
+                                                            size="small"
+                                                            color={person.role === 'Coach' ? 'secondary' : 'primary'}
+                                                            variant="outlined"
+                                                            sx={{ fontWeight: 600, fontSize: '0.72rem' }}
+                                                        />
+                                                    </Box>
+
+                                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.6, fontSize: '0.85rem' }}>
+                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, color: '#475569' }}>
+                                                            <SchoolIcon sx={{ fontSize: 16, color: '#94a3b8' }} />
+                                                            <Typography variant="body2" sx={{ fontWeight: 500, color: '#1e293b' }}>
+                                                                {person.university}
+                                                            </Typography>
+                                                        </Box>
+                                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#64748b', fontSize: '0.8rem' }}>
+                                                            <span>Gender: <strong>{person.gender || 'N/A'}</strong></span>
+                                                            <span>Phone: <strong>{person.phone || 'N/A'}</strong></span>
+                                                        </Box>
+                                                    </Box>
+
+                                                    <Box sx={{ bgcolor: '#f8fafc', p: 1.2, borderRadius: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                        <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
+                                                            Accommodation:
+                                                        </Typography>
+                                                        {person.accommodation === 'Yes' ? (
+                                                            <Chip
+                                                                icon={<CheckCircleIcon sx={{ fontSize: '15px !important' }} />}
+                                                                label="Yes"
+                                                                size="small"
+                                                                sx={{ bgcolor: '#ecfdf5', color: '#065f46', fontWeight: 600, height: 22 }}
+                                                            />
+                                                        ) : (
+                                                            <Chip
+                                                                icon={<CancelIcon sx={{ fontSize: '15px !important' }} />}
+                                                                label="No"
+                                                                size="small"
+                                                                sx={{ bgcolor: '#f1f5f9', color: '#64748b', fontWeight: 600, height: 22 }}
+                                                            />
+                                                        )}
+                                                    </Box>
+
+                                                    <Box sx={{ pt: 1, borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+                                                        {person.roomAllocation ? (
+                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%', justifyContent: 'space-between' }}>
+                                                                <Chip
+                                                                    icon={<HotelIcon sx={{ fontSize: '15px !important' }} />}
+                                                                    label={`${person.roomAllocation.roomNumber} (${person.roomAllocation.building.split(' ')[0]} ${person.roomAllocation.floor.replace('Floor ', 'F')})`}
+                                                                    size="small"
+                                                                    sx={{ bgcolor: '#eff6ff', color: '#1d4ed8', fontWeight: 600, border: '1px solid #bfdbfe' }}
+                                                                />
+                                                                <Tooltip title="Change Room Allocation">
+                                                                    <IconButton
+                                                                        size="small"
+                                                                        onClick={(e) => {
+                                                                            e.currentTarget.blur();
+                                                                            handleOpenMapDialog(person);
+                                                                        }}
+                                                                        sx={{ color: '#2563eb', bgcolor: '#f0fdf4', p: 0.6 }}
+                                                                    >
+                                                                        <EditIcon sx={{ fontSize: 16 }} />
+                                                                    </IconButton>
+                                                                </Tooltip>
+                                                            </Box>
+                                                        ) : (
+                                                            <Button
+                                                                size="small"
+                                                                variant="contained"
+                                                                fullWidth
+                                                                startIcon={<MeetingRoomIcon sx={{ fontSize: 16 }} />}
+                                                                onClick={(e) => {
+                                                                    e.currentTarget.blur();
+                                                                    handleOpenMapDialog(person);
+                                                                }}
+                                                                sx={{
+                                                                    bgcolor: '#0b5299',
+                                                                    color: '#ffffff',
+                                                                    fontWeight: 600,
+                                                                    textTransform: 'none',
+                                                                    borderRadius: 1.5,
+                                                                    py: 0.6,
+                                                                    '&:hover': { bgcolor: '#093f77' }
+                                                                }}
+                                                            >
+                                                                Map a Room
+                                                            </Button>
+                                                        )}
+                                                    </Box>
+                                                </CardContent>
+                                            </Card>
+                                        ))}
+                                    </Box>
+                                )}
+                            </Box>
+                        ) : (
                         <TableContainer component={Paper} sx={{ borderRadius: 2, border: '1px solid #e2e8f0', boxShadow: 'none', overflowX: 'auto', width: '100%' }}>
                             <Table sx={{ minWidth: 700 }} size="medium">
                                 <TableHead sx={{ bgcolor: '#f1f5f9' }}>
@@ -784,7 +958,10 @@ const HostelProvision = () => {
                                                             <Tooltip title="Change Room Allocation">
                                                                 <IconButton
                                                                     size="small"
-                                                                    onClick={() => handleOpenMapDialog(person)}
+                                                                    onClick={(e) => {
+                                                                        e.currentTarget.blur();
+                                                                        handleOpenMapDialog(person);
+                                                                    }}
                                                                     sx={{ color: '#2563eb', bgcolor: '#f0fdf4', p: 0.5 }}
                                                                 >
                                                                     <EditIcon sx={{ fontSize: 16 }} />
@@ -796,7 +973,10 @@ const HostelProvision = () => {
                                                             size="small"
                                                             variant="contained"
                                                             startIcon={<MeetingRoomIcon sx={{ fontSize: 16 }} />}
-                                                            onClick={() => handleOpenMapDialog(person)}
+                                                            onClick={(e) => {
+                                                                e.currentTarget.blur();
+                                                                handleOpenMapDialog(person);
+                                                            }}
                                                             sx={{
                                                                 bgcolor: '#0b5299',
                                                                 color: '#ffffff',
@@ -824,6 +1004,7 @@ const HostelProvision = () => {
                                 </TableBody>
                             </Table>
                         </TableContainer>
+                        )}
                     </Box>
                 )}
             </Paper>
@@ -831,24 +1012,186 @@ const HostelProvision = () => {
             {/* Currently Mapped Participants Section (Below Search Box) */}
             {/* "and search box kinda evaitey rooms map map aina vaallu untaro vaallaney ikkada chupistam idi same for coach kuda" */}
             <Box sx={{ mt: 4 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <HotelIcon sx={{ color: '#0b5299', fontSize: 24 }} />
-                        <Typography variant="h6" sx={{ color: '#1e293b', fontWeight: 700, fontSize: { xs: '1.1rem', md: '1.3rem' } }}>
-                            Currently Mapped {activeTab}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, mb: 2, flexWrap: 'wrap', gap: 1.5 }}>
+                    <Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <HotelIcon sx={{ color: '#0b5299', fontSize: 24 }} />
+                            <Typography variant="h6" sx={{ color: '#1e293b', fontWeight: 700, fontSize: { xs: '1.1rem', md: '1.3rem' } }}>
+                                Currently Mapped {activeTab}
+                            </Typography>
+                            <Chip
+                                label={`${mappedList.length} Allocated`}
+                                size="small"
+                                sx={{
+                                    bgcolor: '#ecfdf5',
+                                    color: '#047857',
+                                    fontWeight: 600,
+                                    border: '1px solid #a7f3d0',
+                                    display: { xs: 'none', sm: 'inline-flex' }
+                                }}
+                            />
+                        </Box>
+                        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.3, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
+                            Showing all {activeTab.toLowerCase()} with assigned rooms
                         </Typography>
-                        <Chip
-                            label={`${mappedList.length} Allocated`}
-                            size="small"
-                            sx={{ bgcolor: '#ecfdf5', color: '#047857', fontWeight: 600, border: '1px solid #a7f3d0' }}
-                        />
                     </Box>
-                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                        Showing all {activeTab.toLowerCase()} with assigned rooms
-                    </Typography>
-                </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, bgcolor: '#ffffff', p: 0.4, borderRadius: 2, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                            <Tooltip title="Cards View">
+                                <IconButton
+                                    size="small"
+                                    onClick={() => setMappedViewMode('cards')}
+                                    sx={{
+                                        p: 0.6,
+                                        borderRadius: 1.5,
+                                        bgcolor: mappedViewMode === 'cards' ? '#0b5299' : 'transparent',
+                                        color: mappedViewMode === 'cards' ? '#ffffff' : '#64748b',
+                                        boxShadow: mappedViewMode === 'cards' ? '0 1px 3px rgba(11,82,153,0.3)' : 'none',
+                                        '&:hover': {
+                                            bgcolor: mappedViewMode === 'cards' ? '#0b5299' : 'rgba(0,0,0,0.06)',
+                                            color: mappedViewMode === 'cards' ? '#ffffff' : '#0b5299'
+                                        }
+                                    }}
+                                >
+                                    <GridViewRoundedIcon sx={{ fontSize: 18 }} />
+                                </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Table View">
+                                <IconButton
+                                    size="small"
+                                    onClick={() => setMappedViewMode('table')}
+                                    sx={{
+                                        p: 0.6,
+                                        borderRadius: 1.5,
+                                        bgcolor: mappedViewMode === 'table' ? '#0b5299' : 'transparent',
+                                        color: mappedViewMode === 'table' ? '#ffffff' : '#64748b',
+                                        boxShadow: mappedViewMode === 'table' ? '0 1px 3px rgba(11,82,153,0.3)' : 'none',
+                                        '&:hover': {
+                                            bgcolor: mappedViewMode === 'table' ? '#0b5299' : 'rgba(0,0,0,0.06)',
+                                            color: mappedViewMode === 'table' ? '#ffffff' : '#0b5299'
+                                        }
+                                    }}
+                                >
+                                    <TableRowsRoundedIcon sx={{ fontSize: 18 }} />
+                                </IconButton>
+                            </Tooltip>
+                        </Box>
+                    </Box>
 
-                <TableContainer component={Paper} sx={{ boxShadow: '0 4px 16px rgba(0,0,0,0.05)', borderRadius: 2.5, border: '1px solid #e2e8f0', overflowX: 'auto', width: '100%' }}>
+                {mappedViewMode === 'cards' ? (
+                    <Box>
+                        {mappedList.length === 0 ? (
+                            <Paper sx={{ py: 6, textAlign: 'center', color: '#64748b', borderRadius: 2.5, border: '1px solid #e2e8f0', boxShadow: 'none' }}>
+                                <HotelIcon sx={{ fontSize: 44, color: '#cbd5e1', mb: 1 }} />
+                                <Typography sx={{ fontWeight: 600, color: '#475569' }}>
+                                    No {activeTab.toLowerCase()} mapped to rooms yet.
+                                </Typography>
+                            </Paper>
+                        ) : (
+                            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 2 }}>
+                                {mappedList.map((person, index) => (
+                                    <Paper
+                                        key={`${person.id}-${index}`}
+                                        variant="outlined"
+                                        sx={{
+                                            p: 2,
+                                            borderRadius: 2.5,
+                                            bgcolor: '#ffffff',
+                                            borderColor: '#e2e8f0',
+                                            boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            justifyContent: 'space-between',
+                                            gap: 1.5,
+                                            transition: 'all 0.2s ease-in-out',
+                                            '&:hover': {
+                                                borderColor: '#cbd5e1',
+                                                boxShadow: '0 6px 16px rgba(11,82,153,0.08)',
+                                                transform: 'translateY(-2px)'
+                                            }
+                                        }}
+                                    >
+                                        <Box>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                                                <Chip
+                                                    label={`#${index + 1}`}
+                                                    size="small"
+                                                    sx={{ fontWeight: 700, fontSize: '11px', bgcolor: '#f1f5f9', color: '#475569', height: 22 }}
+                                                />
+                                                <Chip
+                                                    label={person.role}
+                                                    size="small"
+                                                    color="primary"
+                                                    variant="outlined"
+                                                    sx={{ height: 22, fontSize: '11px', fontWeight: 600 }}
+                                                />
+                                            </Box>
+                                            <Typography sx={{ fontWeight: 700, color: '#0f172a', fontSize: '1.05rem', wordBreak: 'break-word', mb: 0.5 }}>
+                                                {person.name}
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ color: '#64748b', fontSize: '13px', mb: 1.5 }}>
+                                                {person.university}
+                                            </Typography>
+
+                                            <Box sx={{ p: 1.2, bgcolor: '#eff6ff', borderRadius: 2, border: '1px solid #bfdbfe', mb: 1.5 }}>
+                                                <Typography variant="caption" sx={{ color: '#1e40af', fontWeight: 600, display: 'block', mb: 0.3 }}>
+                                                    ALLOCATED ROOM
+                                                </Typography>
+                                                <Typography sx={{ fontWeight: 700, color: '#1d4ed8', fontSize: '1rem' }}>
+                                                    {person.roomAllocation.roomNumber}
+                                                </Typography>
+                                                <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500 }}>
+                                                    {person.roomAllocation.building} • {person.roomAllocation.floor}
+                                                </Typography>
+                                            </Box>
+
+                                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1 }}>
+                                                <Box>
+                                                    <Typography variant="caption" sx={{ color: '#64748b', display: 'block', fontSize: '11px' }}>Gender</Typography>
+                                                    <Typography sx={{ fontWeight: 600, color: '#334155', fontSize: '12.5px' }}>{person.gender}</Typography>
+                                                </Box>
+                                                <Box>
+                                                    <Typography variant="caption" sx={{ color: '#64748b', display: 'block', fontSize: '11px' }}>Phone</Typography>
+                                                    <Typography sx={{ fontWeight: 600, color: '#334155', fontSize: '12.5px' }}>{person.phone}</Typography>
+                                                </Box>
+                                            </Box>
+                                        </Box>
+
+                                        <Box sx={{ display: 'flex', gap: 1, pt: 1.5, borderTop: '1px solid #f1f5f9' }}>
+                                            <Button
+                                                fullWidth
+                                                size="small"
+                                                variant="outlined"
+                                                startIcon={<EditIcon sx={{ fontSize: 16 }} />}
+                                                onClick={(e) => {
+                                                    e.currentTarget.blur();
+                                                    handleOpenMapDialog(person);
+                                                }}
+                                                sx={{ textTransform: 'none', borderRadius: 1.5, fontWeight: 600, color: '#2563eb', borderColor: '#bfdbfe' }}
+                                            >
+                                                Change
+                                            </Button>
+                                            <Button
+                                                fullWidth
+                                                size="small"
+                                                variant="outlined"
+                                                color="error"
+                                                startIcon={<DeleteIcon sx={{ fontSize: 16 }} />}
+                                                onClick={(e) => {
+                                                    e.currentTarget.blur();
+                                                    handleOpenUnassignDialog(person);
+                                                }}
+                                                sx={{ textTransform: 'none', borderRadius: 1.5, fontWeight: 600, borderColor: '#fecaca' }}
+                                            >
+                                                Unassign
+                                            </Button>
+                                        </Box>
+                                    </Paper>
+                                ))}
+                            </Box>
+                        )}
+                    </Box>
+                ) : (
+                    <TableContainer component={Paper} sx={{ boxShadow: '0 4px 16px rgba(0,0,0,0.05)', borderRadius: 2.5, border: '1px solid #e2e8f0', overflowX: 'auto', width: '100%' }}>
                     <Table sx={{ minWidth: 700 }} aria-label="mapped accommodations table">
                         <TableHead sx={{ bgcolor: '#f8fafc' }}>
                             <TableRow>
@@ -935,7 +1278,10 @@ const HostelProvision = () => {
                                                 <Tooltip title="Change Room">
                                                     <IconButton
                                                         size="small"
-                                                        onClick={() => handleOpenMapDialog(person)}
+                                                        onClick={(e) => {
+                                                            e.currentTarget.blur();
+                                                            handleOpenMapDialog(person);
+                                                        }}
                                                         sx={{ color: '#2563eb', bgcolor: '#eff6ff', '&:hover': { bgcolor: '#dbeafe' } }}
                                                     >
                                                         <EditIcon fontSize="small" />
@@ -944,7 +1290,10 @@ const HostelProvision = () => {
                                                 <Tooltip title="Unassign Room">
                                                     <IconButton
                                                         size="small"
-                                                        onClick={() => handleOpenUnassignDialog(person)}
+                                                        onClick={(e) => {
+                                                            e.currentTarget.blur();
+                                                            handleOpenUnassignDialog(person);
+                                                        }}
                                                         sx={{ color: '#dc2626', bgcolor: '#fef2f2', '&:hover': { bgcolor: '#fee2e2' } }}
                                                     >
                                                         <DeleteIcon fontSize="small" />
@@ -972,6 +1321,7 @@ const HostelProvision = () => {
                         </TableBody>
                     </Table>
                 </TableContainer>
+                )}
             </Box>
 
             {/* Accommodation Guidelines Management Section (Below Currently Mapped Participants Table) */}
@@ -1009,19 +1359,29 @@ const HostelProvision = () => {
                         </Box>
                     </Box>
 
-                    <Stack direction="row" spacing={1} sx={{ width: { xs: '100%', sm: 'auto' }, justifyContent: { xs: 'flex-start', sm: 'flex-end' } }}>
+                    <Stack
+                        direction={{ xs: 'column', sm: 'row' }}
+                        spacing={1}
+                        sx={{
+                            width: { xs: '100%', sm: 'auto' },
+                            justifyContent: { xs: 'stretch', sm: 'flex-end' },
+                            mt: { xs: 1.5, sm: 0 }
+                        }}
+                    >
                         <Button
                             variant="outlined"
                             size="small"
                             onClick={handleResetGuidelines}
                             startIcon={<RestartAltIcon />}
                             sx={{
+                                width: { xs: '100%', sm: 'auto' },
                                 textTransform: 'none',
                                 borderRadius: 2,
                                 fontWeight: 600,
                                 color: '#64748b',
                                 borderColor: '#cbd5e1',
-                                fontSize: '12.5px'
+                                fontSize: '12.5px',
+                                py: { xs: 0.8, sm: 0.5 }
                             }}
                         >
                             Reset Defaults
@@ -1033,12 +1393,14 @@ const HostelProvision = () => {
                             disabled={guidelinesSaving}
                             startIcon={guidelinesSaving ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
                             sx={{
+                                width: { xs: '100%', sm: 'auto' },
                                 bgcolor: '#0b5299',
                                 textTransform: 'none',
                                 borderRadius: 2,
                                 fontWeight: 600,
                                 fontSize: '12.5px',
                                 px: 2.5,
+                                py: { xs: 0.8, sm: 0.5 },
                                 boxShadow: '0 2px 8px rgba(11, 82, 153, 0.25)',
                                 '&:hover': { bgcolor: '#09407a' }
                             }}
@@ -1232,8 +1594,11 @@ const HostelProvision = () => {
                 onClose={handleCloseMapDialog}
                 maxWidth="sm"
                 fullWidth
-                PaperProps={{
-                    sx: { borderRadius: 3, p: 1 }
+                disableRestoreFocus
+                slotProps={{
+                    paper: {
+                        sx: { borderRadius: 3, p: 1 }
+                    }
                 }}
             >
                 <DialogTitle sx={{ pb: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -1267,14 +1632,8 @@ const HostelProvision = () => {
                                 <Typography variant="body2" sx={{ color: '#64748b', mb: 1.5 }}>
                                     {selectedPerson.university}
                                 </Typography>
-                                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                                <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: 'wrap' }}>
                                     <Chip label={selectedPerson.role} size="small" color="primary" variant="outlined" />
-                                    <Chip label={`Gender: ${selectedPerson.gender}`} size="small" variant="outlined" />
-                                    <Chip
-                                        label={`Acc Requested: ${selectedPerson.accommodation}`}
-                                        size="small"
-                                        color={selectedPerson.accommodation === 'Yes' ? 'success' : 'default'}
-                                    />
                                     {selectedPerson.roomAllocation && (
                                         <Chip
                                             label={`Current: ${selectedPerson.roomAllocation.roomNumber}`}
@@ -1362,12 +1721,22 @@ const HostelProvision = () => {
                                                     {item.roomNumber}
                                                 </Typography>
                                                 <Chip
-                                                    label={`${item.occupancy}/${item.capacity} Occupied (${item.availableSlots} beds left)`}
+                                                    label={
+                                                        item.isCurrentPersonsRoom
+                                                            ? `${item.actualTotalOccupancy}/${item.capacity} Occupied (Current Room)`
+                                                            : `${item.occupancy}/${item.capacity} Occupied (${item.availableSlots} beds left)`
+                                                    }
                                                     size="small"
                                                     sx={{
                                                         fontSize: '0.75rem',
-                                                        bgcolor: item.occupancy === 0 ? '#ecfdf5' : '#eff6ff',
-                                                        color: item.occupancy === 0 ? '#047857' : '#1d4ed8'
+                                                        fontWeight: item.isCurrentPersonsRoom ? 600 : 500,
+                                                        bgcolor: item.isCurrentPersonsRoom
+                                                            ? '#eff6ff'
+                                                            : (item.occupancy === 0 ? '#ecfdf5' : '#eff6ff'),
+                                                        color: item.isCurrentPersonsRoom
+                                                            ? '#1d4ed8'
+                                                            : (item.occupancy === 0 ? '#047857' : '#1d4ed8'),
+                                                        border: item.isCurrentPersonsRoom ? '1px solid #bfdbfe' : 'none'
                                                     }}
                                                 />
                                             </Box>
@@ -1383,12 +1752,7 @@ const HostelProvision = () => {
                                 </Alert>
                             )}
 
-                            {/* Capacity Info helper */}
-                            <Box sx={{ p: 1.5, bgcolor: '#f0fdf4', borderRadius: 2, border: '1px solid #bbf7d0' }}>
-                                <Typography variant="caption" sx={{ color: '#166534', display: 'block', fontWeight: 500 }}>
-                                    ℹ️ <b>Hostel Rules:</b> Each room accommodates a maximum of 4 members. Fully occupied rooms (4/4 members) are automatically hidden from this list.
-                                </Typography>
-                            </Box>
+
                         </Box>
                     )}
                 </DialogContent>
@@ -1426,7 +1790,8 @@ const HostelProvision = () => {
                 onClose={handleCloseUnassignDialog}
                 maxWidth="xs"
                 fullWidth
-                PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+                disableRestoreFocus
+                slotProps={{ paper: { sx: { borderRadius: 3, p: 1 } } }}
             >
                 <DialogTitle sx={{ color: '#dc2626', fontWeight: 700, pb: 1 }}>
                     Unassign Room?

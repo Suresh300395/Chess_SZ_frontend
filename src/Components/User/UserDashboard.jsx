@@ -25,6 +25,7 @@ import AccommodationDetails from './AccommodationDetails';
 import FoodTokenDetails from './FoodTokenDetails';
 import { getCurrentUser, updateUserSession } from '../../utils/auth';
 import { formatDateDDMMYYYY } from '../../utils/dateUtils';
+import { isMealTokenExpired } from '../../config/foodTokenConfig';
 
 const UserDashboard = () => {
     const user = getCurrentUser();
@@ -57,7 +58,11 @@ const UserDashboard = () => {
     const acc = dashData?.accommodation || {};
     const ft = dashData?.foodTokens || {};
     const cd = dashData?.cautionDeposit || {};
-    const usedPercent = ft.total > 0 ? Math.round((ft.used / ft.total) * 100) : 0;
+    const ftTokens = ft.tokens || [];
+    const activeFtTokens = ftTokens.filter(t => !t.isExpired && !isMealTokenExpired(t.mealDate, t.mealType) && t.status !== 'CANCELLED');
+    const availableFtCount = ft.available !== undefined ? ft.available : activeFtTokens.filter(t => t.status === 'ISSUED').length;
+    const totalActiveFt = ft.total !== undefined ? ft.total : activeFtTokens.length;
+    const usedPercent = totalActiveFt > 0 ? Math.round(((ft.used || 0) / (totalActiveFt + (ft.used || 0))) * 100) : 0;
     const playerDetails = dashData?.details || {};
 
     const formatDate = (dateStr) => {
@@ -170,12 +175,12 @@ const UserDashboard = () => {
     };
 
     return (
-        <Box sx={{ minHeight: '100vh', pt: 8, px: { xs: 1, md: '96px' }, pb: 4, backgroundColor: '#faf6f3' }}>
-            <Card sx={{ width: '100%', borderRadius: 4, boxShadow: '0 8px 32px rgba(0,0,0,0.08)', p: { xs: 1, md: 4 } }}>
+        <Box sx={{ minHeight: '100vh', pt: { xs: 1.5, sm: 2, md: 8 }, px: { xs: 1.5, sm: 2, md: '96px' }, pb: 4, backgroundColor: '#faf6f3' }}>
+            <Card sx={{ width: '100%', borderRadius: { xs: 3, md: 4 }, boxShadow: 'none !important', border: '1px solid #eaedf1', p: { xs: 2, sm: 2.5, md: 4 } }}>
 
                 {/* Page Title */}
-                <Typography variant="h4" fontWeight="bold" color="#0b5299" sx={{ mb: 3 }}>
-                    User Dashboard
+                <Typography variant="h4" fontWeight="bold" color="#0b5299" sx={{ mb: { xs: 2, md: 3 }, fontSize: { xs: '1.35rem', sm: '1.6rem', md: '1.85rem' } }}>
+                    Welcome {dashData?.name || user?.name || user?.username || 'User'}..!
                 </Typography>
 
                 {/* Loading */}
@@ -193,7 +198,7 @@ const UserDashboard = () => {
                             borderRadius: 3,
                             mb: 3,
                             backgroundColor: 'var(--color-navy)',
-                            boxShadow: '0 8px 32px rgba(11,82,153,0.3)',
+                            boxShadow: 'none !important',
                             color: '#fff',
                             overflow: 'hidden',
                             position: 'relative'
@@ -458,22 +463,22 @@ const UserDashboard = () => {
                                             </Box>
                                             <Chip
                                                 icon={<CheckCircleIcon sx={{ fontSize: '16px !important' }} />}
-                                                label={ft.status || 'Inactive'}
+                                                label={availableFtCount > 0 ? 'Active' : (ft.used > 0 ? 'Used' : 'Inactive')}
                                                 size="small"
                                                 sx={{
-                                                    bgcolor: ft.status === 'Active' ? '#dcfce7' : '#f1f5f9',
-                                                    color: ft.status === 'Active' ? '#166534' : '#64748b',
+                                                    bgcolor: availableFtCount > 0 ? '#dcfce7' : '#f1f5f9',
+                                                    color: availableFtCount > 0 ? '#166534' : '#64748b',
                                                     fontWeight: 600,
-                                                    '& .MuiChip-icon': { color: ft.status === 'Active' ? '#166534' : '#64748b' }
+                                                    '& .MuiChip-icon': { color: availableFtCount > 0 ? '#166534' : '#64748b' }
                                                 }}
                                             />
                                         </Box>
                                         <Box sx={{ flexGrow: 1, position: 'relative' }}>
                                             <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 0.5 }}>
-                                                <Typography variant="h3" fontWeight="bold" color="#f97316">{ft.total > 0 ? ft.total - ft.used : 0}</Typography>
+                                                <Typography variant="h3" fontWeight="bold" color="#f97316">{availableFtCount}</Typography>
                                                 <Typography variant="subtitle1" fontWeight="600" color="#64748b">Available</Typography>
                                             </Box>
-                                            <Typography variant="body2" color="#64748b" sx={{ mb: 2 }}>{ft.used || 0} Used of {ft.total || 0}</Typography>
+                                            <Typography variant="body2" color="#64748b" sx={{ mb: 2 }}>{ft.used || 0} Used of {totalActiveFt || 0}</Typography>
                                             <LinearProgress variant="determinate" value={usedPercent} sx={{ height: 8, borderRadius: 4, bgcolor: '#e2e8f0', '& .MuiLinearProgress-bar': { bgcolor: '#f97316', borderRadius: 4 } }} />
                                             <Box sx={{ position: 'absolute', right: 0, top: '20%', width: 50, height: 50, borderRadius: '50%', bgcolor: '#e0f2fe', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
                                                 <Typography variant="caption" fontWeight="bold" color="#0369a1" sx={{ lineHeight: 1 }}>{usedPercent}%</Typography>

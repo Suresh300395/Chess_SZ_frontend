@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import {
     Box, Typography, Chip, Button, Table, TableBody, TableCell,
     TableContainer, TableHead, TableRow, Paper, Alert,
-    Dialog, DialogContent, IconButton
+    Dialog, DialogContent, IconButton, Card, CardContent, Tooltip
 } from '@mui/material';
+import GridViewRoundedIcon from '@mui/icons-material/GridViewRounded';
+import TableRowsRoundedIcon from '@mui/icons-material/TableRowsRounded';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import LiveTvIcon from '@mui/icons-material/LiveTv';
 import MapIcon from '@mui/icons-material/Map';
@@ -21,6 +23,7 @@ const Home = () => {
     const [liveBoard, setLiveBoard] = useState(null);
     const [routeMap, setRouteMap] = useState(null);
     const [isMapModalOpen, setIsMapModalOpen] = useState(false);
+    const [matchViewMode, setMatchViewMode] = useState('table');
     const tabs = ['Live Board', 'Route Map', 'Organizing Committee'];
 
     const resolveImgUrl = (path) => {
@@ -122,13 +125,43 @@ const Home = () => {
                     </Box>
                 </Box>
 
-                <Box sx={{ mt: 5, mb: 4, display: 'flex', justifyContent: 'center' }}>
+                <Box
+                    sx={{
+                        mt: { xs: 2, sm: 5 },
+                        mb: { xs: 1.5, sm: 4 },
+                        display: 'flex',
+                        justifyContent: 'center',
+                        position: { xs: 'sticky', md: 'static' },
+                        top: { xs: 0, md: 'auto' },
+                        zIndex: { xs: 1100, md: 'auto' },
+                        bgcolor: { xs: '#FAF6F3', md: 'transparent' },
+                        py: { xs: 0.5, md: 0 },
+                        px: { xs: 1.5, sm: 2, md: '96px' },
+                        width: '100%',
+                        boxSizing: 'border-box'
+                    }}
+                >
                     <Tabs tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} />
                 </Box>
 
-                <Box component="section" className="tab-content-section" sx={{ px: { xs: 1, md: 6 }, pb: 8 }}>
-                    <Box className="tab-content-card" sx={{ p: { xs: 3, md: 5 }, bgcolor: 'white', borderRadius: 4, boxShadow: '0px 4px 20px rgba(0,0,0,0.05)' }}>
-                        <Box component="h2" className="tab-card-title" sx={{ mb: 3, mt: 0 }}>
+                <Box component="section" className="tab-content-section" sx={{ px: { xs: 1.5, sm: 2, md: '96px' }, pb: { xs: 4, md: 8 } }}>
+                    <Box className="tab-content-card" sx={{ p: { xs: 2, sm: 3, md: 5 }, bgcolor: 'white', borderRadius: 4, boxShadow: '0px 4px 20px rgba(0,0,0,0.05)', height: 'auto', minHeight: 'auto' }}>
+                        <Box
+                            component="h2"
+                            className="tab-card-title"
+                            sx={{
+                                mb: 3,
+                                mt: 0,
+                                position: { xs: 'sticky', md: 'static' },
+                                top: { xs: '54px', md: 'auto' },
+                                zIndex: { xs: 1090, md: 'auto' },
+                                bgcolor: { xs: 'white', md: 'transparent' },
+                                py: { xs: 1, md: 0 },
+                                color: '#0b5299',
+                                fontSize: { xs: '1.45rem', sm: '1.75rem', md: '2rem' },
+                                fontWeight: 700
+                            }}
+                        >
                             {activeTab}
                         </Box>
 
@@ -180,12 +213,128 @@ const Home = () => {
                                     </Box>
                                 )}
 
-                                {/* Top Matches Table */}
+                                {/* Top Matches Table / Cards */}
                                 {liveBoard?.matches && liveBoard.matches.length > 0 && (
                                     <Box sx={{ mt: 3 }}>
-                                        <Typography variant="h6" fontWeight="bold" sx={{ color: '#0f172a', mb: 1.5 }}>
-                                            Top Boards Match Scoreboard
-                                        </Typography>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
+                                            <Typography variant="h6" fontWeight="bold" sx={{ color: '#0f172a' }}>
+                                                Top Boards Match Scoreboard
+                                            </Typography>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, bgcolor: '#ffffff', p: 0.4, borderRadius: 2, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                                                <Tooltip title="Cards View">
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => setMatchViewMode('cards')}
+                                                        sx={{
+                                                            p: 0.6,
+                                                            borderRadius: 1.5,
+                                                            bgcolor: matchViewMode === 'cards' ? '#0b5299' : 'transparent',
+                                                            color: matchViewMode === 'cards' ? '#ffffff' : '#64748b',
+                                                            boxShadow: matchViewMode === 'cards' ? '0 1px 3px rgba(11,82,153,0.3)' : 'none',
+                                                            '&:hover': {
+                                                                bgcolor: matchViewMode === 'cards' ? '#0b5299' : 'rgba(0,0,0,0.06)',
+                                                                color: matchViewMode === 'cards' ? '#ffffff' : '#0b5299'
+                                                            }
+                                                        }}
+                                                    >
+                                                        <GridViewRoundedIcon sx={{ fontSize: 18 }} />
+                                                    </IconButton>
+                                                </Tooltip>
+                                                <Tooltip title="Table View">
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => setMatchViewMode('table')}
+                                                        sx={{
+                                                            p: 0.6,
+                                                            borderRadius: 1.5,
+                                                            bgcolor: matchViewMode === 'table' ? '#0b5299' : 'transparent',
+                                                            color: matchViewMode === 'table' ? '#ffffff' : '#64748b',
+                                                            boxShadow: matchViewMode === 'table' ? '0 1px 3px rgba(11,82,153,0.3)' : 'none',
+                                                            '&:hover': {
+                                                                bgcolor: matchViewMode === 'table' ? '#0b5299' : 'rgba(0,0,0,0.06)',
+                                                                color: matchViewMode === 'table' ? '#ffffff' : '#0b5299'
+                                                            }
+                                                        }}
+                                                    >
+                                                        <TableRowsRoundedIcon sx={{ fontSize: 18 }} />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            </Box>
+                                        </Box>
+
+                                        {matchViewMode === 'cards' ? (
+                                            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 2 }}>
+                                                {liveBoard.matches.map((m, idx) => (
+                                                    <Card
+                                                        key={idx}
+                                                        variant="outlined"
+                                                        sx={{
+                                                            borderRadius: 2.5,
+                                                            border: '1px solid #e2e8f0',
+                                                            boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                                                            transition: 'all 0.2s ease',
+                                                            '&:hover': {
+                                                                boxShadow: '0 6px 16px rgba(11,82,153,0.1)',
+                                                                borderColor: '#93c5fd'
+                                                            }
+                                                        }}
+                                                    >
+                                                        <CardContent sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5, '&:last-child': { pb: 2 } }}>
+                                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                                <Typography sx={{ fontWeight: 800, color: '#0b5299', fontSize: '0.9rem', bgcolor: '#eff6ff', px: 1, py: 0.3, borderRadius: 1 }}>
+                                                                    Board #{m.boardNumber || idx + 1}
+                                                                </Typography>
+                                                                <Chip
+                                                                    label={m.result || '*'}
+                                                                    size="small"
+                                                                    sx={{
+                                                                        fontWeight: 700,
+                                                                        bgcolor: m.result === '*' ? '#fef3c7' : '#f1f5f9',
+                                                                        color: m.result === '*' ? '#d97706' : '#0f172a'
+                                                                    }}
+                                                                />
+                                                            </Box>
+
+                                                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, bgcolor: '#f8fafc', p: 1.5, borderRadius: 2 }}>
+                                                                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                                                                    <Box sx={{ width: 14, height: 14, borderRadius: '50%', bgcolor: '#ffffff', border: '2px solid #94a3b8', mt: 0.3, flexShrink: 0 }} />
+                                                                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                                                                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#0f172a', lineHeight: 1.3 }}>
+                                                                            {m.whitePlayer || 'TBD'}
+                                                                        </Typography>
+                                                                        {m.whiteUniversity && (
+                                                                            <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>
+                                                                                {m.whiteUniversity}
+                                                                            </Typography>
+                                                                        )}
+                                                                    </Box>
+                                                                </Box>
+
+                                                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', my: -0.5 }}>
+                                                                    <Typography variant="caption" sx={{ color: '#94a3b8', fontWeight: 600, fontSize: '0.7rem' }}>
+                                                                        VS
+                                                                    </Typography>
+                                                                </Box>
+
+                                                                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                                                                    <Box sx={{ width: 14, height: 14, borderRadius: '50%', bgcolor: '#0f172a', border: '2px solid #0f172a', mt: 0.3, flexShrink: 0 }} />
+                                                                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                                                                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#0f172a', lineHeight: 1.3 }}>
+                                                                            {m.blackPlayer || 'TBD'}
+                                                                        </Typography>
+                                                                        {m.blackUniversity && (
+                                                                            <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>
+                                                                                {m.blackUniversity}
+                                                                            </Typography>
+                                                                        )}
+                                                                    </Box>
+                                                                </Box>
+                                                            </Box>
+                                                        </CardContent>
+                                                    </Card>
+                                                ))}
+                                            </Box>
+                                        ) : (
                                         <TableContainer component={Paper} sx={{ borderRadius: 2, border: '1px solid #e2e8f0', boxShadow: 'none' }}>
                                             <Table size="small">
                                                 <TableHead sx={{ bgcolor: '#f1f5f9' }}>
@@ -228,6 +377,7 @@ const Home = () => {
                                                 </TableBody>
                                             </Table>
                                         </TableContainer>
+                                        )}
                                     </Box>
                                 )}
 
@@ -356,34 +506,35 @@ const Home = () => {
 
                         {/* ORGANIZING COMMITTEE TAB */}
                         {activeTab === 'Organizing Committee' && (
-                            <Box sx={{ 
-                                display: 'grid', 
-                                gridTemplateColumns: {
-                                    xs: '1fr',
-                                    sm: committeeMembers.length === 1 ? '1fr' : 'repeat(2, 1fr)',
-                                    md: committeeMembers.length === 1 ? '1fr' 
-                                        : committeeMembers.length === 2 ? 'repeat(2, 1fr)'
-                                        : committeeMembers.length === 3 ? 'repeat(3, 1fr)'
-                                        : 'repeat(4, 1fr)'
-                                },
-                                gap: '30px', 
-                                mt: 0,
-                                width: '100%'
-                            }}>
+                            <Box sx={{ width: '100%', mt: 0 }}>
                                 {committeeMembers.length > 0 ? (
-                                    committeeMembers.map((member) => (
-                                        <CommitteeCard 
-                                            key={member._id} 
-                                            member={{
-                                                name: member.memberName,
-                                                role: member.designation,
-                                                position: member.position,
-                                                image: member.photo,
-                                                email: member.email,
-                                                phone: member.phone
-                                            }} 
-                                        />
-                                    ))
+                                    <Box sx={{
+                                        display: 'grid',
+                                        gridTemplateColumns: {
+                                            xs: '1fr',
+                                            sm: committeeMembers.length === 1 ? '1fr' : 'repeat(2, 1fr)',
+                                            md: committeeMembers.length <= 2 ? (committeeMembers.length === 1 ? '1fr' : 'repeat(2, 1fr)') : 'repeat(3, 1fr)',
+                                            lg: committeeMembers.length === 1 ? '1fr'
+                                                : committeeMembers.length === 2 ? 'repeat(2, 1fr)'
+                                                : committeeMembers.length === 3 ? 'repeat(3, 1fr)'
+                                                : 'repeat(4, 1fr)'
+                                        },
+                                        gap: { xs: 2, sm: 2.5, md: 3 }
+                                    }}>
+                                        {committeeMembers.map((member) => (
+                                            <CommitteeCard
+                                                key={member._id}
+                                                member={{
+                                                    name: member.memberName,
+                                                    role: member.designation,
+                                                    position: member.position,
+                                                    image: member.photo,
+                                                    email: member.email,
+                                                    phone: member.phone
+                                                }}
+                                            />
+                                        ))}
+                                    </Box>
                                 ) : (
                                     <Box component="p" style={{ color: 'rgba(13, 35, 59, 0.7)', fontSize: '14px' }}>
                                         No committee members found.

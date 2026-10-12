@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Link, Typography, TextField, Dialog, IconButton } from '@mui/material';
+import { Box, Link, Typography, TextField, Dialog, IconButton, InputAdornment } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../../utils/api';
 import { saveAuthSession } from '../../utils/auth';
@@ -12,6 +14,7 @@ const Authentication = ({ open, onClose, initialUsername = '', initialPassword =
         username: initialUsername || '',
         password: initialPassword || ''
     });
+    const [showPassword, setShowPassword] = useState(false);
 
     useEffect(() => {
         if (open) {
@@ -20,6 +23,7 @@ const Authentication = ({ open, onClose, initialUsername = '', initialPassword =
                 password: initialPassword || ''
             });
             setError('');
+            setShowPassword(false);
         }
     }, [open, initialUsername, initialPassword]);
     const [error, setError] = useState('');
@@ -83,6 +87,7 @@ const Authentication = ({ open, onClose, initialUsername = '', initialPassword =
             setMobileNumber('');
             setOtp(['', '', '', '', '', '']);
             setError('');
+            setShowPassword(false);
         }, 300);
     };
 
@@ -113,7 +118,7 @@ const Authentication = ({ open, onClose, initialUsername = '', initialPassword =
                     navigate('/admin/dashboard');
                 }
             } else {
-                setError(data.message || 'Login failed');
+                setError(data.message || 'Invalid username or password');
             }
         } catch (err) {
             setError(err.message || 'Network error. Is the backend running?');
@@ -126,19 +131,19 @@ const Authentication = ({ open, onClose, initialUsername = '', initialPassword =
     return (
         <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth slotProps={{ paper: { sx: { borderRadius: 2, m: 2, maxWidth: 450 } } }}>
             <Box sx={{ width: '100%', bgcolor: 'white', p: { xs: 4, md: 5 }, position: 'relative' }}>
-                <IconButton 
-                    onClick={handleClose} 
-                    sx={{ 
-                        position: 'absolute', 
-                        top: 8, 
-                        right: 8, 
+                <IconButton
+                    onClick={handleClose}
+                    sx={{
+                        position: 'absolute',
+                        top: 8,
+                        right: 8,
                         color: 'grey.500',
                         transition: 'all 0.3s ease',
-                        '&:hover': { 
-                            bgcolor: '#ff4d4d', 
+                        '&:hover': {
+                            bgcolor: '#ff4d4d',
                             color: 'white',
                             transform: 'rotate(90deg)'
-                        } 
+                        }
                     }}
                 >
                     <CloseIcon />
@@ -170,18 +175,36 @@ const Authentication = ({ open, onClose, initialUsername = '', initialPassword =
                         <TextField
                             fullWidth
                             label="Password"
-                            type="password"
+                            type={showPassword ? 'text' : 'password'}
                             name="password"
                             placeholder="Enter password"
                             value={credentials.password}
                             onChange={handleChange}
                             required
+                            slotProps={{
+                                input: {
+                                    endAdornment: (
+                                        <InputAdornment position="end">
+                                            <IconButton
+                                                aria-label="toggle password visibility"
+                                                onClick={() => setShowPassword(prev => !prev)}
+                                                onMouseDown={(e) => e.preventDefault()}
+                                                edge="end"
+                                                size="small"
+                                                sx={{ color: '#64748b' }}
+                                            >
+                                                {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                                            </IconButton>
+                                        </InputAdornment>
+                                    )
+                                }
+                            }}
                         />
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: -2, alignItems: 'center' }}>
                             <Box></Box>
-                            <Link 
-                                href="#" 
-                                underline="hover" 
+                            <Link
+                                href="#"
+                                underline="hover"
                                 sx={{ fontSize: '0.85rem', color: '#0b5299', cursor: 'pointer' }}
                                 onClick={(e) => { e.preventDefault(); setIsForgotPassword(true); }}
                             >
@@ -205,9 +228,9 @@ const Authentication = ({ open, onClose, initialUsername = '', initialPassword =
                             required
                         />
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: -2, alignItems: 'center' }}>
-                            <Link 
-                                href="#" 
-                                underline="hover" 
+                            <Link
+                                href="#"
+                                underline="hover"
                                 sx={{ fontSize: '0.85rem', color: '#0b5299', cursor: 'pointer' }}
                                 onClick={(e) => { e.preventDefault(); setIsForgotPassword(false); }}
                             >
@@ -231,8 +254,8 @@ const Authentication = ({ open, onClose, initialUsername = '', initialPassword =
                                     value={digit}
                                     onChange={(e) => handleOtpChange(index, e.target.value)}
                                     onKeyDown={(e) => handleOtpKeyDown(index, e)}
-                                    slotProps={{ 
-                                        input: { 
+                                    slotProps={{
+                                        input: {
                                             inputProps: {
                                                 maxLength: 1,
                                                 style: { textAlign: 'center', fontSize: '1.5rem', padding: '10px 0' }
@@ -244,9 +267,9 @@ const Authentication = ({ open, onClose, initialUsername = '', initialPassword =
                             ))}
                         </Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: -2, alignItems: 'center' }}>
-                            <Link 
-                                href="#" 
-                                underline="hover" 
+                            <Link
+                                href="#"
+                                underline="hover"
                                 sx={{ fontSize: '0.85rem', color: '#0b5299', cursor: 'pointer' }}
                                 onClick={(e) => { e.preventDefault(); setIsOtpSent(false); }}
                             >

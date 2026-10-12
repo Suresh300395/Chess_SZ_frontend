@@ -1,5 +1,6 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import Header from './Common/Header';
+import Footer from './Common/Footer';
 import { Box } from '@mui/material';
 
 const FrontendLayout = () => {
@@ -12,6 +13,7 @@ const FrontendLayout = () => {
             <Box component="main" sx={{ flexGrow: 1 }}>
                 <Outlet />
             </Box>
+            <Footer />
         </Box>
     );
 };
