@@ -183,7 +183,7 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/registration" element={<Registration />} />
             <Route path="/user/dashboard" element={
-                <ProtectedRoute allowedRoles={['player']}>
+                <ProtectedRoute allowedRoles={['player', 'coach']}>
                     <UserDashboard />
                 </ProtectedRoute>
             } />

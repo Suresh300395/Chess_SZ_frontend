@@ -9,8 +9,8 @@ import GridViewRoundedIcon from '@mui/icons-material/GridViewRounded';
 import TableRowsRoundedIcon from '@mui/icons-material/TableRowsRounded';
 import { toast } from 'sonner';
 
-// Import centralized API base URL
-import { API_BASE } from '../../utils/api';
+// Import centralized API base URL and endpoints
+import { API_BASE, blocksAPI } from '../../utils/api';
 
 const ManageBlocks = () => {
     const [blocks, setBlocks] = useState([]);
@@ -75,14 +75,9 @@ const ManageBlocks = () => {
 
             const payload = { ...formData, floors: processedFloors };
 
-            const url = editId ? `${API_BASE}/blocks/${editId}` : `${API_BASE}/blocks`;
-            const method = editId ? 'PUT' : 'POST';
-
-            const response = await fetch(url, {
-                method: method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+            const response = editId
+                ? await blocksAPI.update(editId, payload)
+                : await blocksAPI.create(payload);
             const data = await response.json();
 
             if (!response.ok) throw new Error(data.message || 'Failed to save block');
@@ -126,7 +121,7 @@ const ManageBlocks = () => {
     const handleDelete = async (id) => {
         if (!window.confirm('Are you sure you want to delete this block?')) return;
         try {
-            const response = await fetch(`${API_BASE}/blocks/${id}`, { method: 'DELETE' });
+            const response = await blocksAPI.delete(id);
             if (!response.ok) throw new Error('Failed to delete block');
             toast.success('Block deleted successfully');
             fetchBlocks();
@@ -240,11 +235,7 @@ const ManageBlocks = () => {
 
             for (const block of blocksToUpload) {
                 try {
-                    const response = await fetch(`${API_BASE}/blocks`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(block)
-                    });
+                    const response = await blocksAPI.create(block);
                     if (response.ok) successCount++;
                     else errorCount++;
                 } catch (err) {

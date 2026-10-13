@@ -362,17 +362,13 @@ const HostelProvision = () => {
 
         setSubmitting(true);
         try {
-            const response = await fetch('http://localhost:3003/api/registration/assign-room', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    registrationId: selectedPerson.registrationId,
-                    personId: selectedPerson.id,
-                    role: selectedPerson.role,
-                    building: selectedBuilding,
-                    floor: selectedFloor,
-                    roomNumber: selectedRoom
-                })
+            const response = await registrationAPI.assignRoom({
+                registrationId: selectedPerson.registrationId,
+                personId: selectedPerson.id,
+                role: selectedPerson.role,
+                building: selectedBuilding,
+                floor: selectedFloor,
+                roomNumber: selectedRoom
             });
 
             const data = await response.json();
@@ -385,7 +381,7 @@ const HostelProvision = () => {
             }
         } catch (err) {
             console.error('Error saving allocation:', err);
-            toast.error('Server error while saving room allocation');
+            toast.error(err.message || 'Server error while saving room allocation');
         } finally {
             setSubmitting(false);
         }
@@ -410,14 +406,10 @@ const HostelProvision = () => {
         if (!personToUnassign) return;
         setUnassigning(true);
         try {
-            const response = await fetch('http://localhost:3003/api/registration/unassign-room', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    registrationId: personToUnassign.registrationId,
-                    personId: personToUnassign.id,
-                    role: personToUnassign.role
-                })
+            const response = await registrationAPI.unassignRoom({
+                registrationId: personToUnassign.registrationId,
+                personId: personToUnassign.id,
+                role: personToUnassign.role
             });
 
             const data = await response.json();
@@ -430,7 +422,7 @@ const HostelProvision = () => {
             }
         } catch (err) {
             console.error('Error unassigning room:', err);
-            toast.error('Server error while unassigning room');
+            toast.error(err.message || 'Server error while unassigning room');
         } finally {
             setUnassigning(false);
         }

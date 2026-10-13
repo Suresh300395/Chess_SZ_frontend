@@ -3,57 +3,71 @@ import { ORGANIZATION_NAME, EVENT_NAME, PAPER_WIDTH } from '../../../config/food
 import { formatDateDDMMYYYY } from '../../../utils/dateUtils';
 
 /**
+ * Safely escape dynamic values for HTML rendering to prevent XSS
+ */
+const escapeHtml = (value) => {
+    if (value === null || value === undefined) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+};
+
+/**
  * Generate HTML markup for a single 80mm thermal food token receipt
  */
 const generateTokenHTML = (token, qrDataUrl) => {
     const isReprint = Boolean(token.isReprint || (token.printCount && token.printCount > 1));
     const locationInfo = [token.block, token.room ? `Room ${token.room}` : ''].filter(Boolean).join(' - ');
+    const safeQr = (typeof qrDataUrl === 'string' && qrDataUrl.startsWith('data:image/')) ? qrDataUrl : '';
 
     return `
         <div class="token-container">
             <div class="header">
-                <div class="org-name">${ORGANIZATION_NAME}</div>
-                <div class="event-name">${token.eventName || EVENT_NAME}</div>
+                <div class="org-name">${escapeHtml(ORGANIZATION_NAME)}</div>
+                <div class="event-name">${escapeHtml(token.eventName || EVENT_NAME)}</div>
                 <div class="divider"></div>
             </div>
 
             <div class="meal-section">
                 <div class="meal-badge">FOOD TOKEN</div>
-                <div class="meal-type">${(token.mealType || '').toUpperCase()}</div>
-                <div class="meal-date">${formatDateDDMMYYYY(token.mealDate)}</div>
+                <div class="meal-type">${escapeHtml((token.mealType || '').toUpperCase())}</div>
+                <div class="meal-date">${escapeHtml(formatDateDDMMYYYY(token.mealDate))}</div>
             </div>
 
             <div class="details-section">
                 <div class="row">
                     <span class="label">Name:</span>
-                    <span class="value name-val">${token.name || 'Participant'}</span>
+                    <span class="value name-val">${escapeHtml(token.name || 'Participant')}</span>
                 </div>
                 ${token.identifier ? `
                 <div class="row">
                     <span class="label">ID/Mobile:</span>
-                    <span class="value">${token.identifier}</span>
+                    <span class="value">${escapeHtml(token.identifier)}</span>
                 </div>` : ''}
                 ${token.teamOrSport ? `
                 <div class="row">
                     <span class="label">Team:</span>
-                    <span class="value">${token.teamOrSport}</span>
+                    <span class="value">${escapeHtml(token.teamOrSport)}</span>
                 </div>` : ''}
                 ${locationInfo ? `
                 <div class="row">
                     <span class="label">Stay:</span>
-                    <span class="value">${locationInfo}</span>
+                    <span class="value">${escapeHtml(locationInfo)}</span>
                 </div>` : ''}
             </div>
 
             <div class="qr-section">
-                <img src="${qrDataUrl}" alt="QR Code" class="qr-img" />
-                <div class="token-code">${token.code}</div>
+                <img src="${safeQr}" alt="QR Code" class="qr-img" />
+                <div class="token-code">${escapeHtml(token.code)}</div>
             </div>
 
             <div class="footer">
                 <div class="validity">Valid for one-time use only</div>
-                ${isReprint ? `<div class="reprint-badge">*** REPRINT (Copy #${token.printCount}) ***</div>` : ''}
-                <div class="timestamp">Printed: ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                ${isReprint ? `<div class="reprint-badge">*** REPRINT (Copy #${escapeHtml(token.printCount)}) ***</div>` : ''}
+                <div class="timestamp">Printed: ${escapeHtml(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}</div>
             </div>
         </div>
     `;

@@ -52,7 +52,7 @@ export const clearAuthSession = (notifyExpired = false) => {
     window.dispatchEvent(new CustomEvent('authChange', { detail: { expired: notifyExpired } }));
 
     if (notifyExpired && hadUser) {
-        toast.warning('Session expired due to 15 minutes of inactivity. Please login again.', {
+        toast.warning('Session expired. Please login again.', {
             id: 'session-expired-toast',
             duration: 5000,
         });

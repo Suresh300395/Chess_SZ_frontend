@@ -101,6 +101,18 @@ export const registrationAPI = {
         }),
 
     getAll: () => apiFetch('/registration', {}, true),
+
+    assignRoom: (data) =>
+        apiFetch('/registration/assign-room', {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        }, true),
+
+    unassignRoom: (data) =>
+        apiFetch('/registration/unassign-room', {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        }, true),
 };
 
 // Committee APIs
