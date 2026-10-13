@@ -55,8 +55,6 @@ const Authentication = ({ open, onClose, initialUsername = '', initialPassword =
 
     const handleVerifyOtp = (e) => {
         e.preventDefault();
-        const otpValue = otp.join('');
-        console.log("Verifying OTP:", otpValue);
         // Implement verification logic here
     };
 

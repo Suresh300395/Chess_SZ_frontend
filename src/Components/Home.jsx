@@ -76,7 +76,6 @@ const Home = () => {
         const socket = io(SOCKET_URL);
 
         socket.on('connect', () => {
-            console.log('Webhook connected to backend!');
         });
 
         socket.on('committeeUpdated', () => {
