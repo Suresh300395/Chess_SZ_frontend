@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
     Box, Typography, Chip, Button, Paper, Avatar,
-    Dialog, DialogContent, IconButton
+    Dialog, DialogContent, IconButton, Tooltip
 } from '@mui/material';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import LiveTvIcon from '@mui/icons-material/LiveTv';
@@ -343,25 +343,6 @@ const Home = () => {
                                                                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5 }}>
                                                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0, flex: 1 }}>
                                                                         <Box sx={{ position: 'relative', flexShrink: 0, display: 'inline-flex' }}>
-                                                                            {details.p1Won && (
-                                                                                <Box
-                                                                                    sx={{
-                                                                                        position: 'absolute',
-                                                                                        top: -11,
-                                                                                        right: -5,
-                                                                                        fontSize: '23px',
-                                                                                        lineHeight: 1,
-                                                                                        transform: 'rotate(18deg)',
-                                                                                        transformOrigin: 'bottom center',
-                                                                                        filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.22))',
-                                                                                        zIndex: 2,
-                                                                                        userSelect: 'none',
-                                                                                        pointerEvents: 'none'
-                                                                                    }}
-                                                                                >
-                                                                                    👑
-                                                                                </Box>
-                                                                            )}
                                                                             <Avatar
                                                                                 src={m.whitePhoto ? resolveImgUrl(m.whitePhoto) : `https://ui-avatars.com/api/?name=${encodeURIComponent(m.whitePlayer || 'White')}&background=0b5299&color=fff&bold=true`}
                                                                                 alt={m.whitePlayer || 'Player 1'}
@@ -379,9 +360,19 @@ const Home = () => {
                                                                     </Box>
 
                                                                     {isCompleted && (
-                                                                        <Typography sx={{ fontSize: '1.3rem', fontWeight: 800, color: details.p1Won ? '#16a34a' : details.isDraw ? '#2563eb' : '#dc2626', px: 1 }}>
-                                                                            {details.score1}
-                                                                        </Typography>
+                                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 0.5 }}>
+                                                                            {details.p1Won && (
+                                                                                <Box
+                                                                                    component="img"
+                                                                                    src="/Trophyy.webp"
+                                                                                    alt="Winner Trophy"
+                                                                                    sx={{ width: 22, height: 22, objectFit: 'contain' }}
+                                                                                />
+                                                                            )}
+                                                                            <Typography sx={{ fontSize: '1.3rem', fontWeight: 800, color: details.p1Won ? '#16a34a' : details.isDraw ? '#2563eb' : '#dc2626' }}>
+                                                                                {details.score1}
+                                                                            </Typography>
+                                                                        </Box>
                                                                     )}
                                                                 </Box>
 
@@ -391,25 +382,6 @@ const Home = () => {
                                                                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5 }}>
                                                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0, flex: 1 }}>
                                                                         <Box sx={{ position: 'relative', flexShrink: 0, display: 'inline-flex' }}>
-                                                                            {details.p2Won && (
-                                                                                <Box
-                                                                                    sx={{
-                                                                                        position: 'absolute',
-                                                                                        top: -11,
-                                                                                        right: -5,
-                                                                                        fontSize: '23px',
-                                                                                        lineHeight: 1,
-                                                                                        transform: 'rotate(18deg)',
-                                                                                        transformOrigin: 'bottom center',
-                                                                                        filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.22))',
-                                                                                        zIndex: 2,
-                                                                                        userSelect: 'none',
-                                                                                        pointerEvents: 'none'
-                                                                                    }}
-                                                                                >
-                                                                                    👑
-                                                                                </Box>
-                                                                            )}
                                                                             <Avatar
                                                                                 src={m.blackPhoto ? resolveImgUrl(m.blackPhoto) : `https://ui-avatars.com/api/?name=${encodeURIComponent(m.blackPlayer || 'Black')}&background=0b5299&color=fff&bold=true`}
                                                                                 alt={m.blackPlayer || 'Player 2'}
@@ -427,9 +399,19 @@ const Home = () => {
                                                                     </Box>
 
                                                                     {isCompleted && (
-                                                                        <Typography sx={{ fontSize: '1.3rem', fontWeight: 800, color: details.p2Won ? '#16a34a' : details.isDraw ? '#2563eb' : '#dc2626', px: 1 }}>
-                                                                            {details.score2}
-                                                                        </Typography>
+                                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 0.5 }}>
+                                                                            {details.p2Won && (
+                                                                                <Box
+                                                                                    component="img"
+                                                                                    src="/Trophyy.webp"
+                                                                                    alt="Winner Trophy"
+                                                                                    sx={{ width: 22, height: 22, objectFit: 'contain' }}
+                                                                                />
+                                                                            )}
+                                                                            <Typography sx={{ fontSize: '1.3rem', fontWeight: 800, color: details.p2Won ? '#16a34a' : details.isDraw ? '#2563eb' : '#dc2626' }}>
+                                                                                {details.score2}
+                                                                            </Typography>
+                                                                        </Box>
                                                                     )}
                                                                 </Box>
                                                             </Box>
@@ -497,25 +479,6 @@ const Home = () => {
                                                                     }}
                                                                 >
                                                                     <Box sx={{ position: 'relative', flexShrink: 0, display: 'inline-flex' }}>
-                                                                        {details.p1Won && (
-                                                                            <Box
-                                                                                sx={{
-                                                                                    position: 'absolute',
-                                                                                    top: -13,
-                                                                                    right: -6,
-                                                                                    fontSize: '26px',
-                                                                                    lineHeight: 1,
-                                                                                    transform: 'rotate(18deg)',
-                                                                                    transformOrigin: 'bottom center',
-                                                                                    filter: 'drop-shadow(0 2px 5px rgba(0,0,0,0.22))',
-                                                                                    zIndex: 2,
-                                                                                    userSelect: 'none',
-                                                                                    pointerEvents: 'none'
-                                                                                }}
-                                                                            >
-                                                                                👑
-                                                                            </Box>
-                                                                        )}
                                                                         <Avatar
                                                                             src={m.whitePhoto ? resolveImgUrl(m.whitePhoto) : `https://ui-avatars.com/api/?name=${encodeURIComponent(m.whitePlayer || 'White')}&background=0b5299&color=fff&bold=true`}
                                                                             alt={m.whitePlayer || 'Player 1'}
@@ -695,25 +658,6 @@ const Home = () => {
                                                                     }}
                                                                 >
                                                                     <Box sx={{ position: 'relative', flexShrink: 0, display: 'inline-flex' }}>
-                                                                        {details.p2Won && (
-                                                                            <Box
-                                                                                sx={{
-                                                                                    position: 'absolute',
-                                                                                    top: -13,
-                                                                                    right: -6,
-                                                                                    fontSize: '26px',
-                                                                                    lineHeight: 1,
-                                                                                    transform: 'rotate(18deg)',
-                                                                                    transformOrigin: 'bottom center',
-                                                                                    filter: 'drop-shadow(0 2px 5px rgba(0,0,0,0.22))',
-                                                                                    zIndex: 2,
-                                                                                    userSelect: 'none',
-                                                                                    pointerEvents: 'none'
-                                                                                }}
-                                                                            >
-                                                                                👑
-                                                                            </Box>
-                                                                        )}
                                                                         <Avatar
                                                                             src={m.blackPhoto ? resolveImgUrl(m.blackPhoto) : `https://ui-avatars.com/api/?name=${encodeURIComponent(m.blackPlayer || 'Black')}&background=0b5299&color=fff&bold=true`}
                                                                             alt={m.blackPlayer || 'Player 2'}
@@ -754,6 +698,30 @@ const Home = () => {
                                                                         </Typography>
                                                                     </Box>
                                                                 </Box>
+
+                                                                {/* Desktop Winner Trophy at Card Ending */}
+                                                                {isCompleted && (details.p1Won || details.p2Won) && (
+                                                                    <Tooltip title={`Winner: ${details.p1Won ? m.whitePlayer : m.blackPlayer}`} arrow>
+                                                                        <Box
+                                                                            component="img"
+                                                                            src="/Trophyy.webp"
+                                                                            alt="Winner Trophy"
+                                                                            sx={{
+                                                                                width: { sm: 38, md: 44 },
+                                                                                height: { sm: 38, md: 44 },
+                                                                                objectFit: 'contain',
+                                                                                filter: 'drop-shadow(0 3px 6px rgba(0,0,0,0.16))',
+                                                                                flexShrink: 0,
+                                                                                ml: 1.5,
+                                                                                cursor: 'pointer',
+                                                                                transition: 'transform 0.2s ease',
+                                                                                '&:hover': {
+                                                                                    transform: 'scale(1.15)'
+                                                                                }
+                                                                            }}
+                                                                        />
+                                                                    </Tooltip>
+                                                                )}
                                                             </Box>
                                                         </Paper>
                                                     );
