@@ -14,7 +14,6 @@ import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import InfoIcon from '@mui/icons-material/Info';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import { getCurrentUser } from '../../utils/auth';
-import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import PersonIcon from '@mui/icons-material/Person';
 import PhoneIcon from '@mui/icons-material/Phone';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
@@ -375,11 +374,52 @@ const AccommodationDetails = ({ onBack }) => {
                                 <Typography sx={{ fontSize: { xs: '1rem', sm: '1.15rem' }, fontWeight: 700, color: '#0f172a' }}>Important Guidelines</Typography>
                             </Box>
                             
-                            <Box sx={{ bgcolor: '#fefce8', border: '1px solid #fef08a', borderRadius: 2, p: { xs: '16px', sm: 2.5 }, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
                                 {(guidelines && guidelines.length > 0 ? guidelines : DEFAULT_GUIDELINES).map((rule, idx) => (
-                                    <Box key={idx} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.25 }}>
-                                        <WarningAmberIcon sx={{ color: '#eab308', fontSize: 18, mt: 0.1, flexShrink: 0 }} />
-                                        <Typography sx={{ fontSize: { xs: '12px', sm: '13px' }, color: '#713f12', fontWeight: 500, lineHeight: 1.4 }}>
+                                    <Box
+                                        key={idx}
+                                        sx={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 1.5,
+                                            p: { xs: 1.25, sm: 1.5 },
+                                            bgcolor: '#f8fafc',
+                                            borderRadius: '12px',
+                                            border: '1px solid #e2e8f0',
+                                            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                            '&:hover': {
+                                                bgcolor: '#f0f7ff',
+                                                borderColor: '#bae6fd',
+                                                transform: 'translateY(-1px)',
+                                                boxShadow: '0 4px 12px rgba(11, 82, 153, 0.06)'
+                                            }
+                                        }}
+                                    >
+                                        <Box
+                                            sx={{
+                                                width: 28,
+                                                height: 28,
+                                                borderRadius: '50%',
+                                                bgcolor: '#e0f2fe',
+                                                color: '#0284c7',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontWeight: 700,
+                                                fontSize: '12.5px',
+                                                flexShrink: 0
+                                            }}
+                                        >
+                                            {idx + 1}
+                                        </Box>
+                                        <Typography
+                                            sx={{
+                                                fontSize: { xs: '12.5px', sm: '13.5px' },
+                                                color: '#1e293b',
+                                                fontWeight: 500,
+                                                lineHeight: 1.45
+                                            }}
+                                        >
                                             {rule}
                                         </Typography>
                                     </Box>
