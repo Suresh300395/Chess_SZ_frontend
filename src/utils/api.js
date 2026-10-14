@@ -100,10 +100,22 @@ export const registrationAPI = {
             body: JSON.stringify(payload),
         }),
 
+    searchUniversities: (query, signal) =>
+        apiFetch(`/registration/search-universities?q=${encodeURIComponent(query)}`, { signal }),
+
+    getUniversityById: (id) =>
+        apiFetch(`/registration/university/${encodeURIComponent(id)}`),
+
     getAll: () => apiFetch('/registration', {}, true),
 
     assignRoom: (data) =>
         apiFetch('/registration/assign-room', {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        }, true),
+
+    bulkAssignRoom: (data) =>
+        apiFetch('/registration/bulk-assign-room', {
             method: 'PUT',
             body: JSON.stringify(data),
         }, true),

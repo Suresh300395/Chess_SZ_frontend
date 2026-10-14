@@ -27,7 +27,13 @@ import {
     Card,
     CardContent,
     CircularProgress,
-    Stack
+    Stack,
+    Checkbox,
+    FormControlLabel,
+    Divider,
+    Avatar,
+    Tabs,
+    Tab
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
@@ -48,6 +54,10 @@ import SaveIcon from '@mui/icons-material/Save';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import GridViewRoundedIcon from '@mui/icons-material/GridViewRounded';
 import TableRowsRoundedIcon from '@mui/icons-material/TableRowsRounded';
+import GroupAddIcon from '@mui/icons-material/GroupAdd';
+import SchoolIcon from '@mui/icons-material/School';
+import PhoneIcon from '@mui/icons-material/Phone';
+import PersonIcon from '@mui/icons-material/Person';
 import io from 'socket.io-client';
 import { toast } from 'sonner';
 import CustomTabs from '../Common/Tabs';
@@ -75,6 +85,17 @@ const HostelProvision = () => {
     const [selectedFloor, setSelectedFloor] = useState('Floor 1');
     const [selectedRoom, setSelectedRoom] = useState('');
     const [submitting, setSubmitting] = useState(false);
+
+    // Modal state for Bulk University Room Allotment
+    const [bulkModalOpen, setBulkModalOpen] = useState(false);
+    const [bulkSelectedUniversity, setBulkSelectedUniversity] = useState('');
+    const [bulkBuilding, setBulkBuilding] = useState('');
+    const [bulkFloor, setBulkFloor] = useState('');
+    const [bulkRoom, setBulkRoom] = useState('');
+    const [bulkSelectedMemberIds, setBulkSelectedMemberIds] = useState([]);
+    const [bulkSubmitting, setBulkSubmitting] = useState(false);
+    // Modal tab for Bulk University Room Allotment ('Players' | 'Coaches / Managers')
+    const [bulkModalTab, setBulkModalTab] = useState('Players');
 
     // Unassign confirmation dialog
     const [unassignDialogOpen, setUnassignDialogOpen] = useState(false);
@@ -181,7 +202,7 @@ const HostelProvision = () => {
                                 gender: player.gender || 'Not Specified',
                                 phone: player.mobileNo || 'N/A',
                                 accommodation: player.accommodation || 'No',
-                                roomAllocation: player.roomAllocation || null
+                                roomAllocation: (player.roomAllocation && player.roomAllocation.roomNumber) ? player.roomAllocation : null
                             });
                         });
                     }
@@ -196,7 +217,7 @@ const HostelProvision = () => {
                                 gender: coach.gender || 'Not Specified',
                                 phone: coach.mobileNo || 'N/A',
                                 accommodation: coach.accommodation || 'No',
-                                roomAllocation: coach.roomAllocation || null
+                                roomAllocation: (coach.roomAllocation && coach.roomAllocation.roomNumber) ? coach.roomAllocation : null
                             });
                         });
                     }
@@ -351,6 +372,291 @@ const HostelProvision = () => {
         setMapDialogOpen(false);
         setSelectedPerson(null);
         setSelectedRoom('');
+    };
+
+    // Unique list of universities requesting accommodation
+    const universitiesList = useMemo(() => {
+        const uniMap = new Map();
+        accommodationList.forEach(p => {
+            if (p.accommodation === 'Yes' && p.university) {
+                if (!uniMap.has(p.university)) {
+                    uniMap.set(p.university, {
+                        university: p.university,
+                        total: 0,
+                        unallotted: 0,
+                        allotted: 0
+                    });
+                }
+                const info = uniMap.get(p.university);
+                info.total++;
+                if (p.roomAllocation) {
+                    info.allotted++;
+                } else {
+                    info.unallotted++;
+                }
+            }
+        });
+        return Array.from(uniMap.values()).sort((a, b) => a.university.localeCompare(b.university));
+    }, [accommodationList]);
+
+    // Members separated by role ('Players' vs 'Coaches / Managers') for the selected university
+    const universityRoleStats = useMemo(() => {
+        if (!bulkSelectedUniversity) {
+            return {
+                players: { all: [], unallotted: [], allotted: [] },
+                coaches: { all: [], unallotted: [], allotted: [] },
+                totalUnallotted: 0,
+                totalAllotted: 0,
+                totalCount: 0
+            };
+        }
+        const uniMembers = accommodationList.filter(p =>
+            p.university === bulkSelectedUniversity &&
+            p.accommodation === 'Yes'
+        );
+
+        const playersAll = uniMembers.filter(p => p.role === 'Player');
+        const coachesAll = uniMembers.filter(p => p.role !== 'Player');
+
+        const playersUnallotted = playersAll.filter(p => !p.roomAllocation);
+        const playersAllotted = playersAll.filter(p => Boolean(p.roomAllocation));
+
+        const coachesUnallotted = coachesAll.filter(p => !p.roomAllocation);
+        const coachesAllotted = coachesAll.filter(p => Boolean(p.roomAllocation));
+
+        return {
+            players: {
+                all: playersAll,
+                unallotted: playersUnallotted,
+                allotted: playersAllotted
+            },
+            coaches: {
+                all: coachesAll,
+                unallotted: coachesUnallotted,
+                allotted: coachesAllotted
+            },
+            totalUnallotted: playersUnallotted.length + coachesUnallotted.length,
+            totalAllotted: playersAllotted.length + coachesAllotted.length,
+            totalCount: uniMembers.length
+        };
+    }, [accommodationList, bulkSelectedUniversity]);
+
+    // Active tab's members in bulk modal
+    const currentTabMembers = useMemo(() => {
+        return bulkModalTab === 'Players' ? universityRoleStats.players : universityRoleStats.coaches;
+    }, [bulkModalTab, universityRoleStats]);
+
+    // Backward-compatible alias for current active tab members
+    const currentUniversityMembers = currentTabMembers;
+
+    const bulkAvailableFloors = useMemo(() => {
+        const buildingObj = dbBlocks.find(b => b.name === bulkBuilding);
+        return buildingObj?.floors?.map(f => f.floorName) || [];
+    }, [bulkBuilding, dbBlocks]);
+
+    const bulkBuildingObj = useMemo(() => {
+        return dbBlocks.find(b => b.name === bulkBuilding);
+    }, [bulkBuilding, dbBlocks]);
+
+    const bulkRoomCapacity = bulkBuildingObj?.capacityPerRoom || 4;
+
+    const bulkAvailableRooms = useMemo(() => {
+        const buildingObj = dbBlocks.find(b => b.name === bulkBuilding);
+        const floorObj = buildingObj?.floors?.find(f => f.floorName === bulkFloor);
+        const rooms = floorObj?.rooms || [];
+        const capacity = buildingObj?.capacityPerRoom || 4;
+
+        return rooms.map(room => {
+            const occupancy = getRoomOccupancy(bulkBuilding, bulkFloor, room, null);
+            const availableSlots = Math.max(0, capacity - occupancy);
+            return {
+                roomNumber: room,
+                occupancy,
+                capacity,
+                availableSlots,
+                isFull: availableSlots <= 0
+            };
+        }).filter(r => !r.isFull);
+    }, [bulkBuilding, bulkFloor, dbBlocks, getRoomOccupancy]);
+
+    const selectedBulkRoomDetails = useMemo(() => {
+        if (!bulkRoom) return null;
+        return bulkAvailableRooms.find(r => r.roomNumber === bulkRoom) || null;
+    }, [bulkAvailableRooms, bulkRoom]);
+
+    const currentRoomMaxSlots = selectedBulkRoomDetails ? selectedBulkRoomDetails.availableSlots : bulkRoomCapacity;
+
+    const handleOpenBulkModal = (universityName = null) => {
+        if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+        }
+
+        let targetUni = universityName;
+        if (!targetUni && searchResults.length > 0) {
+            targetUni = searchResults[0].university;
+        }
+        if (!targetUni && universitiesList.length > 0) {
+            const withPending = universitiesList.find(u => u.unallotted > 0);
+            targetUni = withPending ? withPending.university : universitiesList[0].university;
+        }
+
+        setBulkSelectedUniversity(targetUni || '');
+        setBulkModalTab(activeTab === 'Players' ? 'Players' : 'Coaches / Managers');
+        setBulkSelectedMemberIds([]);
+
+        const defaultBuilding = dbBlocks.length > 0 ? dbBlocks[0].name : '';
+        setBulkBuilding(defaultBuilding);
+        const defaultBuildingObj = dbBlocks.find(b => b.name === defaultBuilding);
+        const defaultFloor = defaultBuildingObj?.floors?.length > 0 ? defaultBuildingObj.floors[0].floorName : '';
+        setBulkFloor(defaultFloor);
+        setBulkRoom('');
+
+        setBulkModalOpen(true);
+    };
+
+    const handleBulkModalTabChange = (event, newTab) => {
+        if (!newTab) return;
+        setBulkModalTab(newTab);
+        setBulkSelectedMemberIds([]);
+        if (bulkRoom) {
+            const roomInfo = bulkAvailableRooms.find(r => r.roomNumber === bulkRoom);
+            const slots = roomInfo ? roomInfo.availableSlots : bulkRoomCapacity;
+            const targetMembers = newTab === 'Players' ? universityRoleStats.players.unallotted : universityRoleStats.coaches.unallotted;
+            const toSelect = targetMembers.slice(0, slots).map(m => m.id);
+            setBulkSelectedMemberIds(toSelect);
+        }
+    };
+
+    const handleCloseBulkModal = () => {
+        setBulkModalOpen(false);
+        setBulkSelectedMemberIds([]);
+        setBulkRoom('');
+    };
+
+    const handleBulkBuildingChange = (newBuilding) => {
+        setBulkBuilding(newBuilding);
+        const buildingObj = dbBlocks.find(b => b.name === newBuilding);
+        const firstFloor = buildingObj?.floors?.length > 0 ? buildingObj.floors[0].floorName : '';
+        setBulkFloor(firstFloor);
+        setBulkRoom('');
+        setBulkSelectedMemberIds([]);
+    };
+
+    const handleBulkFloorChange = (newFloor) => {
+        setBulkFloor(newFloor);
+        setBulkRoom('');
+        setBulkSelectedMemberIds([]);
+    };
+
+    const handleBulkRoomChange = (newRoom) => {
+        setBulkRoom(newRoom);
+        const roomInfo = bulkAvailableRooms.find(r => r.roomNumber === newRoom);
+        const slots = roomInfo ? roomInfo.availableSlots : bulkRoomCapacity;
+        const unallotted = currentUniversityMembers.unallotted;
+        const toSelect = unallotted.slice(0, slots).map(m => m.id);
+        setBulkSelectedMemberIds(toSelect);
+    };
+
+    const handleAutoSelectMembers = () => {
+        const unallotted = currentUniversityMembers.unallotted;
+        const slots = selectedBulkRoomDetails ? selectedBulkRoomDetails.availableSlots : bulkRoomCapacity;
+        const toSelect = unallotted.slice(0, slots).map(m => m.id);
+        setBulkSelectedMemberIds(toSelect);
+        toast.info(`Selected ${toSelect.length} ${bulkModalTab === 'Players' ? 'player(s)' : 'coach(es)'} based on available room slots.`);
+    };
+
+    const handleToggleMember = (id) => {
+        const slots = selectedBulkRoomDetails ? selectedBulkRoomDetails.availableSlots : bulkRoomCapacity;
+        setBulkSelectedMemberIds(prev => {
+            if (prev.includes(id)) {
+                return prev.filter(mId => mId !== id);
+            } else {
+                if (prev.length >= slots) {
+                    toast.warning(`Cannot select more than ${slots} member(s). Room capacity reached! Allot these first, then allot remaining members.`);
+                    return prev;
+                }
+                return [...prev, id];
+            }
+        });
+    };
+
+    const handleSaveBulkAllocation = async () => {
+        if (!bulkSelectedUniversity) {
+            toast.error('Please select a university');
+            return;
+        }
+        if (!bulkBuilding || !bulkFloor || !bulkRoom) {
+            toast.error('Please select Building, Floor, and Room');
+            return;
+        }
+        if (bulkSelectedMemberIds.length === 0) {
+            toast.error('Please select at least 1 member to allot to this room');
+            return;
+        }
+
+        const selectedMembers = currentUniversityMembers.unallotted.filter(m => bulkSelectedMemberIds.includes(m.id));
+        if (selectedMembers.length === 0) {
+            toast.error('No valid unallotted members selected');
+            return;
+        }
+
+        setBulkSubmitting(true);
+        try {
+            const payload = {
+                allocations: selectedMembers.map(m => ({
+                    registrationId: m.registrationId,
+                    personId: m.id,
+                    role: m.role
+                })),
+                building: bulkBuilding,
+                floor: bulkFloor,
+                roomNumber: bulkRoom
+            };
+
+            const res = await registrationAPI.bulkAssignRoom(payload);
+            const data = await res.json();
+
+            if (res.ok) {
+                toast.success(`Room ${bulkRoom} successfully allotted to ${selectedMembers.length} ${bulkModalTab === 'Players' ? 'player(s)' : 'coach(es)'} of ${bulkSelectedUniversity}!`);
+                await fetchRegistrations();
+                setBulkSelectedMemberIds([]);
+
+                const remainingCount = currentUniversityMembers.unallotted.length - selectedMembers.length;
+                if (remainingCount > 0) {
+                    toast.info(`${remainingCount} ${bulkModalTab === 'Players' ? 'player(s)' : 'coach(es)'} remaining for ${bulkSelectedUniversity}. Select the next room.`);
+                    setBulkRoom('');
+                } else {
+                    toast.success(`All ${bulkModalTab === 'Players' ? 'players' : 'coaches / managers'} of ${bulkSelectedUniversity} have been successfully allotted rooms!`);
+                    setBulkRoom('');
+                }
+            } else {
+                toast.error(data.message || 'Failed to allot room in bulk');
+            }
+        } catch (err) {
+            console.error('Error during bulk room allocation:', err);
+            toast.error(err.message || 'Server error during bulk allocation');
+        } finally {
+            setBulkSubmitting(false);
+        }
+    };
+
+    const handleBulkUnassignSingle = async (member) => {
+        try {
+            const res = await registrationAPI.unassignRoom({
+                registrationId: member.registrationId,
+                personId: member.id,
+                role: member.role
+            });
+            if (res.ok) {
+                toast.success(`Removed ${member.name} from room assignment.`);
+                await fetchRegistrations();
+            } else {
+                toast.error('Failed to unassign room');
+            }
+        } catch (err) {
+            console.error(err);
+            toast.error('Error unassigning room');
+        }
     };
 
     // Handle Saving Room Allocation
@@ -677,7 +983,7 @@ const HostelProvision = () => {
                 {searchQuery.trim() !== '' && (
                     <Box sx={{ mt: 3 }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                                 <Typography sx={{ fontWeight: 600, color: '#1e293b', fontSize: '0.95rem' }}>
                                     Search Results for "{searchQuery}" ({searchResults.length} found)
                                 </Typography>
@@ -688,6 +994,28 @@ const HostelProvision = () => {
                                         color="primary"
                                         sx={{ bgcolor: '#0b5299' }}
                                     />
+                                )}
+                                {searchResults.length > 0 && (
+                                    <Button
+                                        variant="outlined"
+                                        size="small"
+                                        startIcon={<HotelIcon sx={{ fontSize: 16 }} />}
+                                        onClick={() => handleOpenBulkModal(searchResults[0]?.university)}
+                                        sx={{
+                                            borderColor: '#0b5299',
+                                            color: '#0b5299',
+                                            fontWeight: 600,
+                                            textTransform: 'none',
+                                            borderRadius: 2,
+                                            px: 1.5,
+                                            py: 0.3,
+                                            fontSize: '0.82rem',
+                                            bgcolor: 'rgba(11, 82, 153, 0.04)',
+                                            '&:hover': { bgcolor: 'rgba(11, 82, 153, 0.1)', borderColor: '#093f77' }
+                                        }}
+                                    >
+                                        Allot Room for {searchResults[0]?.university || 'University'}
+                                    </Button>
                                 )}
                             </Box>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, bgcolor: '#ffffff', p: 0.4, borderRadius: 2, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
@@ -881,7 +1209,37 @@ const HostelProvision = () => {
                                         <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Gender</TableCell>
                                         <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Phone</TableCell>
                                         <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Accommodation</TableCell>
-                                        <TableCell sx={{ fontWeight: 700, color: '#334155', minWidth: 180 }}>Room Mapping</TableCell>
+                                        <TableCell sx={{ fontWeight: 700, color: '#334155', minWidth: 200 }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                                                <span>Room Mapping</span>
+                                                {searchResults.length > 0 && (
+                                                    <Tooltip title={`Allot Room for all members of ${searchResults[0]?.university || 'University'}`}>
+                                                        <Button
+                                                            size="small"
+                                                            variant="contained"
+                                                            startIcon={<GroupAddIcon sx={{ fontSize: '14px !important' }} />}
+                                                            onClick={() => handleOpenBulkModal(searchResults[0]?.university)}
+                                                            sx={{
+                                                                fontSize: '11px',
+                                                                py: 0.2,
+                                                                px: 1,
+                                                                minHeight: 26,
+                                                                height: 26,
+                                                                textTransform: 'none',
+                                                                bgcolor: '#0b5299',
+                                                                color: '#ffffff',
+                                                                fontWeight: 600,
+                                                                borderRadius: 1.5,
+                                                                boxShadow: 'none',
+                                                                '&:hover': { bgcolor: '#093f77', boxShadow: 'none' }
+                                                            }}
+                                                        >
+                                                            Allot All
+                                                        </Button>
+                                                    </Tooltip>
+                                                )}
+                                            </Box>
+                                        </TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
@@ -1812,6 +2170,484 @@ const HostelProvision = () => {
                         sx={{ textTransform: 'none', borderRadius: 2, px: 2.5 }}
                     >
                         {unassigning ? <CircularProgress size={22} color="inherit" /> : 'Yes, Unassign'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Modal: Bulk University Room Allotment */}
+            <Dialog
+                open={bulkModalOpen}
+                onClose={handleCloseBulkModal}
+                maxWidth="md"
+                fullWidth
+                disableRestoreFocus
+                slotProps={{
+                    paper: {
+                        sx: {
+                            borderRadius: 3,
+                            p: 0,
+                            maxHeight: '90vh',
+                            display: 'flex',
+                            flexDirection: 'column'
+                        }
+                    }
+                }}
+            >
+                <DialogTitle sx={{ px: 3, py: 2, bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Box sx={{ width: 40, height: 40, borderRadius: 2, bgcolor: '#e0f2fe', color: '#0369a1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <HotelIcon />
+                        </Box>
+                        <Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                                <Typography variant="h6" sx={{ fontWeight: 700, color: '#0f172a', fontSize: '1.1rem', lineHeight: 1.2 }}>
+                                    {bulkSelectedUniversity || 'University'} - Room Allotment
+                                </Typography>
+                                {bulkSelectedUniversity && (
+                                    <Chip
+                                        label={`${universityRoleStats.totalUnallotted} Pending / ${universityRoleStats.totalCount} Total`}
+                                        size="small"
+                                        sx={{
+                                            height: 22,
+                                            fontSize: '11px',
+                                            fontWeight: 700,
+                                            bgcolor: universityRoleStats.totalUnallotted > 0 ? '#fef3c7' : '#ecfdf5',
+                                            color: universityRoleStats.totalUnallotted > 0 ? '#92400e' : '#065f46'
+                                        }}
+                                    />
+                                )}
+                            </Box>
+                            <Typography variant="caption" sx={{ color: '#64748b' }}>
+                                Allot hostel rooms by university batch according to room capacity
+                            </Typography>
+                        </Box>
+                    </Box>
+                    <IconButton size="small" onClick={handleCloseBulkModal} sx={{ color: '#64748b' }}>
+                        <ClearIcon fontSize="small" />
+                    </IconButton>
+                </DialogTitle>
+
+                <DialogContent dividers sx={{ p: 3, overflowY: 'auto' }}>
+                    {/* Role Navigation Tabs: Players vs Coaches / Managers */}
+                    <Box sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'flex-start',
+                        mb: 2.5,
+                        p: 0.6,
+                        bgcolor: '#f1f5f9',
+                        borderRadius: 2.5,
+                        border: '1px solid #e2e8f0'
+                    }}>
+                        <Tabs
+                            value={bulkModalTab}
+                            onChange={handleBulkModalTabChange}
+                            textColor="inherit"
+                            sx={{
+                                minHeight: 40,
+                                '& .MuiTabs-indicator': {
+                                    height: '100%',
+                                    borderRadius: 2,
+                                    bgcolor: '#0b5299',
+                                    zIndex: 1
+                                },
+                                '& .MuiTab-root': {
+                                    textTransform: 'none',
+                                    fontWeight: 600,
+                                    fontSize: '0.9rem',
+                                    minHeight: 40,
+                                    py: 0.5,
+                                    px: 2.5,
+                                    borderRadius: 2,
+                                    zIndex: 2,
+                                    color: '#64748b',
+                                    transition: 'all 0.2s ease',
+                                    '&.Mui-selected': {
+                                        color: '#ffffff',
+                                        fontWeight: 700
+                                    }
+                                }
+                            }}
+                        >
+                            <Tab
+                                value="Players"
+                                label={
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <PersonIcon sx={{ fontSize: 18 }} />
+                                        <span>Players</span>
+                                        <Chip
+                                            label={`${universityRoleStats.players.unallotted.length} Pending`}
+                                            size="small"
+                                            sx={{
+                                                height: 20,
+                                                fontSize: '11px',
+                                                fontWeight: 700,
+                                                bgcolor: bulkModalTab === 'Players' ? 'rgba(255,255,255,0.25)' : (universityRoleStats.players.unallotted.length > 0 ? '#fef3c7' : '#ecfdf5'),
+                                                color: bulkModalTab === 'Players' ? '#ffffff' : (universityRoleStats.players.unallotted.length > 0 ? '#92400e' : '#065f46')
+                                            }}
+                                        />
+                                    </Box>
+                                }
+                            />
+                            <Tab
+                                value="Coaches / Managers"
+                                label={
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <GroupsIcon sx={{ fontSize: 18 }} />
+                                        <span>Coaches / Managers</span>
+                                        <Chip
+                                            label={`${universityRoleStats.coaches.unallotted.length} Pending`}
+                                            size="small"
+                                            sx={{
+                                                height: 20,
+                                                fontSize: '11px',
+                                                fontWeight: 700,
+                                                bgcolor: bulkModalTab === 'Coaches / Managers' ? 'rgba(255,255,255,0.25)' : (universityRoleStats.coaches.unallotted.length > 0 ? '#fef3c7' : '#ecfdf5'),
+                                                color: bulkModalTab === 'Coaches / Managers' ? '#ffffff' : (universityRoleStats.coaches.unallotted.length > 0 ? '#92400e' : '#065f46')
+                                            }}
+                                        />
+                                    </Box>
+                                }
+                            />
+                        </Tabs>
+                    </Box>
+
+                    {/* Room Configuration & Member Selection or Empty/Celebration State */}
+                    {currentTabMembers.all.length === 0 ? (
+                        <Box sx={{
+                            p: 4,
+                            textAlign: 'center',
+                            bgcolor: '#f8fafc',
+                            borderRadius: 3,
+                            border: '1.5px dashed #cbd5e1',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: 1.5
+                        }}>
+                            <Box sx={{ width: 48, height: 48, borderRadius: '50%', bgcolor: '#e2e8f0', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                {bulkModalTab === 'Players' ? <PersonIcon sx={{ fontSize: 28 }} /> : <GroupsIcon sx={{ fontSize: 28 }} />}
+                            </Box>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#334155' }}>
+                                No {bulkModalTab === 'Players' ? 'Players' : 'Coaches / Managers'} Registered with Accommodation
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: '#64748b', maxWidth: 450 }}>
+                                {bulkSelectedUniversity} does not have any {bulkModalTab === 'Players' ? 'players' : 'coaches or managers'} requesting hostel accommodation.
+                            </Typography>
+                        </Box>
+                    ) : currentTabMembers.unallotted.length > 0 ? (
+                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2.5 }}>
+                            {/* LEFT COLUMN: Room Selector */}
+                            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5, bgcolor: '#fafafa', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                <Typography sx={{ fontWeight: 700, color: '#1e293b', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <MeetingRoomIcon sx={{ color: '#0b5299', fontSize: 20 }} />
+                                    Step 1: Select Room to Allot
+                                </Typography>
+
+                                {/* Building */}
+                                <FormControl fullWidth size="small">
+                                    <InputLabel id="bulk-building-label">Building / Block</InputLabel>
+                                    <Select
+                                        labelId="bulk-building-label"
+                                        value={bulkBuilding}
+                                        label="Building / Block"
+                                        onChange={(e) => handleBulkBuildingChange(e.target.value)}
+                                        startAdornment={<InputAdornment position="start"><ApartmentIcon sx={{ color: '#0b5299', fontSize: 18 }} /></InputAdornment>}
+                                    >
+                                        {dbBlocks.map(bldg => (
+                                            <MenuItem key={bldg.name} value={bldg.name}>
+                                                {bldg.name} {bldg.capacityPerRoom ? `(${bldg.capacityPerRoom} beds/room)` : ''}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+
+                                {/* Floor */}
+                                <FormControl fullWidth size="small">
+                                    <InputLabel id="bulk-floor-label">Floor</InputLabel>
+                                    <Select
+                                        labelId="bulk-floor-label"
+                                        value={bulkFloor}
+                                        label="Floor"
+                                        onChange={(e) => handleBulkFloorChange(e.target.value)}
+                                        startAdornment={<InputAdornment position="start"><LayersIcon sx={{ color: '#0b5299', fontSize: 18 }} /></InputAdornment>}
+                                    >
+                                        {bulkAvailableFloors.map(fl => (
+                                            <MenuItem key={fl} value={fl}>{fl}</MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+
+                                {/* Room */}
+                                <FormControl fullWidth size="small">
+                                    <InputLabel id="bulk-room-label">Room Number</InputLabel>
+                                    <Select
+                                        labelId="bulk-room-label"
+                                        value={bulkRoom}
+                                        label="Room Number"
+                                        onChange={(e) => handleBulkRoomChange(e.target.value)}
+                                        startAdornment={<InputAdornment position="start"><HotelIcon sx={{ color: '#0b5299', fontSize: 18 }} /></InputAdornment>}
+                                    >
+                                        {bulkAvailableRooms.map(item => (
+                                            <MenuItem key={item.roomNumber} value={item.roomNumber}>
+                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                                                    <Typography sx={{ fontWeight: 600, fontSize: '0.88rem' }}>
+                                                        Room {item.roomNumber}
+                                                    </Typography>
+                                                    <Chip
+                                                        label={`${item.availableSlots} of ${item.capacity} slots free`}
+                                                        size="small"
+                                                        sx={{
+                                                            fontSize: '0.72rem',
+                                                            height: 20,
+                                                            bgcolor: item.occupancy === 0 ? '#ecfdf5' : '#eff6ff',
+                                                            color: item.occupancy === 0 ? '#047857' : '#1d4ed8',
+                                                            fontWeight: 600
+                                                        }}
+                                                    />
+                                                </Box>
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+
+                                {bulkAvailableRooms.length === 0 && (
+                                    <Alert severity="warning" sx={{ fontSize: '0.8rem', borderRadius: 2 }}>
+                                        No vacant rooms available on this floor. Please choose another floor or building.
+                                    </Alert>
+                                )}
+
+                                {/* Room Capacity Status Card */}
+                                {selectedBulkRoomDetails && (
+                                    <Box sx={{
+                                        p: 1.5,
+                                        borderRadius: 2,
+                                        bgcolor: '#eff6ff',
+                                        border: '1px solid #bfdbfe',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: 0.8
+                                    }}>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <Typography sx={{ fontWeight: 700, color: '#1e3a8a', fontSize: '0.9rem' }}>
+                                                Room {selectedBulkRoomDetails.roomNumber} Details
+                                            </Typography>
+                                            <Chip
+                                                label={`${selectedBulkRoomDetails.availableSlots} Beds Available`}
+                                                size="small"
+                                                sx={{ bgcolor: '#1d4ed8', color: '#fff', fontWeight: 700, height: 22 }}
+                                            />
+                                        </Box>
+                                        <Typography variant="caption" sx={{ color: '#3b82f6', display: 'block' }}>
+                                            {bulkBuilding} • {bulkFloor} • Total Capacity: {selectedBulkRoomDetails.capacity}
+                                        </Typography>
+                                        <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
+                                            <Button
+                                                size="small"
+                                                variant="contained"
+                                                onClick={handleAutoSelectMembers}
+                                                disabled={currentTabMembers.unallotted.length === 0}
+                                                sx={{
+                                                    textTransform: 'none',
+                                                    fontSize: '0.78rem',
+                                                    fontWeight: 600,
+                                                    borderRadius: 1.5,
+                                                    bgcolor: '#2563eb',
+                                                    '&:hover': { bgcolor: '#1d4ed8' }
+                                                }}
+                                            >
+                                                Auto-Select Next {Math.min(selectedBulkRoomDetails.availableSlots, currentTabMembers.unallotted.length)} Member(s)
+                                            </Button>
+                                        </Box>
+                                    </Box>
+                                )}
+                            </Paper>
+
+                            {/* RIGHT COLUMN: Member Selection */}
+                            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5, bgcolor: '#ffffff', display: 'flex', flexDirection: 'column' }}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                                    <Typography sx={{ fontWeight: 700, color: '#1e293b', fontSize: '0.95rem' }}>
+                                        Step 2: Select {bulkModalTab === 'Players' ? 'Players' : 'Coaches / Managers'} ({currentTabMembers.unallotted.length} Unallotted)
+                                    </Typography>
+                                    <Chip
+                                        label={`${bulkSelectedMemberIds.length} / ${currentRoomMaxSlots} Selected`}
+                                        size="small"
+                                        color={bulkSelectedMemberIds.length > 0 ? 'primary' : 'default'}
+                                        sx={{ fontWeight: 700, height: 22 }}
+                                    />
+                                </Box>
+
+                                <Typography variant="caption" sx={{ color: '#64748b', mb: 1.5, display: 'block' }}>
+                                    Select up to {currentRoomMaxSlots} {bulkModalTab === 'Players' ? 'players' : 'coaches/managers'} to assign to Room {bulkRoom || '(Select Room)'}.
+                                </Typography>
+
+                                {/* Member Checkbox List */}
+                                <Box sx={{ flex: 1, maxHeight: 320, overflowY: 'auto', pr: 0.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                    {currentTabMembers.unallotted.map((person) => {
+                                        const isSelected = bulkSelectedMemberIds.includes(person.id);
+                                        return (
+                                            <Box
+                                                key={person.id}
+                                                onClick={() => handleToggleMember(person.id)}
+                                                sx={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    p: 1.2,
+                                                    borderRadius: 2,
+                                                    border: isSelected ? '1.5px solid #0b5299' : '1px solid #e2e8f0',
+                                                    bgcolor: isSelected ? '#f0f7ff' : '#f8fafc',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.15s ease',
+                                                    '&:hover': { bgcolor: isSelected ? '#e0f2fe' : '#f1f5f9' }
+                                                }}
+                                            >
+                                                <Checkbox
+                                                    checked={isSelected}
+                                                    size="small"
+                                                    sx={{ p: 0.5, mr: 1, color: '#0b5299' }}
+                                                />
+                                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                                                        <Typography sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.88rem' }}>
+                                                            {person.name}
+                                                        </Typography>
+                                                        <Chip
+                                                            label={person.role}
+                                                            size="small"
+                                                            sx={{ height: 18, fontSize: '10px', fontWeight: 600 }}
+                                                        />
+                                                        <Chip
+                                                            label={person.gender}
+                                                            size="small"
+                                                            sx={{
+                                                                height: 18,
+                                                                fontSize: '10px',
+                                                                bgcolor: person.gender === 'Female' ? '#fce7f3' : '#e0f2fe',
+                                                                color: person.gender === 'Female' ? '#9d174d' : '#0369a1',
+                                                                fontWeight: 600
+                                                            }}
+                                                        />
+                                                    </Box>
+                                                    <Typography variant="caption" sx={{ color: '#64748b' }}>
+                                                        Phone: {person.phone}
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+                                        );
+                                    })}
+                                </Box>
+                            </Paper>
+                        </Box>
+                    ) : (
+                        /* Celebration when all members of this tab are allotted */
+                        <Box sx={{
+                            p: 3,
+                            textAlign: 'center',
+                            bgcolor: '#ecfdf5',
+                            borderRadius: 3,
+                            border: '1.5px solid #a7f3d0',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: 1.5
+                        }}>
+                            <Box sx={{ width: 52, height: 52, borderRadius: '50%', bgcolor: '#d1fae5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <CheckCircleIcon sx={{ fontSize: 32 }} />
+                            </Box>
+                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#065f46' }}>
+                                All {bulkModalTab === 'Players' ? 'players' : 'coaches / managers'} of {bulkSelectedUniversity} are successfully allotted rooms!
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: '#047857', maxWidth: 500 }}>
+                                Every {bulkModalTab === 'Players' ? 'player' : 'coach/manager'} requesting accommodation from this university has been assigned a hostel room. You can review or modify their allocations in the list below.
+                            </Typography>
+                        </Box>
+                    )}
+
+                    {/* 3. Allotted Members Section (Grouped by Room) */}
+                    {currentTabMembers.allotted.length > 0 && (
+                        <Box sx={{ mt: 3 }}>
+                            <Typography sx={{ fontWeight: 700, color: '#1e293b', fontSize: '0.95rem', mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <HotelIcon sx={{ color: '#059669', fontSize: 20 }} />
+                                Allotted {bulkModalTab === 'Players' ? 'Players' : 'Coaches / Managers'} of {bulkSelectedUniversity} ({currentTabMembers.allotted.length} Total)
+                            </Typography>
+
+                            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }, gap: 1.5 }}>
+                                {Object.entries(
+                                    currentTabMembers.allotted.reduce((acc, member) => {
+                                        const roomKey = member.roomAllocation
+                                            ? `Room ${member.roomAllocation.roomNumber} (${member.roomAllocation.building} - ${member.roomAllocation.floor})`
+                                            : 'Unknown Room';
+                                        if (!acc[roomKey]) acc[roomKey] = [];
+                                        acc[roomKey].push(member);
+                                        return acc;
+                                    }, {})
+                                ).map(([roomTitle, members]) => (
+                                    <Paper key={roomTitle} variant="outlined" sx={{ p: 1.5, borderRadius: 2, bgcolor: '#f8fafc' }}>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1, pb: 0.5, borderBottom: '1px solid #e2e8f0' }}>
+                                            <Typography sx={{ fontWeight: 700, color: '#0b5299', fontSize: '0.85rem' }}>
+                                                {roomTitle}
+                                            </Typography>
+                                            <Chip label={`${members.length} member(s)`} size="small" sx={{ height: 20, fontSize: '11px', fontWeight: 600, bgcolor: '#e0f2fe', color: '#0369a1' }} />
+                                        </Box>
+                                        <Stack spacing={0.6}>
+                                            {members.map(m => (
+                                                <Box key={m.id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', py: 0.3 }}>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                                                        <Typography sx={{ fontWeight: 600, color: '#1e293b', fontSize: '0.82rem' }}>
+                                                            {m.name}
+                                                        </Typography>
+                                                        <Chip label={m.role} size="small" sx={{ height: 16, fontSize: '9px' }} />
+                                                        <Typography variant="caption" sx={{ color: '#64748b' }}>
+                                                            ({m.gender}, {m.phone})
+                                                        </Typography>
+                                                    </Box>
+                                                    <Tooltip title="Unassign from Room">
+                                                        <IconButton size="small" onClick={() => handleBulkUnassignSingle(m)} sx={{ color: '#ef4444', p: 0.3 }}>
+                                                            <ClearIcon sx={{ fontSize: 14 }} />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                </Box>
+                                            ))}
+                                        </Stack>
+                                    </Paper>
+                                ))}
+                            </Box>
+                        </Box>
+                    )}
+                </DialogContent>
+
+                <DialogActions sx={{ px: 3, py: 2, bgcolor: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between' }}>
+                    <Button
+                        onClick={handleCloseBulkModal}
+                        variant="outlined"
+                        disabled={bulkSubmitting}
+                        sx={{ textTransform: 'none', borderRadius: 2 }}
+                    >
+                        Close
+                    </Button>
+                    <Button
+                        onClick={handleSaveBulkAllocation}
+                        variant="contained"
+                        disabled={
+                            !bulkRoom ||
+                            bulkSelectedMemberIds.length === 0 ||
+                            bulkSubmitting ||
+                            currentTabMembers.unallotted.length === 0
+                        }
+                        startIcon={bulkSubmitting ? <CircularProgress size={18} color="inherit" /> : <MeetingRoomIcon />}
+                        sx={{
+                            bgcolor: '#0b5299',
+                            color: '#ffffff',
+                            textTransform: 'none',
+                            borderRadius: 2,
+                            px: 3,
+                            fontWeight: 700,
+                            '&:hover': { bgcolor: '#093f77' }
+                        }}
+                    >
+                        {bulkSubmitting
+                            ? 'Allotting...'
+                            : `Allot Room ${bulkRoom || ''} to ${bulkSelectedMemberIds.length} ${bulkModalTab === 'Players' ? (bulkSelectedMemberIds.length === 1 ? 'Player' : 'Players') : (bulkSelectedMemberIds.length === 1 ? 'Coach' : 'Coaches')}`}
                     </Button>
                 </DialogActions>
             </Dialog>
