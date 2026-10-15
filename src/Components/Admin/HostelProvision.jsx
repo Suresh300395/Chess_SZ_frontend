@@ -29,11 +29,7 @@ import {
     CircularProgress,
     Stack,
     Checkbox,
-    FormControlLabel,
-    Divider,
-    Avatar,
-    Tabs,
-    Tab
+    Avatar
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
@@ -45,7 +41,6 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ApartmentIcon from '@mui/icons-material/Apartment';
 import LayersIcon from '@mui/icons-material/Layers';
-import InfoIcon from '@mui/icons-material/Info';
 import GroupsIcon from '@mui/icons-material/Groups';
 import HowToRegIcon from '@mui/icons-material/HowToReg';
 import AssignmentIcon from '@mui/icons-material/Assignment';
@@ -54,17 +49,15 @@ import SaveIcon from '@mui/icons-material/Save';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import GridViewRoundedIcon from '@mui/icons-material/GridViewRounded';
 import TableRowsRoundedIcon from '@mui/icons-material/TableRowsRounded';
-import GroupAddIcon from '@mui/icons-material/GroupAdd';
 import SchoolIcon from '@mui/icons-material/School';
-import PhoneIcon from '@mui/icons-material/Phone';
-import PersonIcon from '@mui/icons-material/Person';
+import PaymentsIcon from '@mui/icons-material/Payments';
+import PrintIcon from '@mui/icons-material/Print';
+import LocalAtmIcon from '@mui/icons-material/LocalAtm';
+import ReceiptIcon from '@mui/icons-material/Receipt';
 import io from 'socket.io-client';
 import { toast } from 'sonner';
 import CustomTabs from '../Common/Tabs';
 import { registrationAPI, blocksAPI, SOCKET_URL } from '../../utils/api';
-
-
-const MAX_ROOM_CAPACITY = 4;
 
 const HostelProvision = () => {
     const [mappedViewMode, setMappedViewMode] = useState('table');
@@ -94,8 +87,15 @@ const HostelProvision = () => {
     const [bulkRoom, setBulkRoom] = useState('');
     const [bulkSelectedMemberIds, setBulkSelectedMemberIds] = useState([]);
     const [bulkSubmitting, setBulkSubmitting] = useState(false);
-    // Modal tab for Bulk University Room Allotment ('Players' | 'Coaches / Managers')
-    const [bulkModalTab, setBulkModalTab] = useState('Players');
+
+    // Raw registrations list to access full registration objects (including cautionDeposit)
+    const [rawRegistrations, setRawRegistrations] = useState([]);
+
+    // Caution Deposit state for Step 3 in bulk modal
+    const [cautionPaidByPersonId, setCautionPaidByPersonId] = useState('');
+    const [cautionPaymentMode, setCautionPaymentMode] = useState('Cash');
+    const [cautionSubmitting, setCautionSubmitting] = useState(false);
+    const [cautionReceiptModalOpen, setCautionReceiptModalOpen] = useState(false);
 
     // Unassign confirmation dialog
     const [unassignDialogOpen, setUnassignDialogOpen] = useState(false);
@@ -189,6 +189,7 @@ const HostelProvision = () => {
             const response = await registrationAPI.getAll();
             if (response.ok) {
                 const data = await response.json();
+                setRawRegistrations(data);
                 let list = [];
                 data.forEach(reg => {
                     if (reg.players && Array.isArray(reg.players)) {
@@ -249,6 +250,9 @@ const HostelProvision = () => {
 
         const socket = io(SOCKET_URL);
         socket.on('dataUpdated', () => {
+            fetchRegistrations();
+        });
+        socket.on('caution_deposit_updated', () => {
             fetchRegistrations();
         });
         socket.on('accommodation_guidelines_updated', (data) => {
@@ -424,6 +428,9 @@ const HostelProvision = () => {
         const coachesUnallotted = coachesAll.filter(p => !p.roomAllocation);
         const coachesAllotted = coachesAll.filter(p => Boolean(p.roomAllocation));
 
+        const unallottedMembers = uniMembers.filter(p => !p.roomAllocation);
+        const allottedMembers = uniMembers.filter(p => Boolean(p.roomAllocation));
+
         return {
             players: {
                 all: playersAll,
@@ -435,19 +442,55 @@ const HostelProvision = () => {
                 unallotted: coachesUnallotted,
                 allotted: coachesAllotted
             },
-            totalUnallotted: playersUnallotted.length + coachesUnallotted.length,
-            totalAllotted: playersAllotted.length + coachesAllotted.length,
+            all: uniMembers,
+            unallotted: unallottedMembers,
+            allotted: allottedMembers,
+            totalUnallotted: unallottedMembers.length,
+            totalAllotted: allottedMembers.length,
             totalCount: uniMembers.length
         };
     }, [accommodationList, bulkSelectedUniversity]);
 
-    // Active tab's members in bulk modal
-    const currentTabMembers = useMemo(() => {
-        return bulkModalTab === 'Players' ? universityRoleStats.players : universityRoleStats.coaches;
-    }, [bulkModalTab, universityRoleStats]);
+    // All members in bulk modal (unified for selected university)
+    const currentUniversityMembers = useMemo(() => {
+        return {
+            all: universityRoleStats.all || [],
+            unallotted: universityRoleStats.unallotted || [],
+            allotted: universityRoleStats.allotted || []
+        };
+    }, [universityRoleStats]);
 
-    // Backward-compatible alias for current active tab members
-    const currentUniversityMembers = currentTabMembers;
+    // Backward-compatible alias
+    const currentTabMembers = currentUniversityMembers;
+
+    // All members across both Players & Coaches who have been allotted a room for bulkSelectedUniversity
+    const allAllottedMembers = useMemo(() => {
+        return universityRoleStats.allotted || [];
+    }, [universityRoleStats]);
+
+    // Find the full registration record for bulkSelectedUniversity
+    const currentRegistration = useMemo(() => {
+        return rawRegistrations.find(r => r.universityName === bulkSelectedUniversity) || null;
+    }, [rawRegistrations, bulkSelectedUniversity]);
+
+    // Caution deposit data for bulkSelectedUniversity
+    const cautionDepositData = currentRegistration?.cautionDeposit || {
+        paid: false,
+        amount: 2000,
+        refundStatus: 'N/A'
+    };
+
+    // Auto-select member for "Paid by" dropdown if not yet selected
+    useEffect(() => {
+        if (allAllottedMembers.length > 0) {
+            setCautionPaidByPersonId(prev => {
+                const exists = allAllottedMembers.some(m => m.id === prev);
+                return exists ? prev : (allAllottedMembers[0]?.id || '');
+            });
+        } else {
+            setCautionPaidByPersonId('');
+        }
+    }, [allAllottedMembers, bulkSelectedUniversity]);
 
     const bulkAvailableFloors = useMemo(() => {
         const buildingObj = dbBlocks.find(b => b.name === bulkBuilding);
@@ -501,7 +544,6 @@ const HostelProvision = () => {
         }
 
         setBulkSelectedUniversity(targetUni || '');
-        setBulkModalTab(activeTab === 'Players' ? 'Players' : 'Coaches / Managers');
         setBulkSelectedMemberIds([]);
 
         const defaultBuilding = dbBlocks.length > 0 ? dbBlocks[0].name : '';
@@ -512,19 +554,6 @@ const HostelProvision = () => {
         setBulkRoom('');
 
         setBulkModalOpen(true);
-    };
-
-    const handleBulkModalTabChange = (event, newTab) => {
-        if (!newTab) return;
-        setBulkModalTab(newTab);
-        setBulkSelectedMemberIds([]);
-        if (bulkRoom) {
-            const roomInfo = bulkAvailableRooms.find(r => r.roomNumber === bulkRoom);
-            const slots = roomInfo ? roomInfo.availableSlots : bulkRoomCapacity;
-            const targetMembers = newTab === 'Players' ? universityRoleStats.players.unallotted : universityRoleStats.coaches.unallotted;
-            const toSelect = targetMembers.slice(0, slots).map(m => m.id);
-            setBulkSelectedMemberIds(toSelect);
-        }
     };
 
     const handleCloseBulkModal = () => {
@@ -555,14 +584,6 @@ const HostelProvision = () => {
         const unallotted = currentUniversityMembers.unallotted;
         const toSelect = unallotted.slice(0, slots).map(m => m.id);
         setBulkSelectedMemberIds(toSelect);
-    };
-
-    const handleAutoSelectMembers = () => {
-        const unallotted = currentUniversityMembers.unallotted;
-        const slots = selectedBulkRoomDetails ? selectedBulkRoomDetails.availableSlots : bulkRoomCapacity;
-        const toSelect = unallotted.slice(0, slots).map(m => m.id);
-        setBulkSelectedMemberIds(toSelect);
-        toast.info(`Selected ${toSelect.length} ${bulkModalTab === 'Players' ? 'player(s)' : 'coach(es)'} based on available room slots.`);
     };
 
     const handleToggleMember = (id) => {
@@ -617,16 +638,19 @@ const HostelProvision = () => {
             const data = await res.json();
 
             if (res.ok) {
-                toast.success(`Room ${bulkRoom} successfully allotted to ${selectedMembers.length} ${bulkModalTab === 'Players' ? 'player(s)' : 'coach(es)'} of ${bulkSelectedUniversity}!`);
+                toast.success(`Room ${bulkRoom} successfully allotted to ${selectedMembers.length} member(s) of ${bulkSelectedUniversity}!`);
                 await fetchRegistrations();
                 setBulkSelectedMemberIds([]);
+                if (selectedMembers.length > 0) {
+                    setCautionPaidByPersonId(selectedMembers[0].id);
+                }
 
                 const remainingCount = currentUniversityMembers.unallotted.length - selectedMembers.length;
                 if (remainingCount > 0) {
-                    toast.info(`${remainingCount} ${bulkModalTab === 'Players' ? 'player(s)' : 'coach(es)'} remaining for ${bulkSelectedUniversity}. Select the next room.`);
+                    toast.info(`${remainingCount} member(s) remaining for ${bulkSelectedUniversity}. You can collect the Caution Deposit in Step 3 below.`);
                     setBulkRoom('');
                 } else {
-                    toast.success(`All ${bulkModalTab === 'Players' ? 'players' : 'coaches / managers'} of ${bulkSelectedUniversity} have been successfully allotted rooms!`);
+                    toast.success(`All members of ${bulkSelectedUniversity} have been successfully allotted rooms! Please collect Caution Deposit in Step 3 below.`);
                     setBulkRoom('');
                 }
             } else {
@@ -656,6 +680,76 @@ const HostelProvision = () => {
         } catch (err) {
             console.error(err);
             toast.error('Error unassigning room');
+        }
+    };
+
+    // Handle Manual Caution Deposit Payment (Step 3)
+    const handlePayCautionDeposit = async () => {
+        if (!bulkSelectedUniversity) {
+            toast.error('Please select a university');
+            return;
+        }
+        if (!cautionPaidByPersonId) {
+            toast.error('Please select the person who paid in the "Paid by" dropdown');
+            return;
+        }
+
+        const payingMember = allAllottedMembers.find(m => m.id === cautionPaidByPersonId);
+        if (!payingMember) {
+            toast.error('Selected member not found among room-allotted members');
+            return;
+        }
+
+        setCautionSubmitting(true);
+        try {
+            const payload = {
+                registrationId: payingMember.registrationId || currentRegistration?._id,
+                universityName: bulkSelectedUniversity,
+                paidBy: {
+                    personId: payingMember.id,
+                    name: payingMember.name,
+                    role: payingMember.role,
+                    phone: payingMember.phone,
+                    roomNumber: payingMember.roomAllocation?.roomNumber || ''
+                },
+                amount: 2000,
+                paymentMode: cautionPaymentMode || 'Cash',
+                notes: 'Manual cash collected at hostel desk'
+            };
+
+            const res = await registrationAPI.payCautionDeposit(payload);
+            const data = await res.json();
+
+            if (res.ok) {
+                toast.success(`Caution deposit of ₹2,000 recorded from ${payingMember.name} (${bulkSelectedUniversity})!`);
+                await fetchRegistrations();
+            } else {
+                toast.error(data.message || 'Failed to record caution deposit');
+            }
+        } catch (err) {
+            console.error('Error recording caution deposit:', err);
+            toast.error(err.message || 'Server error recording caution deposit');
+        } finally {
+            setCautionSubmitting(false);
+        }
+    };
+
+    // Handle Reset / Re-collect Caution Deposit
+    const handleResetCautionDeposit = async () => {
+        if (!bulkSelectedUniversity) return;
+        try {
+            const res = await registrationAPI.resetCautionDeposit({
+                registrationId: currentRegistration?._id,
+                universityName: bulkSelectedUniversity
+            });
+            if (res.ok) {
+                toast.info('Caution deposit status reset to unpaid');
+                await fetchRegistrations();
+            } else {
+                toast.error('Failed to reset caution deposit');
+            }
+        } catch {
+            toast.error('Failed to reset caution deposit');
         }
     };
 
@@ -1209,37 +1303,7 @@ const HostelProvision = () => {
                                         <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Gender</TableCell>
                                         <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Phone</TableCell>
                                         <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Accommodation</TableCell>
-                                        <TableCell sx={{ fontWeight: 700, color: '#334155', minWidth: 200 }}>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-                                                <span>Room Mapping</span>
-                                                {searchResults.length > 0 && (
-                                                    <Tooltip title={`Allot Room for all members of ${searchResults[0]?.university || 'University'}`}>
-                                                        <Button
-                                                            size="small"
-                                                            variant="contained"
-                                                            startIcon={<GroupAddIcon sx={{ fontSize: '14px !important' }} />}
-                                                            onClick={() => handleOpenBulkModal(searchResults[0]?.university)}
-                                                            sx={{
-                                                                fontSize: '11px',
-                                                                py: 0.2,
-                                                                px: 1,
-                                                                minHeight: 26,
-                                                                height: 26,
-                                                                textTransform: 'none',
-                                                                bgcolor: '#0b5299',
-                                                                color: '#ffffff',
-                                                                fontWeight: 600,
-                                                                borderRadius: 1.5,
-                                                                boxShadow: 'none',
-                                                                '&:hover': { bgcolor: '#093f77', boxShadow: 'none' }
-                                                            }}
-                                                        >
-                                                            Allot All
-                                                        </Button>
-                                                    </Tooltip>
-                                                )}
-                                            </Box>
-                                        </TableCell>
+                                        <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Room Mapping</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
@@ -2204,17 +2268,48 @@ const HostelProvision = () => {
                                     {bulkSelectedUniversity || 'University'} - Room Allotment
                                 </Typography>
                                 {bulkSelectedUniversity && (
-                                    <Chip
-                                        label={`${universityRoleStats.totalUnallotted} Pending / ${universityRoleStats.totalCount} Total`}
-                                        size="small"
-                                        sx={{
-                                            height: 22,
-                                            fontSize: '11px',
-                                            fontWeight: 700,
-                                            bgcolor: universityRoleStats.totalUnallotted > 0 ? '#fef3c7' : '#ecfdf5',
-                                            color: universityRoleStats.totalUnallotted > 0 ? '#92400e' : '#065f46'
-                                        }}
-                                    />
+                                    <>
+                                        <Chip
+                                            label={`${universityRoleStats.totalUnallotted} Pending / ${universityRoleStats.totalCount} Total`}
+                                            size="small"
+                                            sx={{
+                                                height: 22,
+                                                fontSize: '11px',
+                                                fontWeight: 700,
+                                                bgcolor: universityRoleStats.totalUnallotted > 0 ? '#fef3c7' : '#ecfdf5',
+                                                color: universityRoleStats.totalUnallotted > 0 ? '#92400e' : '#065f46'
+                                            }}
+                                        />
+                                        {cautionDepositData.paid ? (
+                                            <Chip
+                                                icon={<CheckCircleIcon sx={{ fontSize: '14px !important' }} />}
+                                                label="Deposit: Paid (₹2,000)"
+                                                size="small"
+                                                sx={{
+                                                    height: 22,
+                                                    fontSize: '11px',
+                                                    fontWeight: 700,
+                                                    bgcolor: '#dcfce7',
+                                                    color: '#166534',
+                                                    border: '1px solid #bbf7d0'
+                                                }}
+                                            />
+                                        ) : allAllottedMembers.length > 0 ? (
+                                            <Chip
+                                                icon={<PaymentsIcon sx={{ fontSize: '14px !important' }} />}
+                                                label="Deposit Pending"
+                                                size="small"
+                                                sx={{
+                                                    height: 22,
+                                                    fontSize: '11px',
+                                                    fontWeight: 700,
+                                                    bgcolor: '#fef3c7',
+                                                    color: '#92400e',
+                                                    border: '1px solid #fde68a'
+                                                }}
+                                            />
+                                        ) : null}
+                                    </>
                                 )}
                             </Box>
                             <Typography variant="caption" sx={{ color: '#64748b' }}>
@@ -2228,90 +2323,6 @@ const HostelProvision = () => {
                 </DialogTitle>
 
                 <DialogContent dividers sx={{ p: 3, overflowY: 'auto' }}>
-                    {/* Role Navigation Tabs: Players vs Coaches / Managers */}
-                    <Box sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'flex-start',
-                        mb: 2.5,
-                        p: 0.6,
-                        bgcolor: '#f1f5f9',
-                        borderRadius: 2.5,
-                        border: '1px solid #e2e8f0'
-                    }}>
-                        <Tabs
-                            value={bulkModalTab}
-                            onChange={handleBulkModalTabChange}
-                            textColor="inherit"
-                            sx={{
-                                minHeight: 40,
-                                '& .MuiTabs-indicator': {
-                                    height: '100%',
-                                    borderRadius: 2,
-                                    bgcolor: '#0b5299',
-                                    zIndex: 1
-                                },
-                                '& .MuiTab-root': {
-                                    textTransform: 'none',
-                                    fontWeight: 600,
-                                    fontSize: '0.9rem',
-                                    minHeight: 40,
-                                    py: 0.5,
-                                    px: 2.5,
-                                    borderRadius: 2,
-                                    zIndex: 2,
-                                    color: '#64748b',
-                                    transition: 'all 0.2s ease',
-                                    '&.Mui-selected': {
-                                        color: '#ffffff',
-                                        fontWeight: 700
-                                    }
-                                }
-                            }}
-                        >
-                            <Tab
-                                value="Players"
-                                label={
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                        <PersonIcon sx={{ fontSize: 18 }} />
-                                        <span>Players</span>
-                                        <Chip
-                                            label={`${universityRoleStats.players.unallotted.length} Pending`}
-                                            size="small"
-                                            sx={{
-                                                height: 20,
-                                                fontSize: '11px',
-                                                fontWeight: 700,
-                                                bgcolor: bulkModalTab === 'Players' ? 'rgba(255,255,255,0.25)' : (universityRoleStats.players.unallotted.length > 0 ? '#fef3c7' : '#ecfdf5'),
-                                                color: bulkModalTab === 'Players' ? '#ffffff' : (universityRoleStats.players.unallotted.length > 0 ? '#92400e' : '#065f46')
-                                            }}
-                                        />
-                                    </Box>
-                                }
-                            />
-                            <Tab
-                                value="Coaches / Managers"
-                                label={
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                        <GroupsIcon sx={{ fontSize: 18 }} />
-                                        <span>Coaches / Managers</span>
-                                        <Chip
-                                            label={`${universityRoleStats.coaches.unallotted.length} Pending`}
-                                            size="small"
-                                            sx={{
-                                                height: 20,
-                                                fontSize: '11px',
-                                                fontWeight: 700,
-                                                bgcolor: bulkModalTab === 'Coaches / Managers' ? 'rgba(255,255,255,0.25)' : (universityRoleStats.coaches.unallotted.length > 0 ? '#fef3c7' : '#ecfdf5'),
-                                                color: bulkModalTab === 'Coaches / Managers' ? '#ffffff' : (universityRoleStats.coaches.unallotted.length > 0 ? '#92400e' : '#065f46')
-                                            }}
-                                        />
-                                    </Box>
-                                }
-                            />
-                        </Tabs>
-                    </Box>
-
                     {/* Room Configuration & Member Selection or Empty/Celebration State */}
                     {currentTabMembers.all.length === 0 ? (
                         <Box sx={{
@@ -2326,13 +2337,13 @@ const HostelProvision = () => {
                             gap: 1.5
                         }}>
                             <Box sx={{ width: 48, height: 48, borderRadius: '50%', bgcolor: '#e2e8f0', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                {bulkModalTab === 'Players' ? <PersonIcon sx={{ fontSize: 28 }} /> : <GroupsIcon sx={{ fontSize: 28 }} />}
+                                <GroupsIcon sx={{ fontSize: 28 }} />
                             </Box>
                             <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#334155' }}>
-                                No {bulkModalTab === 'Players' ? 'Players' : 'Coaches / Managers'} Registered with Accommodation
+                                No Members Registered with Accommodation
                             </Typography>
                             <Typography variant="body2" sx={{ color: '#64748b', maxWidth: 450 }}>
-                                {bulkSelectedUniversity} does not have any {bulkModalTab === 'Players' ? 'players' : 'coaches or managers'} requesting hostel accommodation.
+                                {bulkSelectedUniversity} does not have any members requesting hostel accommodation.
                             </Typography>
                         </Box>
                     ) : currentTabMembers.unallotted.length > 0 ? (
@@ -2417,57 +2428,14 @@ const HostelProvision = () => {
                                     </Alert>
                                 )}
 
-                                {/* Room Capacity Status Card */}
-                                {selectedBulkRoomDetails && (
-                                    <Box sx={{
-                                        p: 1.5,
-                                        borderRadius: 2,
-                                        bgcolor: '#eff6ff',
-                                        border: '1px solid #bfdbfe',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: 0.8
-                                    }}>
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <Typography sx={{ fontWeight: 700, color: '#1e3a8a', fontSize: '0.9rem' }}>
-                                                Room {selectedBulkRoomDetails.roomNumber} Details
-                                            </Typography>
-                                            <Chip
-                                                label={`${selectedBulkRoomDetails.availableSlots} Beds Available`}
-                                                size="small"
-                                                sx={{ bgcolor: '#1d4ed8', color: '#fff', fontWeight: 700, height: 22 }}
-                                            />
-                                        </Box>
-                                        <Typography variant="caption" sx={{ color: '#3b82f6', display: 'block' }}>
-                                            {bulkBuilding} • {bulkFloor} • Total Capacity: {selectedBulkRoomDetails.capacity}
-                                        </Typography>
-                                        <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-                                            <Button
-                                                size="small"
-                                                variant="contained"
-                                                onClick={handleAutoSelectMembers}
-                                                disabled={currentTabMembers.unallotted.length === 0}
-                                                sx={{
-                                                    textTransform: 'none',
-                                                    fontSize: '0.78rem',
-                                                    fontWeight: 600,
-                                                    borderRadius: 1.5,
-                                                    bgcolor: '#2563eb',
-                                                    '&:hover': { bgcolor: '#1d4ed8' }
-                                                }}
-                                            >
-                                                Auto-Select Next {Math.min(selectedBulkRoomDetails.availableSlots, currentTabMembers.unallotted.length)} Member(s)
-                                            </Button>
-                                        </Box>
-                                    </Box>
-                                )}
+
                             </Paper>
 
                             {/* RIGHT COLUMN: Member Selection */}
                             <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5, bgcolor: '#ffffff', display: 'flex', flexDirection: 'column' }}>
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
                                     <Typography sx={{ fontWeight: 700, color: '#1e293b', fontSize: '0.95rem' }}>
-                                        Step 2: Select {bulkModalTab === 'Players' ? 'Players' : 'Coaches / Managers'} ({currentTabMembers.unallotted.length} Unallotted)
+                                        Step 2: Select Members ({currentTabMembers.unallotted.length} Unallotted)
                                     </Typography>
                                     <Chip
                                         label={`${bulkSelectedMemberIds.length} / ${currentRoomMaxSlots} Selected`}
@@ -2478,7 +2446,7 @@ const HostelProvision = () => {
                                 </Box>
 
                                 <Typography variant="caption" sx={{ color: '#64748b', mb: 1.5, display: 'block' }}>
-                                    Select up to {currentRoomMaxSlots} {bulkModalTab === 'Players' ? 'players' : 'coaches/managers'} to assign to Room {bulkRoom || '(Select Room)'}.
+                                    Select up to {currentRoomMaxSlots} member(s) to assign to Room {bulkRoom || '(Select Room)'}.
                                 </Typography>
 
                                 {/* Member Checkbox List */}
@@ -2514,7 +2482,13 @@ const HostelProvision = () => {
                                                         <Chip
                                                             label={person.role}
                                                             size="small"
-                                                            sx={{ height: 18, fontSize: '10px', fontWeight: 600 }}
+                                                            sx={{
+                                                                height: 18,
+                                                                fontSize: '10px',
+                                                                fontWeight: 600,
+                                                                bgcolor: person.role === 'Player' ? '#f1f5f9' : '#fef3c7',
+                                                                color: person.role === 'Player' ? '#334155' : '#92400e'
+                                                            }}
                                                         />
                                                         <Chip
                                                             label={person.gender}
@@ -2555,12 +2529,210 @@ const HostelProvision = () => {
                                 <CheckCircleIcon sx={{ fontSize: 32 }} />
                             </Box>
                             <Typography variant="h6" sx={{ fontWeight: 700, color: '#065f46' }}>
-                                All {bulkModalTab === 'Players' ? 'players' : 'coaches / managers'} of {bulkSelectedUniversity} are successfully allotted rooms!
+                                All members of {bulkSelectedUniversity} are successfully allotted rooms!
                             </Typography>
                             <Typography variant="body2" sx={{ color: '#047857', maxWidth: 500 }}>
-                                Every {bulkModalTab === 'Players' ? 'player' : 'coach/manager'} requesting accommodation from this university has been assigned a hostel room. You can review or modify their allocations in the list below.
+                                Every member requesting accommodation from this university has been assigned a hostel room. You can review or modify their allocations in the list below.
                             </Typography>
                         </Box>
+                    )}
+
+                    {/* Step 3: Caution Deposit (Manual Collection) - Appears after room allot is done */}
+                    {allAllottedMembers.length > 0 && (
+                        <Paper
+                            variant="outlined"
+                            sx={{
+                                mt: 2.5,
+                                p: 2.5,
+                                borderRadius: 2.5,
+                                bgcolor: cautionDepositData.paid ? '#f0fdf4' : '#ffffff',
+                                border: cautionDepositData.paid ? '1.5px solid #86efac' : '1.5px solid #cbd5e1',
+                                boxShadow: cautionDepositData.paid ? '0 2px 8px rgba(34, 197, 94, 0.08)' : '0 2px 8px rgba(0,0,0,0.03)'
+                            }}
+                        >
+                            {/* Header */}
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+                                    <Box sx={{
+                                        width: 36,
+                                        height: 36,
+                                        borderRadius: 2,
+                                        bgcolor: cautionDepositData.paid ? '#dcfce7' : '#eff6ff',
+                                        color: cautionDepositData.paid ? '#16a34a' : '#0b5299',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                    }}>
+                                        <PaymentsIcon sx={{ fontSize: 22 }} />
+                                    </Box>
+                                    <Box>
+                                        <Typography sx={{ fontWeight: 700, color: '#0f172a', fontSize: '1rem', lineHeight: 1.2 }}>
+                                            Step 3: Caution Deposit (Manual Cash Collection)
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ color: '#64748b' }}>
+                                            Collect ₹2,000 refundable security deposit in cash at hostel desk
+                                        </Typography>
+                                    </Box>
+                                </Box>
+
+                                <Chip
+                                    icon={cautionDepositData.paid ? <CheckCircleIcon sx={{ fontSize: '16px !important' }} /> : <PaymentsIcon sx={{ fontSize: '16px !important' }} />}
+                                    label={cautionDepositData.paid ? `Paid: ₹${cautionDepositData.amount || 2000}` : 'Caution Deposit Pending (₹2,000)'}
+                                    size="small"
+                                    sx={{
+                                        fontWeight: 700,
+                                        bgcolor: cautionDepositData.paid ? '#dcfce7' : '#fef3c7',
+                                        color: cautionDepositData.paid ? '#166534' : '#92400e',
+                                        border: cautionDepositData.paid ? '1px solid #bbf7d0' : '1px solid #fde68a',
+                                        height: 26,
+                                        fontSize: '11.5px'
+                                    }}
+                                />
+                            </Box>
+
+                            {/* Content: Form if Unpaid, Receipt Summary if Paid */}
+                            {!cautionDepositData.paid ? (
+                                <Box sx={{ bgcolor: '#f8fafc', p: 2, borderRadius: 2, border: '1px solid #e2e8f0' }}>
+                                    {/* Manual Notice */}
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, p: 1, bgcolor: '#eff6ff', borderRadius: 1.5, border: '1px solid #bfdbfe' }}>
+                                        <LocalAtmIcon sx={{ color: '#1d4ed8', fontSize: 20 }} />
+                                        <Typography variant="caption" sx={{ color: '#1e40af', fontWeight: 600 }}>
+                                            Offline / Counter Payment: Collect physical cash of ₹2,000 from the room/university representative and select their name below.
+                                        </Typography>
+                                    </Box>
+
+                                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '2fr 1.2fr 1.2fr auto' }, gap: 1.5, alignItems: 'center' }}>
+                                        {/* Dropdown: Paid by */}
+                                        <FormControl fullWidth size="small">
+                                            <InputLabel id="caution-paid-by-label">Paid by *</InputLabel>
+                                            <Select
+                                                labelId="caution-paid-by-label"
+                                                value={cautionPaidByPersonId || (allAllottedMembers[0]?.id || '')}
+                                                label="Paid by *"
+                                                onChange={(e) => setCautionPaidByPersonId(e.target.value)}
+                                            >
+                                                {allAllottedMembers.map((member) => (
+                                                    <MenuItem key={member.id} value={member.id}>
+                                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', gap: 1 }}>
+                                                            <Typography sx={{ fontWeight: 600, fontSize: '0.85rem' }}>
+                                                                {member.name} ({member.role})
+                                                            </Typography>
+                                                            <Chip
+                                                                label={member.roomAllocation ? `Room ${member.roomAllocation.roomNumber}` : 'Allocated'}
+                                                                size="small"
+                                                                sx={{ height: 18, fontSize: '10px', bgcolor: '#e0f2fe', color: '#0369a1', fontWeight: 600 }}
+                                                            />
+                                                        </Box>
+                                                    </MenuItem>
+                                                ))}
+                                            </Select>
+                                        </FormControl>
+
+                                        {/* Amount: Fixed 2000 */}
+                                        <TextField
+                                            label="Amount"
+                                            size="small"
+                                            value="₹ 2,000"
+                                            InputProps={{
+                                                readOnly: true,
+                                                sx: { fontWeight: 700, color: '#0f172a', bgcolor: '#ffffff' }
+                                            }}
+                                            helperText="Fixed refundable deposit"
+                                        />
+
+                                        {/* Payment Mode */}
+                                        <FormControl fullWidth size="small">
+                                            <InputLabel id="caution-mode-label">Mode</InputLabel>
+                                            <Select
+                                                labelId="caution-mode-label"
+                                                value={cautionPaymentMode}
+                                                label="Mode"
+                                                onChange={(e) => setCautionPaymentMode(e.target.value)}
+                                            >
+                                                <MenuItem value="Cash">Cash (Manual)</MenuItem>
+                                                <MenuItem value="UPI">UPI / QR Code</MenuItem>
+                                            </Select>
+                                        </FormControl>
+
+                                        {/* Pay Button */}
+                                        <Button
+                                            variant="contained"
+                                            onClick={handlePayCautionDeposit}
+                                            disabled={cautionSubmitting || allAllottedMembers.length === 0}
+                                            startIcon={cautionSubmitting ? <CircularProgress size={16} color="inherit" /> : <PaymentsIcon sx={{ fontSize: 18 }} />}
+                                            sx={{
+                                                bgcolor: '#059669',
+                                                color: '#ffffff',
+                                                fontWeight: 700,
+                                                height: 40,
+                                                px: 3,
+                                                borderRadius: 2,
+                                                textTransform: 'none',
+                                                whiteSpace: 'nowrap',
+                                                boxShadow: '0 2px 6px rgba(5, 150, 105, 0.2)',
+                                                '&:hover': { bgcolor: '#047857' }
+                                            }}
+                                        >
+                                            {cautionSubmitting ? 'Recording...' : 'Pay'}
+                                        </Button>
+                                    </Box>
+                                </Box>
+                            ) : (
+                                /* Paid State View */
+                                <Box sx={{ bgcolor: '#ffffff', p: 2, borderRadius: 2, border: '1px solid #bbf7d0', display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 1.5 }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                            <Avatar sx={{ bgcolor: '#dcfce7', color: '#16a34a', width: 44, height: 44 }}>
+                                                <CheckCircleIcon sx={{ fontSize: 26 }} />
+                                            </Avatar>
+                                            <Box>
+                                                <Typography sx={{ fontWeight: 700, color: '#166534', fontSize: '0.98rem' }}>
+                                                    Caution Deposit Received: ₹{cautionDepositData.amount || 2000}
+                                                </Typography>
+                                                <Typography variant="body2" sx={{ color: '#475569', fontSize: '0.84rem' }}>
+                                                    Paid by: <strong>{cautionDepositData.paidBy?.name || 'Representative'}</strong> ({cautionDepositData.paidBy?.role || 'Member'} - Room {cautionDepositData.paidBy?.roomNumber || 'Allotted'})
+                                                </Typography>
+                                                <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>
+                                                    Receipt #{cautionDepositData.receiptNo || 'N/A'} • Mode: {cautionDepositData.paymentMode || 'Cash'} • {cautionDepositData.paidAt ? new Date(cautionDepositData.paidAt).toLocaleDateString() + ' ' + new Date(cautionDepositData.paidAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Today'}
+                                                </Typography>
+                                            </Box>
+                                        </Box>
+
+                                        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                                            <Button
+                                                size="small"
+                                                variant="outlined"
+                                                startIcon={<PrintIcon sx={{ fontSize: 16 }} />}
+                                                onClick={() => setCautionReceiptModalOpen(true)}
+                                                sx={{
+                                                    textTransform: 'none',
+                                                    borderColor: '#16a34a',
+                                                    color: '#16a34a',
+                                                    fontWeight: 600,
+                                                    borderRadius: 1.5,
+                                                    '&:hover': { bgcolor: '#f0fdf4', borderColor: '#15803d' }
+                                                }}
+                                            >
+                                                View / Print Receipt
+                                            </Button>
+                                            <Button
+                                                size="small"
+                                                variant="text"
+                                                onClick={handleResetCautionDeposit}
+                                                sx={{
+                                                    textTransform: 'none',
+                                                    color: '#94a3b8',
+                                                    fontSize: '0.78rem',
+                                                    '&:hover': { color: '#ef4444', bgcolor: 'transparent' }
+                                                }}
+                                            >
+                                                Reset
+                                            </Button>
+                                        </Box>
+                                    </Box>
+                                </Box>
+                            )}
+                        </Paper>
                     )}
 
                     {/* 3. Allotted Members Section (Grouped by Room) */}
@@ -2568,7 +2740,7 @@ const HostelProvision = () => {
                         <Box sx={{ mt: 3 }}>
                             <Typography sx={{ fontWeight: 700, color: '#1e293b', fontSize: '0.95rem', mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
                                 <HotelIcon sx={{ color: '#059669', fontSize: 20 }} />
-                                Allotted {bulkModalTab === 'Players' ? 'Players' : 'Coaches / Managers'} of {bulkSelectedUniversity} ({currentTabMembers.allotted.length} Total)
+                                Allotted Members of {bulkSelectedUniversity} ({currentTabMembers.allotted.length} Total)
                             </Typography>
 
                             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }, gap: 1.5 }}>
@@ -2625,29 +2797,158 @@ const HostelProvision = () => {
                     >
                         Close
                     </Button>
+                    {cautionDepositData.paid && allAllottedMembers.length > 0 && bulkSelectedMemberIds.length === 0 ? (
+                        <Button
+                            onClick={() => {
+                                handleCloseBulkModal();
+                                toast.success(`Hostel allotment & caution deposit complete for ${bulkSelectedUniversity}!`);
+                            }}
+                            variant="contained"
+                            startIcon={<CheckCircleIcon sx={{ fontSize: 18 }} />}
+                            sx={{
+                                bgcolor: '#059669',
+                                color: '#ffffff',
+                                textTransform: 'none',
+                                borderRadius: 2,
+                                px: 3.5,
+                                fontWeight: 700,
+                                boxShadow: '0 2px 6px rgba(5, 150, 105, 0.25)',
+                                '&:hover': { bgcolor: '#047857' }
+                            }}
+                        >
+                            Done
+                        </Button>
+                    ) : (
+                        <Button
+                            onClick={handleSaveBulkAllocation}
+                            variant="contained"
+                            disabled={
+                                !bulkRoom ||
+                                bulkSelectedMemberIds.length === 0 ||
+                                bulkSubmitting ||
+                                currentTabMembers.unallotted.length === 0
+                            }
+                            startIcon={bulkSubmitting ? <CircularProgress size={18} color="inherit" /> : <MeetingRoomIcon />}
+                            sx={{
+                                bgcolor: '#0b5299',
+                                color: '#ffffff',
+                                textTransform: 'none',
+                                borderRadius: 2,
+                                px: 3,
+                                fontWeight: 700,
+                                '&:hover': { bgcolor: '#093f77' }
+                            }}
+                        >
+                            {bulkSubmitting
+                                ? 'Allotting...'
+                                : `Allot Room ${bulkRoom || ''} to ${bulkSelectedMemberIds.length} ${bulkSelectedMemberIds.length === 1 ? 'Member' : 'Members'}`}
+                        </Button>
+                    )}
+                </DialogActions>
+            </Dialog>
+
+            {/* Printable Caution Deposit Receipt Modal */}
+            <Dialog
+                open={cautionReceiptModalOpen}
+                onClose={() => setCautionReceiptModalOpen(false)}
+                maxWidth="sm"
+                fullWidth
+                slotProps={{ paper: { sx: { borderRadius: 3, p: 1 } } }}
+            >
+                <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <ReceiptIcon sx={{ color: '#059669', fontSize: 24 }} />
+                        <Typography sx={{ fontWeight: 700, fontSize: '1.1rem' }}>Hostel Caution Deposit Receipt</Typography>
+                    </Box>
+                    <IconButton size="small" onClick={() => setCautionReceiptModalOpen(false)}>
+                        <ClearIcon fontSize="small" />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent dividers sx={{ p: 3 }}>
+                    <Box id="caution-deposit-printable-receipt" sx={{ p: 2, border: '2px dashed #cbd5e1', borderRadius: 2, bgcolor: '#fcfdfd' }}>
+                        <Box sx={{ textAlign: 'center', pb: 2, borderBottom: '1px solid #e2e8f0', mb: 2 }}>
+                            <Typography variant="h6" sx={{ fontWeight: 800, color: '#0b5299' }}>
+                                SOUTH ZONE INTER-UNIVERSITY TOURNAMENT
+                            </Typography>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#334155' }}>
+                                HOSTEL ACCOMMODATION - CAUTION DEPOSIT RECEIPT
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#64748b' }}>
+                                (Official Cash / Manual Payment Voucher)
+                            </Typography>
+                        </Box>
+
+                        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5, mb: 2, fontSize: '0.88rem' }}>
+                            <Box>
+                                <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>RECEIPT NO:</Typography>
+                                <Typography sx={{ fontWeight: 700, color: '#0f172a' }}>{cautionDepositData.receiptNo || 'CD-MANUAL'}</Typography>
+                            </Box>
+                            <Box sx={{ textAlign: 'right' }}>
+                                <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>DATE & TIME:</Typography>
+                                <Typography sx={{ fontWeight: 700, color: '#0f172a' }}>
+                                    {cautionDepositData.paidAt ? (new Date(cautionDepositData.paidAt).toLocaleDateString() + ' ' + new Date(cautionDepositData.paidAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) : 'Pending Collection'}
+                                </Typography>
+                            </Box>
+                            <Box sx={{ gridColumn: 'span 2' }}>
+                                <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>UNIVERSITY / INSTITUTION:</Typography>
+                                <Typography sx={{ fontWeight: 700, color: '#0b5299', fontSize: '1rem' }}>{bulkSelectedUniversity}</Typography>
+                            </Box>
+                            <Box>
+                                <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>RECEIVED FROM (PAID BY):</Typography>
+                                <Typography sx={{ fontWeight: 700, color: '#0f172a' }}>
+                                    {cautionDepositData.paidBy?.name || 'Representative'} ({cautionDepositData.paidBy?.role || 'Member'})
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: '#64748b' }}>Phone: {cautionDepositData.paidBy?.phone || 'N/A'}</Typography>
+                            </Box>
+                            <Box sx={{ textAlign: 'right' }}>
+                                <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>ALLOTTED HOSTEL ROOM:</Typography>
+                                <Typography sx={{ fontWeight: 700, color: '#0f172a' }}>
+                                    Room {cautionDepositData.paidBy?.roomNumber || 'Allotted'}
+                                </Typography>
+                            </Box>
+                            <Box>
+                                <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>PAYMENT MODE:</Typography>
+                                <Typography sx={{ fontWeight: 700, color: '#047857' }}>{cautionDepositData.paymentMode || 'Cash'} (Manual Desk Receipt)</Typography>
+                            </Box>
+                            <Box sx={{ textAlign: 'right' }}>
+                                <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>AMOUNT RECEIVED:</Typography>
+                                <Typography sx={{ fontWeight: 800, color: '#047857', fontSize: '1.2rem' }}>₹{cautionDepositData.amount || 2000}</Typography>
+                            </Box>
+                        </Box>
+
+                        <Box sx={{ bgcolor: '#ecfdf5', p: 1.5, borderRadius: 1.5, border: '1px solid #a7f3d0', mb: 2 }}>
+                            <Typography variant="caption" sx={{ color: '#065f46', fontWeight: 600, display: 'block', mb: 0.5 }}>
+                                Amount in Words: Rupees Two Thousand Only (Refundable Deposit)
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#047857', fontSize: '0.75rem', display: 'block' }}>
+                                Note: This caution deposit is refundable at the time of vacating the hostel room and returning the keys, subject to room clearance and no property damage.
+                            </Typography>
+                        </Box>
+
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', pt: 3, borderTop: '1px dashed #cbd5e1' }}>
+                            <Box sx={{ textAlign: 'center' }}>
+                                <Typography variant="caption" sx={{ color: '#64748b' }}>Payer Signature</Typography>
+                            </Box>
+                            <Box sx={{ textAlign: 'center' }}>
+                                <Typography sx={{ fontWeight: 700, fontSize: '0.82rem', color: '#1e293b' }}>
+                                    {cautionDepositData.collectedBy || 'Hostel Desk In-charge'}
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: '#64748b' }}>Authorized Signature & Stamp</Typography>
+                            </Box>
+                        </Box>
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ p: 2, display: 'flex', justifyContent: 'space-between' }}>
+                    <Button onClick={() => setCautionReceiptModalOpen(false)} variant="outlined" sx={{ textTransform: 'none' }}>
+                        Close
+                    </Button>
                     <Button
-                        onClick={handleSaveBulkAllocation}
                         variant="contained"
-                        disabled={
-                            !bulkRoom ||
-                            bulkSelectedMemberIds.length === 0 ||
-                            bulkSubmitting ||
-                            currentTabMembers.unallotted.length === 0
-                        }
-                        startIcon={bulkSubmitting ? <CircularProgress size={18} color="inherit" /> : <MeetingRoomIcon />}
-                        sx={{
-                            bgcolor: '#0b5299',
-                            color: '#ffffff',
-                            textTransform: 'none',
-                            borderRadius: 2,
-                            px: 3,
-                            fontWeight: 700,
-                            '&:hover': { bgcolor: '#093f77' }
-                        }}
+                        startIcon={<PrintIcon />}
+                        onClick={() => window.print()}
+                        sx={{ textTransform: 'none', bgcolor: '#059669', '&:hover': { bgcolor: '#047857' } }}
                     >
-                        {bulkSubmitting
-                            ? 'Allotting...'
-                            : `Allot Room ${bulkRoom || ''} to ${bulkSelectedMemberIds.length} ${bulkModalTab === 'Players' ? (bulkSelectedMemberIds.length === 1 ? 'Player' : 'Players') : (bulkSelectedMemberIds.length === 1 ? 'Coach' : 'Coaches')}`}
+                        Print Receipt
                     </Button>
                 </DialogActions>
             </Dialog>

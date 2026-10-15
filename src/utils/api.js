@@ -125,6 +125,24 @@ export const registrationAPI = {
             method: 'PUT',
             body: JSON.stringify(data),
         }, true),
+
+    payCautionDeposit: (data) =>
+        apiFetch('/registration/caution-deposit', {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        }, true),
+
+    refundCautionDeposit: (data) =>
+        apiFetch('/registration/caution-deposit/refund', {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        }, true),
+
+    resetCautionDeposit: (data) =>
+        apiFetch('/registration/caution-deposit', {
+            method: 'DELETE',
+            body: JSON.stringify(data),
+        }, true),
 };
 
 // Committee APIs
