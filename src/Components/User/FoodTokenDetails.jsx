@@ -1,118 +1,229 @@
 import React, { useState, useEffect } from 'react';
 import {
     Box, Typography, Button, Card, CardContent, Chip,
-    CircularProgress, Alert, Tooltip, IconButton, Divider,
-    Accordion, AccordionSummary, AccordionDetails
+    CircularProgress, Alert, Tooltip, Divider,
+    Accordion, AccordionSummary, AccordionDetails,
+    Dialog, DialogTitle, DialogContent, IconButton
 } from '@mui/material';
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ConfirmationNumberOutlinedIcon from '@mui/icons-material/ConfirmationNumberOutlined';
-import WbSunnyOutlinedIcon from '@mui/icons-material/WbSunnyOutlined';
-import RestaurantOutlinedIcon from '@mui/icons-material/RestaurantOutlined';
-import CoffeeOutlinedIcon from '@mui/icons-material/CoffeeOutlined';
-import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined';
-import PersonIcon from '@mui/icons-material/Person';
-import SmartphoneIcon from '@mui/icons-material/Smartphone';
-import GroupsIcon from '@mui/icons-material/Groups';
-import HomeIcon from '@mui/icons-material/Home';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import ScheduleIcon from '@mui/icons-material/Schedule';
+import QrCode2Icon from '@mui/icons-material/QrCode2';
+import CloseIcon from '@mui/icons-material/Close';
 import QRCode from 'qrcode';
 import { toast } from 'sonner';
 import { authAPI } from '../../utils/api';
-import { formatDateDDMMYYYY } from '../../utils/dateUtils';
 import { isMealTokenExpired, getMealExpiryCutoffLabel } from '../../config/foodTokenConfig';
 
-const MEAL_ICONS = {
-    'Breakfast': { icon: WbSunnyOutlinedIcon, color: '#f59e0b', bg: '#fef3c7', borderColor: '#fde68a' },
-    'Lunch': { icon: RestaurantOutlinedIcon, color: '#16a34a', bg: '#dcfce7', borderColor: '#bbf7d0' },
-    'Snacks': { icon: CoffeeOutlinedIcon, color: '#9333ea', bg: '#f3e8ff', borderColor: '#e9d5ff' },
-    'Dinner': { icon: DarkModeOutlinedIcon, color: '#0284c7', bg: '#e0f2fe', borderColor: '#bae6fd' }
-};
+/**
+ * Authentic Food Cloche (Serving Platter with Lid and Steam) SVG icon matching reference design
+ */
+const FoodClocheIcon = ({ size = 68, color = '#ffffff' }) => (
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* Steam Wisps */}
+        <path d="M26 12C24.5 15.5 28.5 17.5 26.5 21" stroke={color} strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M32 9C30 13 35 16 32.5 21" stroke={color} strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M38 12C36.5 15.5 40.5 17.5 38.5 21" stroke={color} strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+        {/* Cloche Knob */}
+        <circle cx="32" cy="24.5" r="3.2" fill={color} />
+        {/* Cloche Serving Dome */}
+        <path d="M13 43C13 30.5 21.5 25.5 32 25.5C42.5 25.5 51 30.5 51 43H13Z" fill={color} />
+        {/* Cloche Base Tray */}
+        <rect x="9" y="45" width="46" height="5" rx="2.5" fill={color} />
+    </svg>
+);
 
-const formatTime = (dateVal) => {
+/**
+ * Format date like "16 OCT 2026" to match reference ticket
+ */
+const formatTicketDate = (dateVal) => {
     if (!dateVal) return '—';
     try {
+        if (typeof dateVal === 'string' && dateVal.includes('-')) {
+            const parts = dateVal.split('T')[0].split('-');
+            const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+            if (parts[0].length === 4) {
+                // YYYY-MM-DD
+                const mIdx = parseInt(parts[1], 10) - 1;
+                return `${parts[2]} ${months[mIdx] || ''} ${parts[0]}`;
+            } else if (parts[2].length === 4) {
+                // DD-MM-YYYY
+                const mIdx = parseInt(parts[1], 10) - 1;
+                return `${parts[0]} ${months[mIdx] || ''} ${parts[2]}`;
+            }
+        }
         const d = new Date(dateVal);
-        if (isNaN(d.getTime())) return '—';
-        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+        if (!isNaN(d.getTime())) {
+            const day = String(d.getDate()).padStart(2, '0');
+            const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+            return `${day} ${months[d.getMonth()]} ${d.getFullYear()}`;
+        }
+        return String(dateVal);
     } catch {
-        return '—';
+        return String(dateVal);
     }
 };
 
 /**
- * Authentic Boarding-pass / Ticket style Meal Coupon Card
- * Perfectly sized for 4-in-a-row display in desktop view
+ * Authentic Vintage Food Voucher Ticket
+ * Matches the requested horizontal ticket layout (Orange Cloche Stub + Cream Body + Date & Time)
  */
-const MealCouponCard = ({ token, qrUrl, onCopy, globalUser, globalTeam }) => {
-    const mealMeta = MEAL_ICONS[token.mealType] || { icon: RestaurantIcon, color: '#f97316', bg: '#fff5f0', borderColor: '#fed7aa' };
-    const IconComp = mealMeta.icon;
+const MealCouponCard = ({ token, onCopy, globalUser, globalTeam, onOpenDetails }) => {
     const isRedeemed = token.status === 'REDEEMED' || token.rawStatus === 'REDEEMED';
     const isExpired = token.isExpired || token.status === 'EXPIRED';
     const cutoffLabel = getMealExpiryCutoffLabel(token.mealType);
 
     const displayName = token.name || globalUser || 'Participant';
-    const displayPhone = token.identifier || '—';
-    const displayTeam = token.teamOrSport || globalTeam || '—';
-    const displayStay = token.stay || [token.block, token.room ? (String(token.room).toLowerCase().includes('room') ? token.room : `Room ${token.room}`) : ''].filter(Boolean).join(' - ') || 'Not Allocated';
+    const displayTeam = token.teamOrSport || globalTeam || '';
+    const displaySubtitle = [displayName, displayTeam].filter(Boolean).join(' • ');
 
     return (
         <Card
             sx={{
                 width: '100%',
-                height: '100%',
-                borderRadius: '20px',
+                borderRadius: '16px',
                 border: isExpired ? '1.5px solid #e2e8f0' : (isRedeemed ? '1.5px solid #cbd5e1' : '1.5px solid #fed7aa'),
-                bgcolor: '#ffffff',
-                boxShadow: isExpired ? 'none' : '0 6px 22px rgba(249, 115, 22, 0.08)',
+                bgcolor: '#fdfbf7', // warm cream vintage ticket paper
+                boxShadow: isExpired ? 'none' : '0 10px 25px -4px rgba(234, 88, 12, 0.12), 0 4px 10px -2px rgba(0, 0, 0, 0.04)',
                 overflow: 'hidden',
                 position: 'relative',
                 display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
+                flexDirection: { xs: 'column', sm: 'row' },
                 transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-                opacity: isExpired ? 0.78 : 1,
+                opacity: isExpired ? 0.75 : 1,
                 '&:hover': {
                     transform: isExpired ? 'none' : 'translateY(-3px)',
-                    boxShadow: isExpired ? 'none' : '0 12px 28px rgba(249, 115, 22, 0.14)'
+                    boxShadow: isExpired ? 'none' : '0 14px 30px -4px rgba(234, 88, 12, 0.18)'
                 }
             }}
         >
-            {/* Top Section: Ticket Details */}
-            <Box sx={{ p: 2, pb: 1.5 }}>
-                {/* Header: Meal Type + Date + Status Badge */}
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-                        <Box
-                            sx={{
-                                width: 44,
-                                height: 44,
-                                borderRadius: '50%',
-                                bgcolor: mealMeta.bg,
-                                color: mealMeta.color,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                border: `1.5px solid ${mealMeta.borderColor}`,
-                                flexShrink: 0
-                            }}
-                        >
-                            <IconComp sx={{ fontSize: 24 }} />
-                        </Box>
-                        <Box>
-                            <Typography sx={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>
-                                {token.mealType}
-                            </Typography>
-                            <Typography sx={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500, mt: 0.25 }}>
-                                {formatDateDDMMYYYY(token.mealDate)}
-                            </Typography>
-                        </Box>
-                    </Box>
+            {/* Left Stub: Food Cloche with Orange Gradient */}
+            <Box
+                sx={{
+                    width: { xs: '100%', sm: '150px', md: '170px' },
+                    minWidth: { sm: '150px', md: '170px' },
+                    background: isExpired
+                        ? 'linear-gradient(135deg, #94a3b8 0%, #64748b 100%)'
+                        : isRedeemed
+                            ? 'linear-gradient(135deg, #64748b 0%, #475569 100%)'
+                            : 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    p: { xs: 2.5, sm: 2 },
+                    position: 'relative',
+                    flexShrink: 0
+                }}
+            >
+                {/* Left Outer Semi-Circle Cutout Notch */}
+                <Box
+                    sx={{
+                        display: { xs: 'none', sm: 'block' },
+                        position: 'absolute',
+                        left: '-14px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '50%',
+                        bgcolor: '#faf6f3',
+                        border: '1.5px solid #fed7aa',
+                        zIndex: 3
+                    }}
+                />
+
+                {/* Serving Dish Cloche with Steam */}
+                <FoodClocheIcon size={64} color="#ffffff" />
+            </Box>
+
+            {/* Vertical Perforation Divider with Top and Bottom Cutout Notches */}
+            <Box
+                sx={{
+                    display: { xs: 'none', sm: 'block' },
+                    position: 'relative',
+                    width: '0px',
+                    borderLeft: '2.5px dashed #ea580c',
+                    opacity: isExpired ? 0.35 : 0.7,
+                    alignSelf: 'stretch',
+                    zIndex: 2,
+                    '&::before': {
+                        content: '""',
+                        position: 'absolute',
+                        left: '-13px',
+                        top: '-14px',
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        bgcolor: '#faf6f3',
+                        border: '1.5px solid #fed7aa',
+                        zIndex: 4
+                    },
+                    '&::after': {
+                        content: '""',
+                        position: 'absolute',
+                        left: '-13px',
+                        bottom: '-14px',
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        bgcolor: '#faf6f3',
+                        border: '1.5px solid #fed7aa',
+                        zIndex: 4
+                    }
+                }}
+            />
+
+            {/* Right Main Ticket Area */}
+            <Box
+                sx={{
+                    flex: 1,
+                    p: { xs: 2, sm: 2.5 },
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    position: 'relative',
+                    bgcolor: '#fdfbf7'
+                }}
+            >
+                {/* Right Outer Semi-Circle Cutout Notch */}
+                <Box
+                    sx={{
+                        display: { xs: 'none', sm: 'block' },
+                        position: 'absolute',
+                        right: '-14px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        width: '28px',
+                        height: '28px',
+                        borderRadius: '50%',
+                        bgcolor: '#faf6f3',
+                        border: '1.5px solid #fed7aa',
+                        zIndex: 3
+                    }}
+                />
+
+                {/* Top Row: Big Bold Meal Name + Status Chip */}
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                    <Typography
+                        sx={{
+                            fontSize: { xs: '1.8rem', sm: '2.3rem' },
+                            fontWeight: 900,
+                            color: isExpired ? '#64748b' : '#0b1e36',
+                            letterSpacing: '1px',
+                            lineHeight: 1,
+                            textTransform: 'uppercase',
+                            fontFamily: 'system-ui, -apple-system, sans-serif'
+                        }}
+                    >
+                        {token.mealType}
+                    </Typography>
 
                     {/* Status Chip */}
                     {isExpired ? (
@@ -133,282 +244,113 @@ const MealCouponCard = ({ token, qrUrl, onCopy, globalUser, globalTeam }) => {
                     )}
                 </Box>
 
-                {/* Participant Details Box (4 Compact Rows) */}
-                <Box
-                    sx={{
-                        borderRadius: '12px',
-                        border: '1px solid #f1f5f9',
-                        p: 0.75,
-                        bgcolor: '#ffffff',
-                        mb: 1.5
-                    }}
-                >
-                    {/* Row 1: Name */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', bgcolor: '#f8fafc', borderRadius: '8px', px: 1.25, py: 0.6, mb: 0.75 }}>
-                        <PersonIcon sx={{ color: '#3b82f6', fontSize: 16, mr: 1, flexShrink: 0 }} />
-                        <Typography sx={{ width: 68, color: '#64748b', fontSize: 11.5, fontWeight: 500, flexShrink: 0 }}>Name</Typography>
-                        <Divider orientation="vertical" flexItem sx={{ mx: 1, borderColor: '#e2e8f0', height: 14 }} />
-                        <Typography sx={{ color: '#0f172a', fontSize: 12.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {displayName}
+                {/* Thin Orange Horizontal Underline */}
+                <Box sx={{ width: '100%', height: '2px', bgcolor: isExpired ? '#cbd5e1' : '#f97316', my: 1 }} />
+
+                {/* Info Row: Calendar Date | Clock Cutoff Time */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1.5, sm: 2.5 }, mt: 0.5, flexWrap: 'wrap' }}>
+                    {/* Date Section */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <CalendarMonthIcon sx={{ color: isExpired ? '#94a3b8' : '#f97316', fontSize: { xs: 24, sm: 28 } }} />
+                        <Typography
+                            sx={{
+                                fontSize: { xs: '1.05rem', sm: '1.2rem' },
+                                fontWeight: 800,
+                                color: isExpired ? '#64748b' : '#0b1e36',
+                                letterSpacing: '0.5px'
+                            }}
+                        >
+                            {formatTicketDate(token.mealDate)}
                         </Typography>
                     </Box>
 
-                    {/* Row 2: ID / Mobile */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', bgcolor: '#f8fafc', borderRadius: '8px', px: 1.25, py: 0.6, mb: 0.75 }}>
-                        <SmartphoneIcon sx={{ color: '#10b981', fontSize: 16, mr: 1, flexShrink: 0 }} />
-                        <Typography sx={{ width: 68, color: '#64748b', fontSize: 11.5, fontWeight: 500, flexShrink: 0 }}>ID/Mobile</Typography>
-                        <Divider orientation="vertical" flexItem sx={{ mx: 1, borderColor: '#e2e8f0', height: 14 }} />
-                        <Typography sx={{ color: '#0f172a', fontSize: 12.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {displayPhone}
-                        </Typography>
-                    </Box>
+                    {/* Vertical Separator | */}
+                    <Divider orientation="vertical" flexItem sx={{ borderColor: '#cbd5e1', height: 24, alignSelf: 'center' }} />
 
-                    {/* Row 3: Team */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', bgcolor: '#f8fafc', borderRadius: '8px', px: 1.25, py: 0.6, mb: 0.75 }}>
-                        <GroupsIcon sx={{ color: '#8b5cf6', fontSize: 16, mr: 1, flexShrink: 0 }} />
-                        <Typography sx={{ width: 68, color: '#64748b', fontSize: 11.5, fontWeight: 500, flexShrink: 0 }}>Team</Typography>
-                        <Divider orientation="vertical" flexItem sx={{ mx: 1, borderColor: '#e2e8f0', height: 14 }} />
-                        <Typography sx={{ color: '#0f172a', fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {displayTeam}
-                        </Typography>
-                    </Box>
-
-                    {/* Row 4: Stay */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', bgcolor: '#f8fafc', borderRadius: '8px', px: 1.25, py: 0.6 }}>
-                        <HomeIcon sx={{ color: '#ea580c', fontSize: 16, mr: 1, flexShrink: 0 }} />
-                        <Typography sx={{ width: 68, color: '#64748b', fontSize: 11.5, fontWeight: 500, flexShrink: 0 }}>Stay</Typography>
-                        <Divider orientation="vertical" flexItem sx={{ mx: 1, borderColor: '#e2e8f0', height: 14 }} />
-                        <Typography sx={{ color: '#0f172a', fontSize: 11.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {displayStay}
+                    {/* Cutoff Time Section */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <AccessTimeIcon sx={{ color: isExpired ? '#94a3b8' : '#f97316', fontSize: { xs: 24, sm: 28 } }} />
+                        <Typography
+                            sx={{
+                                fontSize: { xs: '1.05rem', sm: '1.2rem' },
+                                fontWeight: 800,
+                                color: isExpired ? '#64748b' : '#0b1e36',
+                                letterSpacing: '0.5px'
+                            }}
+                        >
+                            {cutoffLabel}
                         </Typography>
                     </Box>
                 </Box>
 
-                {/* Coupon Code Dashed Box */}
+                {/* Bottom Bar: Coupon Code + QR Trigger + Participant Info */}
                 <Box
                     sx={{
-                        p: 1.25,
-                        px: 1.5,
-                        borderRadius: '12px',
-                        border: '1.5px dashed #cbd5e1',
-                        bgcolor: '#ffffff',
-                        mb: 1.5
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        mt: 1.5,
+                        pt: 1,
+                        borderTop: '1px dashed #e2e8f0',
+                        flexWrap: 'wrap',
+                        gap: 1
                     }}
                 >
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Typography sx={{ fontSize: 10, fontWeight: 700, color: '#64748b', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
-                            COUPON CODE
-                        </Typography>
-                        <Tooltip title="Copy Code">
-                            <IconButton size="small" onClick={() => onCopy(token.code)} sx={{ p: 0.25 }}>
-                                <ContentCopyIcon sx={{ fontSize: 16, color: '#64748b' }} />
-                            </IconButton>
-                        </Tooltip>
-                    </Box>
-                    <Typography
+                    {/* Coupon Code Pill */}
+                    <Tooltip title="Click to copy coupon code">
+                        <Box
+                            onClick={() => onCopy(token.code)}
+                            sx={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 0.75,
+                                px: 1.2,
+                                py: 0.35,
+                                bgcolor: '#fff7ed',
+                                borderRadius: '8px',
+                                border: '1px solid #fed7aa',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease',
+                                '&:hover': { bgcolor: '#ffedd5', borderColor: '#f97316' }
+                            }}
+                        >
+                            <Typography sx={{ fontSize: 10.5, fontWeight: 700, color: '#9a3412', letterSpacing: '0.5px' }}>
+                                CODE:
+                            </Typography>
+                            <Typography sx={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 800, color: '#ea580c', letterSpacing: '1px' }}>
+                                {token.code}
+                            </Typography>
+                            <ContentCopyIcon sx={{ fontSize: 13, color: '#9a3412' }} />
+                        </Box>
+                    </Tooltip>
+
+                    {/* Participant Name & Team preview */}
+                    <Typography sx={{ fontSize: 11.5, color: '#64748b', fontWeight: 600, display: { xs: 'none', md: 'block' } }}>
+                        {displaySubtitle}
+                    </Typography>
+
+                    {/* Show QR & Details Button */}
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => onOpenDetails(token)}
+                        startIcon={<QrCode2Icon sx={{ fontSize: 16 }} />}
                         sx={{
-                            fontFamily: 'monospace',
-                            fontSize: 19,
-                            fontWeight: 800,
-                            color: isExpired ? '#94a3b8' : (isRedeemed ? '#64748b' : '#ea580c'),
-                            letterSpacing: '2.5px',
-                            textDecoration: isExpired ? 'line-through' : 'none',
-                            mt: 0.25
+                            textTransform: 'none',
+                            borderRadius: '8px',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            borderColor: '#fdba74',
+                            color: '#c2410c',
+                            py: 0.3,
+                            px: 1.25,
+                            bgcolor: '#ffffff',
+                            '&:hover': { borderColor: '#ea580c', bgcolor: '#fff7ed' }
                         }}
                     >
-                        {token.code}
-                    </Typography>
+                        QR & Details
+                    </Button>
                 </Box>
-
-                {/* Timestamps Footer (Issued On & Cutoff Time) */}
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-                    {/* Issued On */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                        <Box
-                            sx={{
-                                width: 30,
-                                height: 30,
-                                borderRadius: '8px',
-                                bgcolor: '#eff6ff',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: '#3b82f6',
-                                flexShrink: 0
-                            }}
-                        >
-                            <CalendarMonthIcon sx={{ fontSize: 17 }} />
-                        </Box>
-                        <Box>
-                            <Typography sx={{ fontSize: 9.5, color: '#64748b', fontWeight: 500, lineHeight: 1.1 }}>Issued</Typography>
-                            <Typography sx={{ fontSize: 11.5, color: '#0f172a', fontWeight: 700, lineHeight: 1.2 }}>
-                                {formatDateDDMMYYYY(token.issuedAt)}
-                            </Typography>
-                        </Box>
-                    </Box>
-
-                    <Divider orientation="vertical" flexItem sx={{ borderColor: '#e2e8f0', height: 24 }} />
-
-                    {/* Cutoff Time */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                        <Box
-                            sx={{
-                                width: 30,
-                                height: 30,
-                                borderRadius: '8px',
-                                bgcolor: '#fff7ed',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: '#ea580c',
-                                flexShrink: 0
-                            }}
-                        >
-                            <AccessTimeIcon sx={{ fontSize: 17 }} />
-                        </Box>
-                        <Box>
-                            <Typography sx={{ fontSize: 9.5, color: '#64748b', fontWeight: 500, lineHeight: 1.1 }}>Cutoff</Typography>
-                            <Typography sx={{ fontSize: 11.5, color: '#0f172a', fontWeight: 700, lineHeight: 1.2 }}>
-                                {cutoffLabel}
-                            </Typography>
-                        </Box>
-                    </Box>
-                </Box>
-            </Box>
-
-            {/* Perforation Horizontal Divider Line with Cutout Notches */}
-            <Box
-                sx={{
-                    position: 'relative',
-                    width: '100%',
-                    borderTop: '2px dashed #cbd5e1',
-                    my: 0.5,
-                    '&::before': {
-                        content: '""',
-                        position: 'absolute',
-                        left: '-12px',
-                        top: '-11px',
-                        width: '22px',
-                        height: '22px',
-                        borderRadius: '50%',
-                        bgcolor: '#faf6f3',
-                        border: '1.5px solid #fed7aa',
-                        zIndex: 2
-                    },
-                    '&::after': {
-                        content: '""',
-                        position: 'absolute',
-                        right: '-12px',
-                        top: '-11px',
-                        width: '22px',
-                        height: '22px',
-                        borderRadius: '50%',
-                        bgcolor: '#faf6f3',
-                        border: '1.5px solid #fed7aa',
-                        zIndex: 2
-                    }
-                }}
-            />
-
-            {/* Bottom Stub Section: Thermal Ticket Stub / QR Code */}
-            <Box
-                sx={{
-                    p: 2,
-                    pt: 1.5,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    textAlign: 'center',
-                    position: 'relative',
-                    bgcolor: '#fafbfc'
-                }}
-            >
-                {/* Organization & Event Header */}
-                <Typography sx={{ fontSize: '0.82rem', fontWeight: 800, color: '#0f172a', letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-                    ADITYA UNIVERSITY
-                </Typography>
-                <Typography sx={{ fontSize: '0.68rem', color: '#64748b', fontWeight: 500, mt: 0.25, maxWidth: 220 }}>
-                    {token.eventName || 'South Zone Inter-University Chess Tournament'}
-                </Typography>
-
-                {/* Chess Icon Divider */}
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '70%', my: 1, gap: 1 }}>
-                    <Box sx={{ flex: 1, height: '1px', bgcolor: '#b45309', opacity: 0.35 }} />
-                    <span style={{ fontSize: '13px', color: '#b45309', userSelect: 'none' }}>♟</span>
-                    <Box sx={{ flex: 1, height: '1px', bgcolor: '#b45309', opacity: 0.35 }} />
-                </Box>
-
-                {/* Food Token Meal Title */}
-                <Typography sx={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '2px', color: '#64748b', textTransform: 'uppercase' }}>
-                    F O O D   T O K E N
-                </Typography>
-                <Typography sx={{ fontSize: '1.3rem', fontWeight: 900, color: '#ea580c', letterSpacing: '0.75px', lineHeight: 1.2, mt: 0.25 }}>
-                    {(token.mealType || '').toUpperCase()}
-                </Typography>
-                <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#475569', mt: 0.25 }}>
-                    {formatDateDDMMYYYY(token.mealDate)}
-                </Typography>
-
-                {/* QR Code Container */}
-                <Box
-                    sx={{
-                        p: 0.75,
-                        mt: 1,
-                        mb: 0.75,
-                        bgcolor: '#ffffff',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '12px',
-                        display: 'inline-flex',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-                    }}
-                >
-                    {qrUrl ? (
-                        <img
-                            src={qrUrl}
-                            alt={`QR for ${token.code}`}
-                            style={{ width: 115, height: 115, display: 'block', borderRadius: '6px' }}
-                        />
-                    ) : (
-                        <Box sx={{ width: 115, height: 115, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <CircularProgress size={20} sx={{ color: '#ea580c' }} />
-                        </Box>
-                    )}
-                </Box>
-
-                {/* Spaced Monospace Code */}
-                <Typography
-                    sx={{
-                        fontFamily: 'monospace',
-                        fontSize: 13.5,
-                        fontWeight: 800,
-                        color: isExpired ? '#94a3b8' : '#0f172a',
-                        letterSpacing: '2.5px',
-                        mb: 0.75
-                    }}
-                >
-                    {token.code.split('').join(' ')}
-                </Typography>
-
-                {/* Valid for One-time Use Badge */}
-                <Box
-                    sx={{
-                        bgcolor: '#fef3c7',
-                        px: 1.5,
-                        py: 0.35,
-                        borderRadius: '50px',
-                        border: '1px solid #fde68a'
-                    }}
-                >
-                    <Typography sx={{ fontSize: '0.62rem', fontWeight: 800, color: '#b45309', letterSpacing: '0.5px' }}>
-                        VALID FOR ONE-TIME USE ONLY
-                    </Typography>
-                </Box>
-
-                {/* Printed Timestamp */}
-                <Typography sx={{ fontSize: '0.65rem', color: '#94a3b8', mt: 1 }}>
-                    Printed: {formatTime(token.lastPrintedAt || token.issuedAt)}
-                </Typography>
             </Box>
         </Card>
     );
@@ -419,6 +361,7 @@ const FoodTokenDetails = ({ onBack }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [qrMap, setQrMap] = useState({});
+    const [detailsToken, setDetailsToken] = useState(null);
     const [, setTick] = useState(0);
 
     // Re-check expiry every 30 seconds so tokens disappear in real time when cutoff passes
@@ -454,10 +397,10 @@ const FoodTokenDetails = ({ onBack }) => {
             for (const token of data.tokens) {
                 try {
                     map[token.code] = await QRCode.toDataURL(token.code, {
-                        width: 200,
+                        width: 240,
                         margin: 1,
                         color: {
-                            dark: '#0f172a',
+                            dark: '#0b1e36',
                             light: '#ffffff'
                         }
                     });
@@ -473,7 +416,7 @@ const FoodTokenDetails = ({ onBack }) => {
     const handleCopy = (code) => {
         if (!code) return;
         navigator.clipboard.writeText(code);
-        toast.success(`Copied code ${code} to clipboard`);
+        toast.success(`Copied coupon code ${code} to clipboard`);
     };
 
     if (loading) {
@@ -495,10 +438,10 @@ const FoodTokenDetails = ({ onBack }) => {
         );
     }
 
-    const allTokens = data?.tokens || [];
+    const allTokens = (data?.tokens || []).filter(t => t.mealType !== 'Snacks');
 
     // Filter tokens by expiration cutoff time:
-    // Breakfast: 10:00 AM, Lunch: 2:00 PM, Snacks: 6:00 PM, Dinner: 9:00 PM
+    // Breakfast: 11:00 AM, Lunch: 3:00 PM, Dinner: 10:00 PM
     const activeTokens = allTokens.filter(t => {
         const expired = t.isExpired || isMealTokenExpired(t.mealDate, t.mealType);
         return !expired && t.status !== 'CANCELLED';
@@ -523,7 +466,7 @@ const FoodTokenDetails = ({ onBack }) => {
                     <Box>
                         <Typography variant="h5" fontWeight="bold" color="#1e293b">Food Tokens &amp; Coupons</Typography>
                         <Typography variant="body2" color="#64748b">
-                            Your issued meal coupons and QR codes for dining
+                            Your issued meal coupons and vouchers for dining
                         </Typography>
                     </Box>
                 </Box>
@@ -604,11 +547,11 @@ const FoodTokenDetails = ({ onBack }) => {
                     Meal Expiration Schedule:
                 </Typography>
                 <Typography variant="caption" sx={{ color: '#1e40af' }}>
-                    Breakfast: <strong>10:00 AM</strong> &bull; Lunch: <strong>2:00 PM</strong> &bull; Snacks: <strong>6:00 PM</strong> &bull; Dinner: <strong>9:00 PM</strong>. Coupons expire automatically after cutoff.
+                    Breakfast: <strong>11:00 AM</strong> &bull; Lunch: <strong>3:00 PM</strong> &bull; Dinner: <strong>10:00 PM</strong>. Coupons expire automatically after cutoff.
                 </Typography>
             </Box>
 
-            {/* Active Tokens List / Grid (4 coupons in 1 row in desktop view) */}
+            {/* Active Tokens List / Grid (2 wide tickets in 1 row in desktop view) */}
             {activeTokens.length === 0 ? (
                 <Card sx={{ borderRadius: 3, p: 6, textAlign: 'center', border: '1px dashed #cbd5e1', bgcolor: '#f8fafc' }}>
                     <Box sx={{ mb: 2, color: '#94a3b8' }}>
@@ -633,11 +576,11 @@ const FoodTokenDetails = ({ onBack }) => {
                             display: 'grid',
                             gridTemplateColumns: {
                                 xs: '1fr',
-                                sm: 'repeat(2, 1fr)',
+                                sm: '1fr',
                                 md: 'repeat(2, 1fr)',
-                                lg: 'repeat(4, 1fr)'
+                                xl: 'repeat(2, 1fr)'
                             },
-                            gap: 2.5,
+                            gap: 3,
                             width: '100%'
                         }}
                     >
@@ -645,17 +588,17 @@ const FoodTokenDetails = ({ onBack }) => {
                             <MealCouponCard
                                 key={token.id || token.code}
                                 token={token}
-                                qrUrl={qrMap[token.code]}
                                 onCopy={handleCopy}
                                 globalUser={data?.userName}
                                 globalTeam={data?.teamOrSport}
+                                onOpenDetails={setDetailsToken}
                             />
                         ))}
                     </Box>
                 </Box>
             )}
 
-            {/* Expired / Past Coupons Collapsible Accordion (4 coupons in 1 row) */}
+            {/* Expired / Past Coupons Collapsible Accordion */}
             {expiredTokens.length > 0 && (
                 <Accordion
                     defaultExpanded={false}
@@ -691,11 +634,11 @@ const FoodTokenDetails = ({ onBack }) => {
                                 display: 'grid',
                                 gridTemplateColumns: {
                                     xs: '1fr',
-                                    sm: 'repeat(2, 1fr)',
+                                    sm: '1fr',
                                     md: 'repeat(2, 1fr)',
-                                    lg: 'repeat(4, 1fr)'
+                                    xl: 'repeat(2, 1fr)'
                                 },
-                                gap: 2.5,
+                                gap: 3,
                                 width: '100%'
                             }}
                         >
@@ -703,16 +646,129 @@ const FoodTokenDetails = ({ onBack }) => {
                                 <MealCouponCard
                                     key={token.id || token.code}
                                     token={token}
-                                    qrUrl={qrMap[token.code]}
                                     onCopy={handleCopy}
                                     globalUser={data?.userName}
                                     globalTeam={data?.teamOrSport}
+                                    onOpenDetails={setDetailsToken}
                                 />
                             ))}
                         </Box>
                     </AccordionDetails>
                 </Accordion>
             )}
+
+            {/* QR Code & Token Details Dialog */}
+            <Dialog
+                open={Boolean(detailsToken)}
+                onClose={() => setDetailsToken(null)}
+                maxWidth="xs"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        borderRadius: '20px',
+                        p: 1,
+                        overflow: 'hidden'
+                    }
+                }}
+            >
+                {detailsToken && (
+                    <>
+                        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
+                            <Box>
+                                <Typography sx={{ fontSize: '1.25rem', fontWeight: 900, color: '#0b1e36', textTransform: 'uppercase', lineHeight: 1.2 }}>
+                                    {detailsToken.mealType} Coupon
+                                </Typography>
+                                <Typography sx={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>
+                                    {formatTicketDate(detailsToken.mealDate)} • {getMealExpiryCutoffLabel(detailsToken.mealType)}
+                                </Typography>
+                            </Box>
+                            <IconButton onClick={() => setDetailsToken(null)} size="small" sx={{ color: '#94a3b8' }}>
+                                <CloseIcon />
+                            </IconButton>
+                        </DialogTitle>
+
+                        <DialogContent sx={{ textAlign: 'center', pt: 1, pb: 2 }}>
+                            {/* QR Code */}
+                            <Box
+                                sx={{
+                                    p: 1.5,
+                                    bgcolor: '#ffffff',
+                                    border: '2px solid #fed7aa',
+                                    borderRadius: '16px',
+                                    display: 'inline-flex',
+                                    boxShadow: '0 4px 16px rgba(249, 115, 22, 0.1)',
+                                    mb: 2
+                                }}
+                            >
+                                {qrMap[detailsToken.code] ? (
+                                    <img
+                                        src={qrMap[detailsToken.code]}
+                                        alt={`QR for ${detailsToken.code}`}
+                                        style={{ width: 180, height: 180, display: 'block', borderRadius: '8px' }}
+                                    />
+                                ) : (
+                                    <Box sx={{ width: 180, height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <CircularProgress size={30} sx={{ color: '#ea580c' }} />
+                                    </Box>
+                                )}
+                            </Box>
+
+                            {/* Coupon Code Pill */}
+                            <Box
+                                onClick={() => handleCopy(detailsToken.code)}
+                                sx={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: 1,
+                                    px: 2,
+                                    py: 0.75,
+                                    bgcolor: '#fff7ed',
+                                    borderRadius: '12px',
+                                    border: '1.5px dashed #ea580c',
+                                    cursor: 'pointer',
+                                    mb: 2,
+                                    '&:hover': { bgcolor: '#ffedd5' }
+                                }}
+                            >
+                                <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#9a3412', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                                    CODE:
+                                </Typography>
+                                <Typography sx={{ fontFamily: 'monospace', fontSize: 18, fontWeight: 900, color: '#ea580c', letterSpacing: '2px' }}>
+                                    {detailsToken.code}
+                                </Typography>
+                                <ContentCopyIcon sx={{ fontSize: 16, color: '#9a3412' }} />
+                            </Box>
+
+                            {/* Details Card */}
+                            <Box sx={{ bgcolor: '#f8fafc', borderRadius: '12px', p: 1.5, textAlign: 'left', border: '1px solid #e2e8f0' }}>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5 }}>
+                                    <Typography sx={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>Participant:</Typography>
+                                    <Typography sx={{ fontSize: 12, color: '#0f172a', fontWeight: 800 }}>{detailsToken.name || data?.userName || 'Participant'}</Typography>
+                                </Box>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5 }}>
+                                    <Typography sx={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>ID / Mobile:</Typography>
+                                    <Typography sx={{ fontSize: 12, color: '#0f172a', fontWeight: 800 }}>{detailsToken.identifier || '—'}</Typography>
+                                </Box>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5 }}>
+                                    <Typography sx={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>University / Team:</Typography>
+                                    <Typography sx={{ fontSize: 12, color: '#0f172a', fontWeight: 800 }}>{detailsToken.teamOrSport || data?.teamOrSport || '—'}</Typography>
+                                </Box>
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 0.5 }}>
+                                    <Typography sx={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>Hostel Stay:</Typography>
+                                    <Typography sx={{ fontSize: 12, color: '#0f172a', fontWeight: 800 }}>
+                                        {detailsToken.stay || [detailsToken.block, detailsToken.room ? `Room ${detailsToken.room}` : ''].filter(Boolean).join(' - ') || 'Not Allocated'}
+                                    </Typography>
+                                </Box>
+                            </Box>
+
+                            <Typography sx={{ fontSize: 11, color: '#94a3b8', mt: 1.5 }}>
+                                Aditya University • South Zone Inter-University Chess Tournament
+                            </Typography>
+                        </DialogContent>
+                    </>
+                )}
+            </Dialog>
         </Box>
     );
 };

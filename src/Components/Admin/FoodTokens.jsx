@@ -46,7 +46,6 @@ import PersonIcon from '@mui/icons-material/Person';
 import DownloadIcon from '@mui/icons-material/Download';
 import WbSunnyOutlinedIcon from '@mui/icons-material/WbSunnyOutlined';
 import RestaurantOutlinedIcon from '@mui/icons-material/RestaurantOutlined';
-import CoffeeOutlinedIcon from '@mui/icons-material/CoffeeOutlined';
 import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined';
 import io from 'socket.io-client';
 import { toast } from 'sonner';
@@ -159,11 +158,6 @@ const MEAL_CONFIG = {
         icon: RestaurantOutlinedIcon,
         bgColor: '#dcfce7',
         iconColor: '#16a34a'
-    },
-    'Snacks': {
-        icon: CoffeeOutlinedIcon,
-        bgColor: '#f3e8ff',
-        iconColor: '#9333ea'
     },
     'Dinner': {
         icon: DarkModeOutlinedIcon,
@@ -1633,7 +1627,7 @@ const FoodTokens = () => {
 
                     {/* Breakdown by Meal Type (Dashboard Style) */}
                     {stats?.byMeal && (
-                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 2, mb: 3, width: '100%' }}>
+                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 2, mb: 3, width: '100%' }}>
                             {[
                                 {
                                     mealKey: 'Breakfast',
@@ -1666,22 +1660,6 @@ const FoodTokens = () => {
                                     hoverBorder: '#a7f3d0',
                                     badgeBg: '#ecfdf5',
                                     badgeColor: '#047857'
-                                },
-                                {
-                                    mealKey: 'Snacks',
-                                    title: 'SNACKS',
-                                    count: stats.byMeal?.['Snacks']?.issued || 0,
-                                    subtitle: 'Evening Refreshments',
-                                    badge: 'Evening',
-                                    icon: <CoffeeOutlinedIcon sx={{ fontSize: 26, color: '#ffffff' }} />,
-                                    bgIcon: <CoffeeOutlinedIcon sx={{ fontSize: 90, color: '#d06c38' }} />,
-                                    gradient: 'linear-gradient(135deg, #d06c38 0%, #ea580c 100%)',
-                                    shadow: 'rgba(208, 108, 56, 0.22)',
-                                    bgGradient: 'linear-gradient(145deg, #ffffff 0%, #fffbf7 100%)',
-                                    borderColor: '#e2e8f0',
-                                    hoverBorder: '#fed7aa',
-                                    badgeBg: '#fff7ed',
-                                    badgeColor: '#c2410c'
                                 },
                                 {
                                     mealKey: 'Dinner',

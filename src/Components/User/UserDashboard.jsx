@@ -21,6 +21,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import CloseIcon from '@mui/icons-material/Close';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
+import InfoIcon from '@mui/icons-material/Info';
 import AccommodationDetails from './AccommodationDetails';
 import FoodTokenDetails from './FoodTokenDetails';
 import { getCurrentUser, updateUserSession } from '../../utils/auth';
@@ -473,17 +474,21 @@ const UserDashboard = () => {
                                                 }}
                                             />
                                         </Box>
-                                        <Box sx={{ flexGrow: 1, position: 'relative' }}>
-                                            <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 0.5 }}>
-                                                <Typography variant="h3" fontWeight="bold" color="#f97316">{availableFtCount}</Typography>
-                                                <Typography variant="subtitle1" fontWeight="600" color="#64748b">Available</Typography>
+                                        <Box sx={{ flexGrow: 1 }}>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                                <Box>
+                                                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 0.5 }}>
+                                                        <Typography variant="h3" fontWeight="bold" color="#f97316">{availableFtCount}</Typography>
+                                                        <Typography variant="subtitle1" fontWeight="600" color="#64748b">Available</Typography>
+                                                    </Box>
+                                                    <Typography variant="body2" color="#64748b">{ft.used || 0} Used of {totalActiveFt || 0}</Typography>
+                                                </Box>
+                                                <Box sx={{ width: 50, height: 50, borderRadius: '50%', bgcolor: '#e0f2fe', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', flexShrink: 0, ml: 1.5 }}>
+                                                    <Typography variant="caption" fontWeight="bold" color="#0369a1" sx={{ lineHeight: 1 }}>{usedPercent}%</Typography>
+                                                    <Typography sx={{ fontSize: '10px', color: '#0369a1', lineHeight: 1, mt: 0.5 }}>Used</Typography>
+                                                </Box>
                                             </Box>
-                                            <Typography variant="body2" color="#64748b" sx={{ mb: 2 }}>{ft.used || 0} Used of {totalActiveFt || 0}</Typography>
                                             <LinearProgress variant="determinate" value={usedPercent} sx={{ height: 8, borderRadius: 4, bgcolor: '#e2e8f0', '& .MuiLinearProgress-bar': { bgcolor: '#f97316', borderRadius: 4 } }} />
-                                            <Box sx={{ position: 'absolute', right: 0, top: '20%', width: 50, height: 50, borderRadius: '50%', bgcolor: '#e0f2fe', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-                                                <Typography variant="caption" fontWeight="bold" color="#0369a1" sx={{ lineHeight: 1 }}>{usedPercent}%</Typography>
-                                                <Typography sx={{ fontSize: '10px', color: '#0369a1', lineHeight: 1, mt: 0.5 }}>Used</Typography>
-                                            </Box>
                                         </Box>
                                         <Button
                                             variant="contained"
@@ -502,17 +507,28 @@ const UserDashboard = () => {
                                                 <Avatar sx={{ bgcolor: '#22c55e', width: 48, height: 48, borderRadius: 2 }}>
                                                     <AccountBalanceWalletIcon />
                                                 </Avatar>
-                                                <Typography variant="h6" fontWeight="bold" color="#1e293b">Caution Deposit</Typography>
+                                                <Typography variant="h6" fontWeight="bold" color="#1e293b">
+                                                    {(dashData?.userType === 'coach' || user?.role === 'coach') ? 'Coach Caution Deposit' : 'Caution Deposit'}
+                                                </Typography>
                                             </Box>
                                             <Chip
-                                                icon={<AccessTimeIcon sx={{ fontSize: '16px !important' }} />}
+                                                icon={
+                                                    cd.refundStatus === 'Refunded' ? (
+                                                        <CheckCircleIcon sx={{ fontSize: '16px !important', color: '#166534 !important' }} />
+                                                    ) : (
+                                                        <AccessTimeIcon sx={{ fontSize: '16px !important', color: cd.refundStatus === 'Refund Pending' ? '#b45309 !important' : '#64748b !important' }} />
+                                                    )
+                                                }
                                                 label={cd.refundStatus || 'N/A'}
                                                 size="small"
                                                 sx={{
-                                                    bgcolor: cd.refundStatus === 'Refund Pending' ? '#fef3c7' : '#f1f5f9',
-                                                    color: cd.refundStatus === 'Refund Pending' ? '#b45309' : '#64748b',
+                                                    bgcolor: cd.refundStatus === 'Refunded' ? '#dcfce7' : (cd.refundStatus === 'Refund Pending' ? '#fef3c7' : '#f1f5f9'),
+                                                    color: cd.refundStatus === 'Refunded' ? '#166534' : (cd.refundStatus === 'Refund Pending' ? '#b45309' : '#64748b'),
                                                     fontWeight: 600,
-                                                    '& .MuiChip-icon': { color: cd.refundStatus === 'Refund Pending' ? '#b45309' : '#64748b' }
+                                                    border: cd.refundStatus === 'Refunded' ? '1px solid #86efac' : (cd.refundStatus === 'Refund Pending' ? '1px solid #fde68a' : 'none'),
+                                                    '& .MuiChip-icon': {
+                                                        color: cd.refundStatus === 'Refunded' ? '#166534' : (cd.refundStatus === 'Refund Pending' ? '#b45309' : '#64748b')
+                                                    }
                                                 }}
                                             />
                                         </Box>
@@ -521,10 +537,45 @@ const UserDashboard = () => {
                                                 <Typography variant="h3" fontWeight="bold" color="#16a34a">₹{cd.amount?.toLocaleString('en-IN') || 0}</Typography>
                                                 <Typography variant="subtitle1" fontWeight="600" color="#16a34a">{cd.paid ? 'Paid' : 'Unpaid'}</Typography>
                                             </Box>
+                                            {cd.paid && cd.paidBy && (
+                                                <Typography variant="body2" color="#64748b" sx={{ mb: 1 }}>
+                                                    Paid by <span style={{ fontWeight: 600, color: '#1e293b', marginLeft: '4px' }}>{cd.paidBy}</span>
+                                                </Typography>
+                                            )}
                                             <Typography variant="body2" color="#64748b" sx={{ mb: 2 }}>
                                                 Total Deposit <span style={{ fontWeight: 600, color: '#1e293b', marginLeft: '4px' }}>₹{cd.amount?.toLocaleString('en-IN') || 0}</span>
                                             </Typography>
                                             <Divider sx={{ my: 2 }} />
+
+                                            {/* Refund Information below the line */}
+                                            <Box sx={{
+                                                bgcolor: '#ffffff',
+                                                p: 1.75,
+                                                borderRadius: 2,
+                                                border: '1px solid #bbf7d0',
+                                                boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                                                display: 'flex',
+                                                alignItems: 'flex-start',
+                                                gap: 1.25
+                                            }}>
+                                                <InfoIcon sx={{ fontSize: 20, color: '#16a34a', mt: 0.2, flexShrink: 0 }} />
+                                                <Box>
+                                                    <Typography variant="subtitle2" fontWeight="700" color="#166534" sx={{ mb: 0.5 }}>
+                                                        Refund Information
+                                                    </Typography>
+                                                    <Typography variant="body2" color="#334155" sx={{ fontSize: '0.84rem', lineHeight: 1.55 }}>
+                                                        {cd.refundStatus === 'Refunded' ? (
+                                                            <>
+                                                                Caution deposit of <strong>₹{cd.amount?.toLocaleString('en-IN') || '2,000'}</strong> has been <strong>successfully refunded</strong>{(dashData?.userType === 'coach' || user?.role === 'coach') ? ' to Coach.' : ' to your university representative.'}
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                This {(dashData?.userType === 'coach' || user?.role === 'coach') ? 'coach ' : ''}caution deposit is <strong>100% refundable</strong>. Money will be refunded at the time of <strong>vacating the hostel room and returning keys</strong>, subject to room clearance and no property damage.
+                                                            </>
+                                                        )}
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
                                         </Box>
                                     </Box>
                                 </Box>
