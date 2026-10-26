@@ -71,193 +71,344 @@ const formatTicketDate = (dateVal) => {
 };
 
 /**
- * Authentic Vintage Food Voucher Ticket
- * Matches the requested horizontal ticket layout (Orange Cloche Stub + Cream Body + Date & Time)
+ * Meal theme styling based on brand CSS variables:
+ * - Breakfast: --color-orange: #d06c38
+ * - Lunch:     --color-blue:   #0b5299
+ * - Dinner:    --color-gold:   #BE9337
  */
-const MealCouponCard = ({ token, onCopy, globalUser, globalTeam, onOpenDetails }) => {
+const MEAL_THEMES = {
+    breakfast: {
+        primary: '#d06c38',
+        gradient: 'linear-gradient(145deg, #e07d47 0%, #d06c38 100%)',
+        border: '#fed7aa',
+        shadow: 'rgba(208, 108, 56, 0.18)'
+    },
+    lunch: {
+        primary: '#0b5299',
+        gradient: 'linear-gradient(145deg, #186bbd 0%, #0b5299 100%)',
+        border: '#bfdbfe',
+        shadow: 'rgba(11, 82, 153, 0.18)'
+    },
+    dinner: {
+        primary: '#BE9337',
+        gradient: 'linear-gradient(145deg, #d4a748 0%, #BE9337 100%)',
+        border: '#fde68a',
+        shadow: 'rgba(190, 147, 55, 0.20)'
+    }
+};
+
+const getMealTheme = (mealType) => {
+    const key = (mealType || '').trim().toLowerCase();
+    if (key.includes('breakfast')) return MEAL_THEMES.breakfast;
+    if (key.includes('lunch')) return MEAL_THEMES.lunch;
+    if (key.includes('dinner')) return MEAL_THEMES.dinner;
+    return MEAL_THEMES.breakfast;
+};
+
+/**
+ * Custom sort order: Breakfast (1) -> Lunch (2) -> Dinner (3)
+ */
+const MEAL_ORDER = {
+    breakfast: 1,
+    lunch: 2,
+    dinner: 3
+};
+
+const getMealOrder = (mealType) => {
+    const key = (mealType || '').trim().toLowerCase();
+    return MEAL_ORDER[key] || 99;
+};
+
+const sortTokens = (tokensList) => {
+    return [...tokensList].sort((a, b) => {
+        const dateA = a.mealDate || '';
+        const dateB = b.mealDate || '';
+        if (dateA !== dateB) return dateA.localeCompare(dateB);
+        return getMealOrder(a.mealType) - getMealOrder(b.mealType);
+    });
+};
+
+/**
+ * Authentic Vintage Food Voucher Ticket
+ * Matches the requested horizontal ticket layout (Stub + Cream Body + Date & Time)
+ */
+const MealCouponCard = ({ token, onOpenDetails }) => {
     const isRedeemed = token.status === 'REDEEMED' || token.rawStatus === 'REDEEMED';
     const isExpired = token.isExpired || token.status === 'EXPIRED';
     const cutoffLabel = getMealExpiryCutoffLabel(token.mealType);
-
-    const displayName = token.name || globalUser || 'Participant';
-    const displayTeam = token.teamOrSport || globalTeam || '';
-    const displaySubtitle = [displayName, displayTeam].filter(Boolean).join(' • ');
+    const theme = getMealTheme(token.mealType);
 
     return (
         <Card
+            onClick={() => onOpenDetails && onOpenDetails(token)}
             sx={{
                 width: '100%',
                 borderRadius: '16px',
-                border: isExpired ? '1.5px solid #e2e8f0' : (isRedeemed ? '1.5px solid #cbd5e1' : '1.5px solid #fed7aa'),
+                border: isExpired ? '1.5px solid #e2e8f0' : (isRedeemed ? '1.5px solid #cbd5e1' : `1.5px solid ${theme.border}`),
                 bgcolor: '#fdfbf7', // warm cream vintage ticket paper
-                boxShadow: isExpired ? 'none' : '0 10px 25px -4px rgba(234, 88, 12, 0.12), 0 4px 10px -2px rgba(0, 0, 0, 0.04)',
+                boxShadow: isExpired ? 'none' : `0 8px 20px -4px ${theme.shadow}, 0 2px 6px -2px rgba(0, 0, 0, 0.04)`,
                 overflow: 'hidden',
                 position: 'relative',
                 display: 'flex',
-                flexDirection: { xs: 'column', sm: 'row' },
-                transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+                flexDirection: 'row',
+                alignItems: 'stretch',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
                 opacity: isExpired ? 0.75 : 1,
+                minHeight: { xs: 100, sm: 110 },
                 '&:hover': {
                     transform: isExpired ? 'none' : 'translateY(-3px)',
-                    boxShadow: isExpired ? 'none' : '0 14px 30px -4px rgba(234, 88, 12, 0.18)'
+                    boxShadow: isExpired ? 'none' : `0 12px 28px -4px ${theme.shadow}`,
+                    borderColor: isExpired ? '#cbd5e1' : theme.primary
                 }
             }}
         >
-            {/* Left Stub: Food Cloche with Orange Gradient */}
+            {/* Left Edge Middle Cutout Notch */}
             <Box
                 sx={{
-                    width: { xs: '100%', sm: '150px', md: '170px' },
-                    minWidth: { sm: '150px', md: '170px' },
+                    position: 'absolute',
+                    left: '-12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    bgcolor: '#faf6f3',
+                    border: isExpired ? '1.5px solid #e2e8f0' : `1.5px solid ${theme.border}`,
+                    zIndex: 3
+                }}
+            />
+
+            {/* Top-Left Corner Notch */}
+            <Box
+                sx={{
+                    position: 'absolute',
+                    left: '-10px',
+                    top: '-10px',
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '50%',
+                    bgcolor: '#faf6f3',
+                    border: isExpired ? '1.5px solid #e2e8f0' : `1.5px solid ${theme.border}`,
+                    zIndex: 3
+                }}
+            />
+
+            {/* Bottom-Left Corner Notch */}
+            <Box
+                sx={{
+                    position: 'absolute',
+                    left: '-10px',
+                    bottom: '-10px',
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '50%',
+                    bgcolor: '#faf6f3',
+                    border: isExpired ? '1.5px solid #e2e8f0' : `1.5px solid ${theme.border}`,
+                    zIndex: 3
+                }}
+            />
+
+            {/* Divider Top Notch */}
+            <Box
+                sx={{
+                    position: 'absolute',
+                    left: { xs: '84px', sm: '100px', md: '110px' },
+                    top: '-9px',
+                    transform: 'translateX(-50%)',
+                    width: '18px',
+                    height: '18px',
+                    borderRadius: '50%',
+                    bgcolor: '#faf6f3',
+                    border: isExpired ? '1.5px solid #e2e8f0' : `1.5px solid ${theme.border}`,
+                    zIndex: 3
+                }}
+            />
+
+            {/* Divider Bottom Notch */}
+            <Box
+                sx={{
+                    position: 'absolute',
+                    left: { xs: '84px', sm: '100px', md: '110px' },
+                    bottom: '-9px',
+                    transform: 'translateX(-50%)',
+                    width: '18px',
+                    height: '18px',
+                    borderRadius: '50%',
+                    bgcolor: '#faf6f3',
+                    border: isExpired ? '1.5px solid #e2e8f0' : `1.5px solid ${theme.border}`,
+                    zIndex: 3
+                }}
+            />
+
+            {/* Right Edge Middle Cutout Notch */}
+            <Box
+                sx={{
+                    position: 'absolute',
+                    right: '-12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    bgcolor: '#faf6f3',
+                    border: isExpired ? '1.5px solid #e2e8f0' : `1.5px solid ${theme.border}`,
+                    zIndex: 3
+                }}
+            />
+
+            {/* Top-Right Corner Notch */}
+            <Box
+                sx={{
+                    position: 'absolute',
+                    right: '-10px',
+                    top: '-10px',
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '50%',
+                    bgcolor: '#faf6f3',
+                    border: isExpired ? '1.5px solid #e2e8f0' : `1.5px solid ${theme.border}`,
+                    zIndex: 3
+                }}
+            />
+
+            {/* Bottom-Right Corner Notch */}
+            <Box
+                sx={{
+                    position: 'absolute',
+                    right: '-10px',
+                    bottom: '-10px',
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '50%',
+                    bgcolor: '#faf6f3',
+                    border: isExpired ? '1.5px solid #e2e8f0' : `1.5px solid ${theme.border}`,
+                    zIndex: 3
+                }}
+            />
+
+            {/* Right Perforation Dots Column */}
+            <Box
+                sx={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '12px',
+                    bottom: '12px',
+                    width: '6px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    pointerEvents: 'none',
+                    opacity: isExpired ? 0.35 : 0.6,
+                    zIndex: 2
+                }}
+            >
+                {[...Array(6)].map((_, i) => (
+                    <Box
+                        key={i}
+                        sx={{
+                            width: 5,
+                            height: 5,
+                            borderRadius: '50%',
+                            bgcolor: '#94a3b8'
+                        }}
+                    />
+                ))}
+            </Box>
+
+            {/* --- Left Stub with Cloche Icon --- */}
+            <Box
+                sx={{
+                    width: { xs: '84px', sm: '100px', md: '110px' },
+                    flexShrink: 0,
                     background: isExpired
-                        ? 'linear-gradient(135deg, #94a3b8 0%, #64748b 100%)'
-                        : isRedeemed
-                            ? 'linear-gradient(135deg, #64748b 0%, #475569 100%)'
-                            : 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                        ? 'linear-gradient(145deg, #94a3b8 0%, #64748b 100%)'
+                        : theme.gradient,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    p: { xs: 1, sm: 1.5 },
+                    position: 'relative'
+                }}
+            >
+                <FoodClocheIcon
+                    size={52}
+                    color="#ffffff"
+                />
+            </Box>
+
+            {/* Vertical Dashed Separation Line */}
+            <Box
+                sx={{
+                    width: 0,
+                    borderRight: isExpired ? '2px dashed #cbd5e1' : `2px dashed ${theme.primary}`,
+                    alignSelf: 'stretch',
+                    position: 'relative',
+                    zIndex: 1
+                }}
+            />
+
+            {/* --- Right Cream Body with Meal Name, Line, Date & Time --- */}
+            <Box
+                sx={{
+                    flex: 1,
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    p: { xs: 2.5, sm: 2 },
-                    position: 'relative',
-                    flexShrink: 0
+                    py: { xs: 1.75, sm: 2 },
+                    px: { xs: 1.5, sm: 2.5 },
+                    minWidth: 0,
+                    zIndex: 1
                 }}
             >
-                {/* Left Outer Semi-Circle Cutout Notch */}
+                {/* Meal Name - Big Bold Centered */}
+                <Typography
+                    sx={{
+                        fontSize: { xs: '1.5rem', sm: '1.85rem', md: '2.1rem' },
+                        fontWeight: 900,
+                        color: isExpired ? '#64748b' : '#081d39',
+                        letterSpacing: '1px',
+                        lineHeight: 1.1,
+                        textTransform: 'uppercase',
+                        textAlign: 'center',
+                        fontFamily: 'system-ui, -apple-system, sans-serif'
+                    }}
+                >
+                    {token.mealType}
+                </Typography>
+
+                {/* Thin Horizontal Underline */}
                 <Box
                     sx={{
-                        display: { xs: 'none', sm: 'block' },
-                        position: 'absolute',
-                        left: '-14px',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        width: '28px',
-                        height: '28px',
-                        borderRadius: '50%',
-                        bgcolor: '#faf6f3',
-                        border: '1.5px solid #fed7aa',
-                        zIndex: 3
+                        width: '88%',
+                        height: '2px',
+                        bgcolor: isExpired ? '#cbd5e1' : theme.primary,
+                        my: { xs: 1, sm: 1.25 }
                     }}
                 />
-
-                {/* Serving Dish Cloche with Steam */}
-                <FoodClocheIcon size={64} color="#ffffff" />
-            </Box>
-
-            {/* Vertical Perforation Divider with Top and Bottom Cutout Notches */}
-            <Box
-                sx={{
-                    display: { xs: 'none', sm: 'block' },
-                    position: 'relative',
-                    width: '0px',
-                    borderLeft: '2.5px dashed #ea580c',
-                    opacity: isExpired ? 0.35 : 0.7,
-                    alignSelf: 'stretch',
-                    zIndex: 2,
-                    '&::before': {
-                        content: '""',
-                        position: 'absolute',
-                        left: '-13px',
-                        top: '-14px',
-                        width: '24px',
-                        height: '24px',
-                        borderRadius: '50%',
-                        bgcolor: '#faf6f3',
-                        border: '1.5px solid #fed7aa',
-                        zIndex: 4
-                    },
-                    '&::after': {
-                        content: '""',
-                        position: 'absolute',
-                        left: '-13px',
-                        bottom: '-14px',
-                        width: '24px',
-                        height: '24px',
-                        borderRadius: '50%',
-                        bgcolor: '#faf6f3',
-                        border: '1.5px solid #fed7aa',
-                        zIndex: 4
-                    }
-                }}
-            />
-
-            {/* Right Main Ticket Area */}
-            <Box
-                sx={{
-                    flex: 1,
-                    p: { xs: 2, sm: 2.5 },
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center',
-                    position: 'relative',
-                    bgcolor: '#fdfbf7'
-                }}
-            >
-                {/* Right Outer Semi-Circle Cutout Notch */}
-                <Box
-                    sx={{
-                        display: { xs: 'none', sm: 'block' },
-                        position: 'absolute',
-                        right: '-14px',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        width: '28px',
-                        height: '28px',
-                        borderRadius: '50%',
-                        bgcolor: '#faf6f3',
-                        border: '1.5px solid #fed7aa',
-                        zIndex: 3
-                    }}
-                />
-
-                {/* Top Row: Big Bold Meal Name + Status Chip */}
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
-                    <Typography
-                        sx={{
-                            fontSize: { xs: '1.8rem', sm: '2.3rem' },
-                            fontWeight: 900,
-                            color: isExpired ? '#64748b' : '#0b1e36',
-                            letterSpacing: '1px',
-                            lineHeight: 1,
-                            textTransform: 'uppercase',
-                            fontFamily: 'system-ui, -apple-system, sans-serif'
-                        }}
-                    >
-                        {token.mealType}
-                    </Typography>
-
-                    {/* Status Chip */}
-                    {isExpired ? (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, bgcolor: '#fef2f2', px: 1.25, py: 0.4, borderRadius: '50px', border: '1px solid #fecaca' }}>
-                            <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: '#ef4444' }} />
-                            <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#b91c1c' }}>Expired</Typography>
-                        </Box>
-                    ) : isRedeemed ? (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, bgcolor: '#f1f5f9', px: 1.25, py: 0.4, borderRadius: '50px', border: '1px solid #cbd5e1' }}>
-                            <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: '#64748b' }} />
-                            <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#475569' }}>Redeemed</Typography>
-                        </Box>
-                    ) : (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, bgcolor: '#ecfdf5', px: 1.25, py: 0.4, borderRadius: '50px', border: '1px solid #a7f3d0' }}>
-                            <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: '#10b981' }} />
-                            <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#047857' }}>Ready</Typography>
-                        </Box>
-                    )}
-                </Box>
-
-                {/* Thin Orange Horizontal Underline */}
-                <Box sx={{ width: '100%', height: '2px', bgcolor: isExpired ? '#cbd5e1' : '#f97316', my: 1 }} />
 
                 {/* Info Row: Calendar Date | Clock Cutoff Time */}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1.5, sm: 2.5 }, mt: 0.5, flexWrap: 'wrap' }}>
+                <Box
+                    sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: { xs: 1, sm: 1.75 },
+                        flexWrap: 'nowrap'
+                    }}
+                >
                     {/* Date Section */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <CalendarMonthIcon sx={{ color: isExpired ? '#94a3b8' : '#f97316', fontSize: { xs: 24, sm: 28 } }} />
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 0.8 } }}>
+                        <CalendarMonthIcon sx={{ color: isExpired ? '#94a3b8' : theme.primary, fontSize: { xs: 20, sm: 24 } }} />
                         <Typography
                             sx={{
-                                fontSize: { xs: '1.05rem', sm: '1.2rem' },
+                                fontSize: { xs: '0.85rem', sm: '1rem', md: '1.05rem' },
                                 fontWeight: 800,
-                                color: isExpired ? '#64748b' : '#0b1e36',
-                                letterSpacing: '0.5px'
+                                color: isExpired ? '#64748b' : '#081d39',
+                                letterSpacing: '0.3px',
+                                whiteSpace: 'nowrap'
                             }}
                         >
                             {formatTicketDate(token.mealDate)}
@@ -265,91 +416,23 @@ const MealCouponCard = ({ token, onCopy, globalUser, globalTeam, onOpenDetails }
                     </Box>
 
                     {/* Vertical Separator | */}
-                    <Divider orientation="vertical" flexItem sx={{ borderColor: '#cbd5e1', height: 24, alignSelf: 'center' }} />
+                    <Divider orientation="vertical" flexItem sx={{ borderColor: '#cbd5e1', height: 18, alignSelf: 'center', mx: { xs: 0.25, sm: 0.5 } }} />
 
                     {/* Cutoff Time Section */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <AccessTimeIcon sx={{ color: isExpired ? '#94a3b8' : '#f97316', fontSize: { xs: 24, sm: 28 } }} />
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 0.8 } }}>
+                        <AccessTimeIcon sx={{ color: isExpired ? '#94a3b8' : theme.primary, fontSize: { xs: 20, sm: 24 } }} />
                         <Typography
                             sx={{
-                                fontSize: { xs: '1.05rem', sm: '1.2rem' },
+                                fontSize: { xs: '0.85rem', sm: '1rem', md: '1.05rem' },
                                 fontWeight: 800,
-                                color: isExpired ? '#64748b' : '#0b1e36',
-                                letterSpacing: '0.5px'
+                                color: isExpired ? '#64748b' : '#081d39',
+                                letterSpacing: '0.3px',
+                                whiteSpace: 'nowrap'
                             }}
                         >
                             {cutoffLabel}
                         </Typography>
                     </Box>
-                </Box>
-
-                {/* Bottom Bar: Coupon Code + QR Trigger + Participant Info */}
-                <Box
-                    sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        mt: 1.5,
-                        pt: 1,
-                        borderTop: '1px dashed #e2e8f0',
-                        flexWrap: 'wrap',
-                        gap: 1
-                    }}
-                >
-                    {/* Coupon Code Pill */}
-                    <Tooltip title="Click to copy coupon code">
-                        <Box
-                            onClick={() => onCopy(token.code)}
-                            sx={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 0.75,
-                                px: 1.2,
-                                py: 0.35,
-                                bgcolor: '#fff7ed',
-                                borderRadius: '8px',
-                                border: '1px solid #fed7aa',
-                                cursor: 'pointer',
-                                transition: 'all 0.15s ease',
-                                '&:hover': { bgcolor: '#ffedd5', borderColor: '#f97316' }
-                            }}
-                        >
-                            <Typography sx={{ fontSize: 10.5, fontWeight: 700, color: '#9a3412', letterSpacing: '0.5px' }}>
-                                CODE:
-                            </Typography>
-                            <Typography sx={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 800, color: '#ea580c', letterSpacing: '1px' }}>
-                                {token.code}
-                            </Typography>
-                            <ContentCopyIcon sx={{ fontSize: 13, color: '#9a3412' }} />
-                        </Box>
-                    </Tooltip>
-
-                    {/* Participant Name & Team preview */}
-                    <Typography sx={{ fontSize: 11.5, color: '#64748b', fontWeight: 600, display: { xs: 'none', md: 'block' } }}>
-                        {displaySubtitle}
-                    </Typography>
-
-                    {/* Show QR & Details Button */}
-                    <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={() => onOpenDetails(token)}
-                        startIcon={<QrCode2Icon sx={{ fontSize: 16 }} />}
-                        sx={{
-                            textTransform: 'none',
-                            borderRadius: '8px',
-                            fontSize: 11,
-                            fontWeight: 700,
-                            borderColor: '#fdba74',
-                            color: '#c2410c',
-                            py: 0.3,
-                            px: 1.25,
-                            bgcolor: '#ffffff',
-                            '&:hover': { borderColor: '#ea580c', bgcolor: '#fff7ed' }
-                        }}
-                    >
-                        QR & Details
-                    </Button>
                 </Box>
             </Box>
         </Card>
@@ -440,17 +523,16 @@ const FoodTokenDetails = ({ onBack }) => {
 
     const allTokens = (data?.tokens || []).filter(t => t.mealType !== 'Snacks');
 
-    // Filter tokens by expiration cutoff time:
-    // Breakfast: 11:00 AM, Lunch: 3:00 PM, Dinner: 10:00 PM
-    const activeTokens = allTokens.filter(t => {
+    // Filter tokens by expiration cutoff time and sort chronologically: Breakfast -> Lunch -> Dinner
+    const activeTokens = sortTokens(allTokens.filter(t => {
         const expired = t.isExpired || isMealTokenExpired(t.mealDate, t.mealType);
         return !expired && t.status !== 'CANCELLED';
-    });
+    }));
 
-    const expiredTokens = allTokens.filter(t => {
+    const expiredTokens = sortTokens(allTokens.filter(t => {
         const expired = t.isExpired || isMealTokenExpired(t.mealDate, t.mealType);
         return expired && t.status !== 'CANCELLED';
-    });
+    }));
 
     const availableCount = activeTokens.filter(t => t.status === 'ISSUED').length;
     const activeTotalCount = activeTokens.length;
@@ -576,11 +658,10 @@ const FoodTokenDetails = ({ onBack }) => {
                             display: 'grid',
                             gridTemplateColumns: {
                                 xs: '1fr',
-                                sm: '1fr',
-                                md: 'repeat(2, 1fr)',
-                                xl: 'repeat(2, 1fr)'
+                                sm: 'repeat(2, 1fr)',
+                                md: 'repeat(3, 1fr)'
                             },
-                            gap: 3,
+                            gap: 2,
                             width: '100%'
                         }}
                     >
@@ -634,11 +715,10 @@ const FoodTokenDetails = ({ onBack }) => {
                                 display: 'grid',
                                 gridTemplateColumns: {
                                     xs: '1fr',
-                                    sm: '1fr',
-                                    md: 'repeat(2, 1fr)',
-                                    xl: 'repeat(2, 1fr)'
+                                    sm: 'repeat(2, 1fr)',
+                                    md: 'repeat(3, 1fr)'
                                 },
-                                gap: 3,
+                                gap: 2,
                                 width: '100%'
                             }}
                         >

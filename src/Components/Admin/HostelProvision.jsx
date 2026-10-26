@@ -88,6 +88,7 @@ const HostelProvision = () => {
     const [bulkRoom, setBulkRoom] = useState('');
     const [bulkSelectedMemberIds, setBulkSelectedMemberIds] = useState([]);
     const [bulkSubmitting, setBulkSubmitting] = useState(false);
+    const [modalActiveTab, setModalActiveTab] = useState('Players');
 
     // Raw registrations list to access full registration objects (including cautionDeposit)
     const [rawRegistrations, setRawRegistrations] = useState([]);
@@ -95,6 +96,8 @@ const HostelProvision = () => {
     // Caution Deposit state for Step 3 in bulk modal
     const [cautionPaidByPersonId, setCautionPaidByPersonId] = useState('');
     const [cautionPaymentMode, setCautionPaymentMode] = useState('Cash');
+    const [cautionDepositAmount, setCautionDepositAmount] = useState('2000');
+    const [coachCautionAmounts, setCoachCautionAmounts] = useState({});
     const [cautionSubmitting, setCautionSubmitting] = useState(false);
     const [cautionReceiptModalOpen, setCautionReceiptModalOpen] = useState(false);
     const [selectedCoachReceipt, setSelectedCoachReceipt] = useState(null);
@@ -454,21 +457,35 @@ const HostelProvision = () => {
         };
     }, [accommodationList, bulkSelectedUniversity]);
 
-    // All members in bulk modal (unified for selected university)
-    const currentUniversityMembers = useMemo(() => {
+    // Members in bulk modal for selected modal tab ('Players' vs 'Coaches / Managers')
+    const currentTabMembers = useMemo(() => {
+        if (modalActiveTab === 'Coaches / Managers') {
+            return {
+                all: universityRoleStats.coaches?.all || [],
+                unallotted: universityRoleStats.coaches?.unallotted || [],
+                allotted: universityRoleStats.coaches?.allotted || []
+            };
+        }
         return {
-            all: universityRoleStats.all || [],
-            unallotted: universityRoleStats.unallotted || [],
-            allotted: universityRoleStats.allotted || []
+            all: universityRoleStats.players?.all || [],
+            unallotted: universityRoleStats.players?.unallotted || [],
+            allotted: universityRoleStats.players?.allotted || []
         };
-    }, [universityRoleStats]);
+    }, [universityRoleStats, modalActiveTab]);
 
-    // Backward-compatible alias
-    const currentTabMembers = currentUniversityMembers;
+    const currentUniversityMembers = currentTabMembers;
 
     // All members across both Players & Coaches who have been allotted a room for bulkSelectedUniversity
     const allAllottedMembers = useMemo(() => {
         return universityRoleStats.allotted || [];
+    }, [universityRoleStats]);
+
+    const allAllottedPlayers = useMemo(() => {
+        return universityRoleStats.players?.allotted || [];
+    }, [universityRoleStats]);
+
+    const allAllottedCoaches = useMemo(() => {
+        return universityRoleStats.coaches?.allotted || [];
     }, [universityRoleStats]);
 
     // Find the full registration record for bulkSelectedUniversity
@@ -479,21 +496,21 @@ const HostelProvision = () => {
     // Caution deposit data for bulkSelectedUniversity
     const cautionDepositData = currentRegistration?.cautionDeposit || {
         paid: false,
-        amount: 2000,
+        amount: 0,
         refundStatus: 'N/A'
     };
 
-    // Auto-select member for "Paid by" dropdown if not yet selected
+    // Auto-select player for "Paid by" dropdown if not yet selected
     useEffect(() => {
-        if (allAllottedMembers.length > 0) {
+        if (allAllottedPlayers.length > 0) {
             setCautionPaidByPersonId(prev => {
-                const exists = allAllottedMembers.some(m => m.id === prev);
-                return exists ? prev : (allAllottedMembers[0]?.id || '');
+                const exists = allAllottedPlayers.some(m => m.id === prev);
+                return exists ? prev : (allAllottedPlayers[0]?.id || '');
             });
         } else {
             setCautionPaidByPersonId('');
         }
-    }, [allAllottedMembers, bulkSelectedUniversity]);
+    }, [allAllottedPlayers, bulkSelectedUniversity]);
 
     const bulkAvailableFloors = useMemo(() => {
         const buildingObj = dbBlocks.find(b => b.name === bulkBuilding);
@@ -548,6 +565,7 @@ const HostelProvision = () => {
 
         setBulkSelectedUniversity(targetUni || '');
         setBulkSelectedMemberIds([]);
+        setModalActiveTab(activeTab === 'Coaches / Managers' ? 'Coaches / Managers' : 'Players');
 
         const defaultBuilding = dbBlocks.length > 0 ? dbBlocks[0].name : '';
         setBulkBuilding(defaultBuilding);
@@ -557,6 +575,12 @@ const HostelProvision = () => {
         setBulkRoom('');
 
         setBulkModalOpen(true);
+    };
+
+    const handleModalTabChange = (newTab) => {
+        setModalActiveTab(newTab);
+        setBulkSelectedMemberIds([]);
+        setBulkRoom('');
     };
 
     const handleCloseBulkModal = () => {
@@ -697,9 +721,15 @@ const HostelProvision = () => {
             return;
         }
 
-        const payingMember = allAllottedMembers.find(m => m.id === cautionPaidByPersonId);
+        const payingMember = allAllottedPlayers.find(m => m.id === cautionPaidByPersonId);
         if (!payingMember) {
-            toast.error('Selected member not found among room-allotted members');
+            toast.error('Selected player not found among room-allotted players');
+            return;
+        }
+
+        const amtToPay = Number(cautionDepositAmount);
+        if (!amtToPay || amtToPay <= 0) {
+            toast.error('Please enter a valid deposit amount');
             return;
         }
 
@@ -715,7 +745,7 @@ const HostelProvision = () => {
                     phone: payingMember.phone,
                     roomNumber: payingMember.roomAllocation?.roomNumber || ''
                 },
-                amount: 2000,
+                amount: amtToPay,
                 paymentMode: cautionPaymentMode || 'Cash',
                 notes: 'Manual cash collected at hostel desk'
             };
@@ -724,7 +754,7 @@ const HostelProvision = () => {
             const data = await res.json();
 
             if (res.ok) {
-                toast.success(`Caution deposit of ₹2,000 recorded from ${payingMember.name} (${bulkSelectedUniversity})!`);
+                toast.success(`Caution deposit of ₹${amtToPay.toLocaleString('en-IN')} recorded from ${payingMember.name} (${bulkSelectedUniversity})!`);
                 await fetchRegistrations();
             } else {
                 toast.error(data.message || 'Failed to record caution deposit');
@@ -760,6 +790,12 @@ const HostelProvision = () => {
     const handlePayCoachCautionDeposit = async (coach) => {
         if (!bulkSelectedUniversity || !currentRegistration) return;
         setCoachCautionSubmittingId(coach._id);
+        const enteredAmt = Number(coachCautionAmounts[coach._id] !== undefined ? coachCautionAmounts[coach._id] : 2000);
+        if (!enteredAmt || enteredAmt <= 0) {
+            toast.error('Please enter a valid caution deposit amount');
+            setCoachCautionSubmittingId(null);
+            return;
+        }
         try {
             const payload = {
                 registrationId: currentRegistration._id,
@@ -772,7 +808,7 @@ const HostelProvision = () => {
                     phone: coach.mobileNo || coach.phone || '',
                     roomNumber: coach.roomAllocation?.roomNumber || ''
                 },
-                amount: 2000,
+                amount: enteredAmt,
                 paymentMode: 'Cash',
                 notes: 'Coach caution deposit collected at hostel desk'
             };
@@ -780,7 +816,7 @@ const HostelProvision = () => {
             const res = await registrationAPI.payCautionDeposit(payload);
             const data = await res.json();
             if (res.ok) {
-                toast.success(`Caution deposit of ₹2,000 recorded for Coach ${coach.name}!`);
+                toast.success(`Caution deposit of ₹${enteredAmt.toLocaleString('en-IN')} recorded for Coach ${coach.name}!`);
                 await fetchRegistrations();
             } else {
                 toast.error(data.message || 'Failed to record coach caution deposit');
@@ -2331,20 +2367,20 @@ const HostelProvision = () => {
                                 {bulkSelectedUniversity && (
                                     <>
                                         <Chip
-                                            label={`${universityRoleStats.totalUnallotted} Pending / ${universityRoleStats.totalCount} Total`}
+                                            label={`${currentTabMembers.unallotted.length} ${modalActiveTab === 'Players' ? 'Players' : 'Coaches'} Pending / ${currentTabMembers.all.length} Total`}
                                             size="small"
                                             sx={{
                                                 height: 22,
                                                 fontSize: '11px',
                                                 fontWeight: 700,
-                                                bgcolor: universityRoleStats.totalUnallotted > 0 ? '#fef3c7' : '#ecfdf5',
-                                                color: universityRoleStats.totalUnallotted > 0 ? '#92400e' : '#065f46'
+                                                bgcolor: currentTabMembers.unallotted.length > 0 ? '#fef3c7' : '#ecfdf5',
+                                                color: currentTabMembers.unallotted.length > 0 ? '#92400e' : '#065f46'
                                             }}
                                         />
                                         {cautionDepositData.paid ? (
                                             <Chip
                                                 icon={<CheckCircleIcon sx={{ fontSize: '14px !important' }} />}
-                                                label="Deposit: Paid (₹2,000)"
+                                                label={`Deposit: Paid (₹${Number(cautionDepositData.amount || 0).toLocaleString('en-IN')})`}
                                                 size="small"
                                                 sx={{
                                                     height: 22,
@@ -2384,6 +2420,91 @@ const HostelProvision = () => {
                 </DialogTitle>
 
                 <DialogContent dividers sx={{ p: 3, overflowY: 'auto' }}>
+                    {/* Role Switcher Tabs (Players vs Coaches/Managers) */}
+                    <Box sx={{
+                        display: 'flex',
+                        justifyContent: 'center',
+                        mb: 2.5,
+                        p: 0.5,
+                        bgcolor: '#f1f5f9',
+                        borderRadius: '50px',
+                        border: '1px solid #e2e8f0',
+                        width: 'fit-content',
+                        mx: 'auto'
+                    }}>
+                        <Button
+                            onClick={() => handleModalTabChange('Players')}
+                            disableElevation
+                            variant={modalActiveTab === 'Players' ? 'contained' : 'text'}
+                            startIcon={<PersonIcon sx={{ fontSize: 18 }} />}
+                            sx={{
+                                borderRadius: '50px',
+                                textTransform: 'none',
+                                fontWeight: 700,
+                                fontSize: '0.88rem',
+                                px: 2.5,
+                                py: 0.8,
+                                minHeight: 38,
+                                bgcolor: modalActiveTab === 'Players' ? '#d06c38' : 'transparent',
+                                color: modalActiveTab === 'Players' ? '#ffffff' : '#0b5299',
+                                boxShadow: modalActiveTab === 'Players' ? '0 4px 10px rgba(208, 108, 56, 0.3)' : 'none',
+                                '&:hover': {
+                                    bgcolor: modalActiveTab === 'Players' ? '#b85828' : 'rgba(11, 82, 153, 0.08)'
+                                }
+                            }}
+                        >
+                            Players
+                            <Chip
+                                label={`${universityRoleStats.players?.unallotted?.length || 0} Pending`}
+                                size="small"
+                                sx={{
+                                    ml: 1,
+                                    height: 20,
+                                    fontSize: '10px',
+                                    fontWeight: 700,
+                                    bgcolor: modalActiveTab === 'Players' ? 'rgba(255,255,255,0.25)' : '#e2e8f0',
+                                    color: modalActiveTab === 'Players' ? '#ffffff' : '#334155'
+                                }}
+                            />
+                        </Button>
+
+                        <Button
+                            onClick={() => handleModalTabChange('Coaches / Managers')}
+                            disableElevation
+                            variant={modalActiveTab === 'Coaches / Managers' ? 'contained' : 'text'}
+                            startIcon={<GroupsIcon sx={{ fontSize: 18 }} />}
+                            sx={{
+                                borderRadius: '50px',
+                                textTransform: 'none',
+                                fontWeight: 700,
+                                fontSize: '0.88rem',
+                                px: 2.5,
+                                py: 0.8,
+                                minHeight: 38,
+                                bgcolor: modalActiveTab === 'Coaches / Managers' ? '#d06c38' : 'transparent',
+                                color: modalActiveTab === 'Coaches / Managers' ? '#ffffff' : '#0b5299',
+                                boxShadow: modalActiveTab === 'Coaches / Managers' ? '0 4px 10px rgba(208, 108, 56, 0.3)' : 'none',
+                                '&:hover': {
+                                    bgcolor: modalActiveTab === 'Coaches / Managers' ? '#b85828' : 'rgba(11, 82, 153, 0.08)'
+                                }
+                            }}
+                        >
+                            Coaches / Managers
+                            <Chip
+                                label={`${universityRoleStats.coaches?.unallotted?.length || 0} Pending`}
+                                size="small"
+                                sx={{
+                                    ml: 1,
+                                    height: 20,
+                                    fontSize: '10px',
+                                    fontWeight: 700,
+                                    bgcolor: modalActiveTab === 'Coaches / Managers' ? 'rgba(255,255,255,0.25)' : '#e2e8f0',
+                                    color: modalActiveTab === 'Coaches / Managers' ? '#ffffff' : '#334155'
+                                }}
+                            />
+                        </Button>
+                    </Box>
+
                     {/* Room Configuration & Member Selection or Empty/Celebration State */}
                     {currentTabMembers.all.length === 0 ? (
                         <Box sx={{
@@ -2401,10 +2522,10 @@ const HostelProvision = () => {
                                 <GroupsIcon sx={{ fontSize: 28 }} />
                             </Box>
                             <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#334155' }}>
-                                No Members Registered with Accommodation
+                                No {modalActiveTab === 'Players' ? 'Players' : 'Coaches / Managers'} Registered with Accommodation
                             </Typography>
                             <Typography variant="body2" sx={{ color: '#64748b', maxWidth: 450 }}>
-                                {bulkSelectedUniversity} does not have any members requesting hostel accommodation.
+                                {bulkSelectedUniversity} does not have any {modalActiveTab.toLowerCase()} requesting hostel accommodation.
                             </Typography>
                         </Box>
                     ) : currentTabMembers.unallotted.length > 0 ? (
@@ -2496,7 +2617,7 @@ const HostelProvision = () => {
                             <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5, bgcolor: '#ffffff', display: 'flex', flexDirection: 'column' }}>
                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
                                     <Typography sx={{ fontWeight: 700, color: '#1e293b', fontSize: '0.95rem' }}>
-                                        Step 2: Select Members ({currentTabMembers.unallotted.length} Unallotted)
+                                        Step 2: Select {modalActiveTab === 'Players' ? 'Players' : 'Coaches / Managers'} ({currentTabMembers.unallotted.length} Unallotted)
                                     </Typography>
                                     <Chip
                                         label={`${bulkSelectedMemberIds.length} / ${currentRoomMaxSlots} Selected`}
@@ -2507,7 +2628,7 @@ const HostelProvision = () => {
                                 </Box>
 
                                 <Typography variant="caption" sx={{ color: '#64748b', mb: 1.5, display: 'block' }}>
-                                    Select up to {currentRoomMaxSlots} member(s) to assign to Room {bulkRoom || '(Select Room)'}.
+                                    Select up to {currentRoomMaxSlots} {modalActiveTab === 'Players' ? 'player(s)' : 'coach(es)/manager(s)'} to assign to Room {bulkRoom || '(Select Room)'}.
                                 </Typography>
 
                                 {/* Member Checkbox List */}
@@ -2574,32 +2695,35 @@ const HostelProvision = () => {
                             </Paper>
                         </Box>
                     ) : (
-                        /* Celebration when all members of this tab are allotted */
+                        /* Clean & concise out-of members allotted status */
                         <Box sx={{
-                            p: 3,
-                            textAlign: 'center',
+                            py: 1.8,
+                            px: 3,
                             bgcolor: '#ecfdf5',
-                            borderRadius: 3,
+                            borderRadius: 2.5,
                             border: '1.5px solid #a7f3d0',
                             display: 'flex',
-                            flexDirection: 'column',
                             alignItems: 'center',
-                            gap: 1.5
+                            justifyContent: 'center',
+                            gap: 1.5,
+                            boxShadow: '0 1px 4px rgba(5, 150, 105, 0.08)'
                         }}>
-                            <Box sx={{ width: 52, height: 52, borderRadius: '50%', bgcolor: '#d1fae5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <CheckCircleIcon sx={{ fontSize: 32 }} />
-                            </Box>
-                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#065f46' }}>
-                                All members of {bulkSelectedUniversity} are successfully allotted rooms!
+                            <CheckCircleIcon sx={{ color: '#059669', fontSize: 26 }} />
+                            <Typography sx={{ fontWeight: 700, color: '#065f46', fontSize: '1rem' }}>
+                                {currentTabMembers.allotted.length} / {currentTabMembers.all.length} {modalActiveTab === 'Players' ? 'Players' : 'Coaches / Managers'} Allotted
                             </Typography>
-                            <Typography variant="body2" sx={{ color: '#047857', maxWidth: 500 }}>
-                                Every member requesting accommodation from this university has been assigned a hostel room. You can review or modify their allocations in the list below.
-                            </Typography>
+                            <Chip
+                                label="All Allotted"
+                                size="small"
+                                sx={{ bgcolor: '#d1fae5', color: '#047857', fontWeight: 700, height: 24, fontSize: '11.5px' }}
+                            />
                         </Box>
                     )}
 
-                    {/* Step 3: Caution Deposit (Manual Collection) - Appears after room allot is done */}
-                    {allAllottedMembers.length > 0 && (
+                    {/* Step 3: Caution Deposit (Manual Collection) - Separated by Role */}
+
+                    {/* 1. PLAYERS TAB: Show Only Players Caution Deposit */}
+                    {modalActiveTab === 'Players' && allAllottedPlayers.length > 0 && (
                         <Paper
                             variant="outlined"
                             sx={{
@@ -2628,17 +2752,17 @@ const HostelProvision = () => {
                                     </Box>
                                     <Box>
                                         <Typography sx={{ fontWeight: 700, color: '#0f172a', fontSize: '1rem', lineHeight: 1.2 }}>
-                                            Step 3: Caution Deposit (Manual Cash Collection)
+                                            Step 3: Players Caution Deposit (Manual Cash Collection)
                                         </Typography>
                                         <Typography variant="caption" sx={{ color: '#64748b' }}>
-                                            Collect ₹2,000 refundable security deposit in cash at hostel desk
+                                            Collect refundable security deposit in cash at hostel desk for allotted players
                                         </Typography>
                                     </Box>
                                 </Box>
 
                                 <Chip
                                     icon={cautionDepositData.paid ? <CheckCircleIcon sx={{ fontSize: '16px !important' }} /> : <PaymentsIcon sx={{ fontSize: '16px !important' }} />}
-                                    label={cautionDepositData.paid ? `Paid: ₹${cautionDepositData.amount || 2000}` : 'Caution Deposit Pending (₹2,000)'}
+                                    label={cautionDepositData.paid ? `Paid: ₹${Number(cautionDepositData.amount || 0).toLocaleString('en-IN')}` : 'Caution Deposit Pending'}
                                     size="small"
                                     sx={{
                                         fontWeight: 700,
@@ -2654,25 +2778,17 @@ const HostelProvision = () => {
                             {/* Content: Form if Unpaid, Receipt Summary if Paid */}
                             {!cautionDepositData.paid ? (
                                 <Box sx={{ bgcolor: '#f8fafc', p: 2, borderRadius: 2, border: '1px solid #e2e8f0' }}>
-                                    {/* Manual Notice */}
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, p: 1, bgcolor: '#eff6ff', borderRadius: 1.5, border: '1px solid #bfdbfe' }}>
-                                        <LocalAtmIcon sx={{ color: '#1d4ed8', fontSize: 20 }} />
-                                        <Typography variant="caption" sx={{ color: '#1e40af', fontWeight: 600 }}>
-                                            Offline / Counter Payment: Collect physical cash of ₹2,000 from the room/university representative and select their name below.
-                                        </Typography>
-                                    </Box>
-
                                     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '2fr 1.2fr 1.2fr auto' }, gap: 1.5, alignItems: 'center' }}>
-                                        {/* Dropdown: Paid by */}
-                                        <FormControl fullWidth size="small">
+                                        {/* Dropdown: Paid by - ONLY ALLOTTED PLAYERS */}
+                                        <FormControl fullWidth size="small" sx={{ '& .MuiOutlinedInput-root': { height: 40, bgcolor: '#ffffff' } }}>
                                             <InputLabel id="caution-paid-by-label">Paid by *</InputLabel>
                                             <Select
                                                 labelId="caution-paid-by-label"
-                                                value={cautionPaidByPersonId || (allAllottedMembers[0]?.id || '')}
+                                                value={cautionPaidByPersonId || (allAllottedPlayers[0]?.id || '')}
                                                 label="Paid by *"
                                                 onChange={(e) => setCautionPaidByPersonId(e.target.value)}
                                             >
-                                                {allAllottedMembers.map((member) => (
+                                                {allAllottedPlayers.map((member) => (
                                                     <MenuItem key={member.id} value={member.id}>
                                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', gap: 1 }}>
                                                             <Typography sx={{ fontWeight: 600, fontSize: '0.85rem' }}>
@@ -2689,20 +2805,23 @@ const HostelProvision = () => {
                                             </Select>
                                         </FormControl>
 
-                                        {/* Amount: Fixed 2000 */}
+                                        {/* Amount: Editable */}
                                         <TextField
-                                            label="Amount"
+                                            label="Deposit Amount (₹) *"
                                             size="small"
-                                            value="₹ 2,000"
+                                            type="number"
+                                            value={cautionDepositAmount}
+                                            onChange={(e) => setCautionDepositAmount(e.target.value)}
+                                            placeholder="2000"
+                                            sx={{ '& .MuiOutlinedInput-root': { height: 40, bgcolor: '#ffffff' } }}
                                             InputProps={{
-                                                readOnly: true,
-                                                sx: { fontWeight: 700, color: '#0f172a', bgcolor: '#ffffff' }
+                                                startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                                                sx: { fontWeight: 700, color: '#0f172a' }
                                             }}
-                                            helperText="Fixed refundable deposit"
                                         />
 
                                         {/* Payment Mode */}
-                                        <FormControl fullWidth size="small">
+                                        <FormControl fullWidth size="small" sx={{ '& .MuiOutlinedInput-root': { height: 40, bgcolor: '#ffffff' } }}>
                                             <InputLabel id="caution-mode-label">Mode</InputLabel>
                                             <Select
                                                 labelId="caution-mode-label"
@@ -2719,7 +2838,7 @@ const HostelProvision = () => {
                                         <Button
                                             variant="contained"
                                             onClick={handlePayCautionDeposit}
-                                            disabled={cautionSubmitting || allAllottedMembers.length === 0}
+                                            disabled={cautionSubmitting || allAllottedPlayers.length === 0}
                                             startIcon={cautionSubmitting ? <CircularProgress size={16} color="inherit" /> : <PaymentsIcon sx={{ fontSize: 18 }} />}
                                             sx={{
                                                 bgcolor: '#059669',
@@ -2748,7 +2867,7 @@ const HostelProvision = () => {
                                             </Avatar>
                                             <Box>
                                                 <Typography sx={{ fontWeight: 700, color: '#166534', fontSize: '0.98rem' }}>
-                                                    Caution Deposit Received: ₹{cautionDepositData.amount || 2000}
+                                                    Caution Deposit Received: ₹{Number(cautionDepositData.amount || 0).toLocaleString('en-IN')}
                                                 </Typography>
                                                 <Typography variant="body2" sx={{ color: '#475569', fontSize: '0.84rem' }}>
                                                     Paid by: <strong>{cautionDepositData.paidBy?.name || 'Representative'}</strong> ({cautionDepositData.paidBy?.role || 'Member'} - Room {cautionDepositData.paidBy?.roomNumber || 'Allotted'})
@@ -2796,158 +2915,200 @@ const HostelProvision = () => {
                                     </Box>
                                 </Box>
                             )}
+                        </Paper>
+                    )}
 
-                            {/* Coaches Caution Deposit Sub-Section (Separate ₹2,000 for each coach) */}
-                            {currentRegistration?.coaches && currentRegistration.coaches.length > 0 && (
-                                <Box sx={{ mt: 2.5, pt: 2, borderTop: '1px dashed #cbd5e1' }}>
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                            <PersonIcon sx={{ color: '#0b5299', fontSize: 20 }} />
-                                            <Typography sx={{ fontWeight: 700, color: '#0f172a', fontSize: '0.92rem' }}>
-                                                Coaches Caution Deposit (Separate ₹2,000 per Coach)
-                                            </Typography>
-                                        </Box>
-                                        <Chip
-                                            size="small"
-                                            label={`${currentRegistration.coaches.filter(c => c.cautionDeposit?.paid).length}/${currentRegistration.coaches.length} Coaches Paid`}
-                                            sx={{ height: 22, fontSize: '11px', fontWeight: 600, bgcolor: '#eff6ff', color: '#1d4ed8' }}
-                                        />
+                    {/* 2. COACHES / MANAGERS TAB: Show Only Coaches Caution Deposit */}
+                    {modalActiveTab === 'Coaches / Managers' && currentRegistration?.coaches && currentRegistration.coaches.length > 0 && (allAllottedCoaches.length > 0 || currentRegistration.coaches.some(c => c.cautionDeposit?.paid)) && (
+                        <Paper
+                            variant="outlined"
+                            sx={{
+                                mt: 2.5,
+                                p: 2.5,
+                                borderRadius: 2.5,
+                                bgcolor: '#ffffff',
+                                border: '1.5px solid #cbd5e1',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
+                            }}
+                        >
+                            {/* Header */}
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+                                    <Box sx={{
+                                        width: 36,
+                                        height: 36,
+                                        borderRadius: 2,
+                                        bgcolor: '#eff6ff',
+                                        color: '#0b5299',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                    }}>
+                                        <PersonIcon sx={{ fontSize: 22 }} />
                                     </Box>
-
-                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                                        {currentRegistration.coaches.map(coach => {
-                                            const isPaid = coach.cautionDeposit?.paid;
-                                            const isRefunded = coach.cautionDeposit?.refundStatus === 'Refunded';
-                                            const hasRoom = coach.roomAllocation && coach.roomAllocation.roomNumber;
-
-                                            return (
-                                                <Box
-                                                    key={coach._id}
-                                                    sx={{
-                                                        p: 1.5,
-                                                        borderRadius: 2,
-                                                        bgcolor: isPaid ? '#f0fdf4' : '#f8fafc',
-                                                        border: isPaid ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
-                                                        display: 'flex',
-                                                        justifyContent: 'space-between',
-                                                        alignItems: 'center',
-                                                        flexWrap: 'wrap',
-                                                        gap: 1.5
-                                                    }}
-                                                >
-                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                                        <Avatar sx={{ bgcolor: isPaid ? '#dcfce7' : '#e0f2fe', color: isPaid ? '#16a34a' : '#0369a1', width: 36, height: 36 }}>
-                                                            <PersonIcon sx={{ fontSize: 20 }} />
-                                                        </Avatar>
-                                                        <Box>
-                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                                <Typography sx={{ fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>
-                                                                    {coach.name}
-                                                                </Typography>
-                                                                <Chip
-                                                                    label={coach.role || 'Coach'}
-                                                                    size="small"
-                                                                    sx={{ height: 18, fontSize: '10px', bgcolor: '#e2e8f0', color: '#475569', fontWeight: 600 }}
-                                                                />
-                                                                {hasRoom ? (
-                                                                    <Chip
-                                                                        label={`Room ${coach.roomAllocation.roomNumber} (${coach.roomAllocation.building || ''})`}
-                                                                        size="small"
-                                                                        sx={{ height: 18, fontSize: '10px', bgcolor: '#e0f2fe', color: '#0284c7', fontWeight: 600 }}
-                                                                    />
-                                                                ) : (
-                                                                    <Chip
-                                                                        label="No room yet"
-                                                                        size="small"
-                                                                        sx={{ height: 18, fontSize: '10px', bgcolor: '#f1f5f9', color: '#94a3b8' }}
-                                                                    />
-                                                                )}
-                                                            </Box>
-                                                            <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.2 }}>
-                                                                Phone: {coach.mobileNo || coach.phone || 'N/A'}
-                                                                {isPaid && ` • Receipt #${coach.cautionDeposit?.receiptNo || 'CD-COACH'} • Paid ₹${coach.cautionDeposit?.amount || 2000}`}
-                                                            </Typography>
-                                                        </Box>
-                                                    </Box>
-
-                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                        {isPaid ? (
-                                                            <>
-                                                                <Chip
-                                                                    icon={<CheckCircleIcon sx={{ fontSize: '14px !important' }} />}
-                                                                    label={isRefunded ? 'Refunded' : 'Deposit Paid (₹2,000)'}
-                                                                    size="small"
-                                                                    sx={{
-                                                                        bgcolor: isRefunded ? '#f1f5f9' : '#dcfce7',
-                                                                        color: isRefunded ? '#64748b' : '#166534',
-                                                                        fontWeight: 700,
-                                                                        height: 26,
-                                                                        fontSize: '11px'
-                                                                    }}
-                                                                />
-                                                                <Button
-                                                                    size="small"
-                                                                    variant="outlined"
-                                                                    startIcon={<PrintIcon sx={{ fontSize: 14 }} />}
-                                                                    onClick={() => {
-                                                                        setSelectedCoachReceipt(coach);
-                                                                        setCautionReceiptModalOpen(true);
-                                                                    }}
-                                                                    sx={{
-                                                                        textTransform: 'none',
-                                                                        fontSize: '11px',
-                                                                        py: 0.2,
-                                                                        px: 1,
-                                                                        borderColor: '#16a34a',
-                                                                        color: '#16a34a',
-                                                                        borderRadius: 1.5,
-                                                                        '&:hover': { bgcolor: '#f0fdf4' }
-                                                                    }}
-                                                                >
-                                                                    Receipt
-                                                                </Button>
-                                                                <Button
-                                                                    size="small"
-                                                                    variant="text"
-                                                                    onClick={() => handleResetCoachCautionDeposit(coach)}
-                                                                    sx={{
-                                                                        textTransform: 'none',
-                                                                        color: '#94a3b8',
-                                                                        fontSize: '11px',
-                                                                        p: 0.5,
-                                                                        '&:hover': { color: '#ef4444' }
-                                                                    }}
-                                                                >
-                                                                    Reset
-                                                                </Button>
-                                                            </>
-                                                        ) : (
-                                                            <Button
-                                                                size="small"
-                                                                variant="contained"
-                                                                startIcon={coachCautionSubmittingId === coach._id ? <CircularProgress size={14} color="inherit" /> : <PaymentsIcon sx={{ fontSize: 16 }} />}
-                                                                disabled={coachCautionSubmittingId === coach._id}
-                                                                onClick={() => handlePayCoachCautionDeposit(coach)}
-                                                                sx={{
-                                                                    bgcolor: '#059669',
-                                                                    color: '#ffffff',
-                                                                    fontWeight: 700,
-                                                                    fontSize: '12px',
-                                                                    borderRadius: 1.5,
-                                                                    textTransform: 'none',
-                                                                    '&:hover': { bgcolor: '#047857' }
-                                                                }}
-                                                            >
-                                                                Collect ₹2,000
-                                                            </Button>
-                                                        )}
-                                                    </Box>
-                                                </Box>
-                                            );
-                                        })}
+                                    <Box>
+                                        <Typography sx={{ fontWeight: 700, color: '#0f172a', fontSize: '1rem', lineHeight: 1.2 }}>
+                                            Step 3: Coaches Caution Deposit (Manual Cash Collection)
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ color: '#64748b' }}>
+                                            Collect refundable security deposit in cash at hostel desk for room-allotted coaches
+                                        </Typography>
                                     </Box>
                                 </Box>
-                            )}
+                                <Chip
+                                    size="small"
+                                    label={`${currentRegistration.coaches.filter(c => c.cautionDeposit?.paid).length}/${currentRegistration.coaches.length} Coaches Paid`}
+                                    sx={{ height: 24, fontSize: '12px', fontWeight: 700, bgcolor: '#eff6ff', color: '#1d4ed8' }}
+                                />
+                            </Box>
+
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                {currentRegistration.coaches.map(coach => {
+                                    const isPaid = coach.cautionDeposit?.paid;
+                                    const isRefunded = coach.cautionDeposit?.refundStatus === 'Refunded';
+                                    const hasRoom = coach.roomAllocation && coach.roomAllocation.roomNumber;
+
+                                    return (
+                                        <Box
+                                            key={coach._id}
+                                            sx={{
+                                                p: 1.5,
+                                                borderRadius: 2,
+                                                bgcolor: isPaid ? '#f0fdf4' : '#f8fafc',
+                                                border: isPaid ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center',
+                                                flexWrap: 'wrap',
+                                                gap: 1.5
+                                            }}
+                                        >
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                <Avatar sx={{ bgcolor: isPaid ? '#dcfce7' : '#e0f2fe', color: isPaid ? '#16a34a' : '#0369a1', width: 36, height: 36 }}>
+                                                    <PersonIcon sx={{ fontSize: 20 }} />
+                                                </Avatar>
+                                                <Box>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                        <Typography sx={{ fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>
+                                                            {coach.name}
+                                                        </Typography>
+                                                        <Chip
+                                                            label={coach.role || 'Coach'}
+                                                            size="small"
+                                                            sx={{ height: 18, fontSize: '10px', bgcolor: '#e2e8f0', color: '#475569', fontWeight: 600 }}
+                                                        />
+                                                        {hasRoom ? (
+                                                            <Chip
+                                                                label={`Room ${coach.roomAllocation.roomNumber} (${coach.roomAllocation.building || ''})`}
+                                                                size="small"
+                                                                sx={{ height: 18, fontSize: '10px', bgcolor: '#e0f2fe', color: '#0284c7', fontWeight: 600 }}
+                                                            />
+                                                        ) : (
+                                                            <Chip
+                                                                label="No room yet"
+                                                                size="small"
+                                                                sx={{ height: 18, fontSize: '10px', bgcolor: '#f1f5f9', color: '#94a3b8' }}
+                                                            />
+                                                        )}
+                                                    </Box>
+                                                    <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.2 }}>
+                                                        Phone: {coach.mobileNo || coach.phone || 'N/A'}
+                                                        {isPaid && ` • Receipt #${coach.cautionDeposit?.receiptNo || 'CD-COACH'} • Paid ₹${Number(coach.cautionDeposit?.amount || 0).toLocaleString('en-IN')}`}
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                {isPaid ? (
+                                                    <>
+                                                        <Chip
+                                                            icon={<CheckCircleIcon sx={{ fontSize: '14px !important' }} />}
+                                                            label={isRefunded ? 'Refunded' : `Deposit Paid (₹${Number(coach.cautionDeposit?.amount || 0).toLocaleString('en-IN')})`}
+                                                            size="small"
+                                                            sx={{
+                                                                bgcolor: isRefunded ? '#f1f5f9' : '#dcfce7',
+                                                                color: isRefunded ? '#64748b' : '#166534',
+                                                                fontWeight: 700,
+                                                                height: 26,
+                                                                fontSize: '11px'
+                                                            }}
+                                                        />
+                                                        <Button
+                                                            size="small"
+                                                            variant="outlined"
+                                                            startIcon={<PrintIcon sx={{ fontSize: 14 }} />}
+                                                            onClick={() => {
+                                                                setSelectedCoachReceipt(coach);
+                                                                setCautionReceiptModalOpen(true);
+                                                            }}
+                                                            sx={{
+                                                                textTransform: 'none',
+                                                                fontSize: '11px',
+                                                                py: 0.2,
+                                                                px: 1,
+                                                                borderColor: '#16a34a',
+                                                                color: '#16a34a',
+                                                                borderRadius: 1.5,
+                                                                '&:hover': { bgcolor: '#f0fdf4' }
+                                                            }}
+                                                        >
+                                                            Receipt
+                                                        </Button>
+                                                        <Button
+                                                            size="small"
+                                                            variant="text"
+                                                            onClick={() => handleResetCoachCautionDeposit(coach)}
+                                                            sx={{
+                                                                textTransform: 'none',
+                                                                color: '#94a3b8',
+                                                                fontSize: '11px',
+                                                                p: 0.5,
+                                                                '&:hover': { color: '#ef4444' }
+                                                            }}
+                                                        >
+                                                            Reset
+                                                        </Button>
+                                                    </>
+                                                ) : (
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                                                        <TextField
+                                                            size="small"
+                                                            type="number"
+                                                            placeholder="2000"
+                                                            value={coachCautionAmounts[coach._id] !== undefined ? coachCautionAmounts[coach._id] : '2000'}
+                                                            onChange={(e) => setCoachCautionAmounts(prev => ({ ...prev, [coach._id]: e.target.value }))}
+                                                            InputProps={{
+                                                                startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                                                                sx: { height: 32, fontSize: '12px', width: 100, bgcolor: '#ffffff' }
+                                                            }}
+                                                        />
+                                                        <Button
+                                                            size="small"
+                                                            variant="contained"
+                                                            startIcon={coachCautionSubmittingId === coach._id ? <CircularProgress size={14} color="inherit" /> : <PaymentsIcon sx={{ fontSize: 16 }} />}
+                                                            disabled={coachCautionSubmittingId === coach._id}
+                                                            onClick={() => handlePayCoachCautionDeposit(coach)}
+                                                            sx={{
+                                                                bgcolor: '#059669',
+                                                                color: '#ffffff',
+                                                                fontWeight: 700,
+                                                                fontSize: '12px',
+                                                                borderRadius: 1.5,
+                                                                textTransform: 'none',
+                                                                height: 32,
+                                                                whiteSpace: 'nowrap',
+                                                                '&:hover': { bgcolor: '#047857' }
+                                                            }}
+                                                        >
+                                                            Collect
+                                                        </Button>
+                                                    </Box>
+                                                )}
+                                            </Box>
+                                        </Box>
+                                    );
+                                })}
+                            </Box>
                         </Paper>
                     )}
 
@@ -2956,10 +3117,10 @@ const HostelProvision = () => {
                         <Box sx={{ mt: 3 }}>
                             <Typography sx={{ fontWeight: 700, color: '#1e293b', fontSize: '0.95rem', mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
                                 <HotelIcon sx={{ color: '#059669', fontSize: 20 }} />
-                                Allotted Members of {bulkSelectedUniversity} ({currentTabMembers.allotted.length} Total)
+                                Allotted {modalActiveTab === 'Players' ? 'Players' : 'Coaches / Managers'} of {bulkSelectedUniversity} ({currentTabMembers.allotted.length} Total)
                             </Typography>
 
-                            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }, gap: 1.5 }}>
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, width: '100%' }}>
                                 {Object.entries(
                                     currentTabMembers.allotted.reduce((acc, member) => {
                                         const roomKey = member.roomAllocation
@@ -2970,28 +3131,28 @@ const HostelProvision = () => {
                                         return acc;
                                     }, {})
                                 ).map(([roomTitle, members]) => (
-                                    <Paper key={roomTitle} variant="outlined" sx={{ p: 1.5, borderRadius: 2, bgcolor: '#f8fafc' }}>
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1, pb: 0.5, borderBottom: '1px solid #e2e8f0' }}>
-                                            <Typography sx={{ fontWeight: 700, color: '#0b5299', fontSize: '0.85rem' }}>
+                                    <Paper key={roomTitle} variant="outlined" sx={{ p: 2, borderRadius: 2.5, bgcolor: '#f8fafc', width: '100%' }}>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, pb: 1, borderBottom: '1px solid #e2e8f0' }}>
+                                            <Typography sx={{ fontWeight: 700, color: '#0b5299', fontSize: '0.92rem' }}>
                                                 {roomTitle}
                                             </Typography>
-                                            <Chip label={`${members.length} member(s)`} size="small" sx={{ height: 20, fontSize: '11px', fontWeight: 600, bgcolor: '#e0f2fe', color: '#0369a1' }} />
+                                            <Chip label={`${members.length} member(s)`} size="small" sx={{ height: 22, fontSize: '11px', fontWeight: 600, bgcolor: '#e0f2fe', color: '#0369a1' }} />
                                         </Box>
-                                        <Stack spacing={0.6}>
+                                        <Stack spacing={0.8}>
                                             {members.map(m => (
-                                                <Box key={m.id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem', py: 0.3 }}>
-                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                                                        <Typography sx={{ fontWeight: 600, color: '#1e293b', fontSize: '0.82rem' }}>
+                                                <Box key={m.id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem', py: 0.6, px: 1.2, borderRadius: 1.5, bgcolor: '#ffffff', border: '1px solid #f1f5f9' }}>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                                                        <Typography sx={{ fontWeight: 600, color: '#1e293b', fontSize: '0.86rem' }}>
                                                             {m.name}
                                                         </Typography>
-                                                        <Chip label={m.role} size="small" sx={{ height: 16, fontSize: '9px' }} />
+                                                        <Chip label={m.role} size="small" sx={{ height: 18, fontSize: '10px', bgcolor: m.role === 'Player' ? '#f1f5f9' : '#fef3c7', color: m.role === 'Player' ? '#334155' : '#92400e', fontWeight: 600 }} />
                                                         <Typography variant="caption" sx={{ color: '#64748b' }}>
                                                             ({m.gender}, {m.phone})
                                                         </Typography>
                                                     </Box>
                                                     <Tooltip title="Unassign from Room">
-                                                        <IconButton size="small" onClick={() => handleBulkUnassignSingle(m)} sx={{ color: '#ef4444', p: 0.3 }}>
-                                                            <ClearIcon sx={{ fontSize: 14 }} />
+                                                        <IconButton size="small" onClick={() => handleBulkUnassignSingle(m)} sx={{ color: '#ef4444', p: 0.4, '&:hover': { bgcolor: '#fef2f2' } }}>
+                                                            <ClearIcon sx={{ fontSize: 16 }} />
                                                         </IconButton>
                                                     </Tooltip>
                                                 </Box>
@@ -3013,7 +3174,9 @@ const HostelProvision = () => {
                     >
                         Close
                     </Button>
-                    {cautionDepositData.paid && allAllottedMembers.length > 0 && bulkSelectedMemberIds.length === 0 ? (
+                    {((modalActiveTab === 'Players' && cautionDepositData.paid && allAllottedPlayers.length > 0) ||
+                      (modalActiveTab === 'Coaches / Managers' && currentRegistration?.coaches?.length > 0 && currentRegistration.coaches.every(c => c.cautionDeposit?.paid))) &&
+                      bulkSelectedMemberIds.length === 0 ? (
                         <Button
                             onClick={() => {
                                 handleCloseBulkModal();

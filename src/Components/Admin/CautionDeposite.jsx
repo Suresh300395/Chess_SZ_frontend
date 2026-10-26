@@ -55,6 +55,7 @@ const CautionDeposite = () => {
     const [payTargetType, setPayTargetType] = useState('team'); // 'team' | 'coach'
     const [paidByPersonId, setPaidByPersonId] = useState('');
     const [paymentMode, setPaymentMode] = useState('Cash');
+    const [depositAmount, setDepositAmount] = useState('2000');
     const [submitting, setSubmitting] = useState(false);
 
     // Modal state for viewing/printing receipt
@@ -100,12 +101,11 @@ const CautionDeposite = () => {
         };
     }, []);
 
-    // 1. Team / University Deposit List
+    // 1. Team / University Deposit List (Players only - Coaches are managed in separate Coaches tab)
     const universityDepositList = useMemo(() => {
         return registrations.map(reg => {
             const allottedPlayers = (reg.players || []).filter(p => p.roomAllocation && p.roomAllocation.roomNumber);
-            const allottedCoaches = (reg.coaches || []).filter(c => c.roomAllocation && c.roomAllocation.roomNumber);
-            const allAllotted = [...allottedPlayers.map(p => ({ ...p, role: 'Player', name: p.playerName, phone: p.mobileNo })), ...allottedCoaches];
+            const allAllotted = allottedPlayers.map(p => ({ ...p, role: 'Player', name: p.playerName, phone: p.mobileNo, id: p._id }));
 
             const roomsSet = new Set();
             allAllotted.forEach(m => {
@@ -116,7 +116,7 @@ const CautionDeposite = () => {
 
             const deposit = reg.cautionDeposit || {
                 paid: false,
-                amount: 2000,
+                amount: 0,
                 refundStatus: 'N/A'
             };
 
@@ -139,7 +139,7 @@ const CautionDeposite = () => {
                 const hasRoom = !!(coach.roomAllocation && coach.roomAllocation.roomNumber);
                 const deposit = coach.cautionDeposit || {
                     paid: false,
-                    amount: 2000,
+                    amount: 0,
                     refundStatus: 'N/A'
                 };
 
@@ -270,6 +270,7 @@ const CautionDeposite = () => {
             setPaidByPersonId('');
         }
         setPaymentMode('Cash');
+        setDepositAmount('2000');
         setPayModalOpen(true);
     };
 
@@ -279,12 +280,19 @@ const CautionDeposite = () => {
         setPayTargetType('coach');
         setPaidByPersonId(coachItem.coachId);
         setPaymentMode('Cash');
+        setDepositAmount('2000');
         setPayModalOpen(true);
     };
 
     // Confirm Payment
     const handleConfirmPayment = async () => {
         if (!selectedPayItem) return;
+
+        const amtToPay = Number(depositAmount);
+        if (!amtToPay || amtToPay <= 0) {
+            toast.error('Please enter a valid deposit amount');
+            return;
+        }
 
         setSubmitting(true);
         try {
@@ -300,7 +308,7 @@ const CautionDeposite = () => {
                         phone: selectedPayItem.coachPhone || '',
                         roomNumber: selectedPayItem.roomNumber || ''
                     },
-                    amount: 2000,
+                    amount: amtToPay,
                     paymentMode: paymentMode || 'Cash',
                     notes: 'Coach caution deposit manual collection'
                 };
@@ -308,7 +316,7 @@ const CautionDeposite = () => {
                 const res = await registrationAPI.payCautionDeposit(payload);
                 const data = await res.json();
                 if (res.ok) {
-                    toast.success(`Coach caution deposit of ₹2,000 recorded for Coach ${selectedPayItem.coachName}!`);
+                    toast.success(`Coach caution deposit of ₹${amtToPay.toLocaleString('en-IN')} recorded for Coach ${selectedPayItem.coachName}!`);
                     setPayModalOpen(false);
                     await fetchRegistrations();
                 } else {
@@ -338,7 +346,7 @@ const CautionDeposite = () => {
                         phone: payingMember.phone,
                         roomNumber: payingMember.roomAllocation?.roomNumber || ''
                     },
-                    amount: 2000,
+                    amount: amtToPay,
                     paymentMode: paymentMode || 'Cash',
                     notes: 'Manual cash collected at hostel desk'
                 };
@@ -347,7 +355,7 @@ const CautionDeposite = () => {
                 const data = await res.json();
 
                 if (res.ok) {
-                    toast.success(`Caution deposit of ₹2,000 recorded from ${payingMember.name} (${selectedPayItem.universityName})!`);
+                    toast.success(`Caution deposit of ₹${amtToPay.toLocaleString('en-IN')} recorded from ${payingMember.name} (${selectedPayItem.universityName})!`);
                     setPayModalOpen(false);
                     await fetchRegistrations();
                 } else {
@@ -451,7 +459,7 @@ const CautionDeposite = () => {
                             Caution Deposit Management
                         </Typography>
                         <Typography sx={{ color: '#64748b', fontSize: '0.88rem' }}>
-                            Collect, track, and refund ₹2,000 security deposits separately for Teams & Coaches
+                            Collect, track, and refund security deposits separately for Teams & Coaches
                         </Typography>
                     </Box>
                 </Box>
@@ -771,7 +779,7 @@ const CautionDeposite = () => {
                                                             '&:hover': { bgcolor: '#047857' }
                                                         }}
                                                     >
-                                                        Collect ₹2,000
+                                                        Collect Deposit
                                                     </Button>
                                                 ) : (
                                                     <Typography variant="caption" sx={{ color: '#94a3b8' }}>Allot room first</Typography>
@@ -945,7 +953,7 @@ const CautionDeposite = () => {
                                                             '&:hover': { bgcolor: '#047857' }
                                                         }}
                                                     >
-                                                        Collect ₹2,000
+                                                        Collect Deposit
                                                     </Button>
                                                 ) : (
                                                     <Typography variant="caption" sx={{ color: '#94a3b8' }}>Allot room first</Typography>
@@ -985,8 +993,8 @@ const CautionDeposite = () => {
                 <DialogContent dividers sx={{ p: 3 }}>
                     <Alert severity="info" sx={{ mb: 2.5, borderRadius: 2 }}>
                         {payTargetType === 'coach'
-                            ? `Collect physical cash of ₹2,000 for Coach ${selectedPayItem?.coachName} (${selectedPayItem?.universityName}). This is an independent deposit from player caution deposits.`
-                            : 'Collect physical cash of ₹2,000 at the hostel desk from the room or university representative.'
+                            ? `Collect physical cash for Coach ${selectedPayItem?.coachName} (${selectedPayItem?.universityName}). This is an independent deposit from player caution deposits.`
+                            : 'Collect physical cash at the hostel desk from the room or university representative.'
                         }
                     </Alert>
 
@@ -1039,11 +1047,17 @@ const CautionDeposite = () => {
 
                         {/* Amount */}
                         <TextField
-                            label="Deposit Amount"
-                            value="₹ 2,000"
+                            label="Deposit Amount (₹) *"
+                            type="number"
+                            value={depositAmount}
+                            onChange={(e) => setDepositAmount(e.target.value)}
                             size="small"
-                            InputProps={{ readOnly: true, sx: { fontWeight: 700, bgcolor: '#f8fafc' } }}
-                            helperText="Fixed refundable caution deposit"
+                            placeholder="e.g. 2000"
+                            InputProps={{
+                                startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                                sx: { fontWeight: 700, bgcolor: '#ffffff' }
+                            }}
+                            helperText="Enter collected deposit amount"
                         />
 
                         {/* Payment Mode */}
@@ -1072,7 +1086,7 @@ const CautionDeposite = () => {
                         startIcon={submitting ? <CircularProgress size={16} color="inherit" /> : <PaymentsIcon />}
                         sx={{ bgcolor: '#059669', '&:hover': { bgcolor: '#047857' }, textTransform: 'none', fontWeight: 700 }}
                     >
-                        {submitting ? 'Recording...' : 'Record Payment (₹2,000)'}
+                        {submitting ? 'Recording...' : `Record Payment (₹${Number(depositAmount || 0).toLocaleString('en-IN')})`}
                     </Button>
                 </DialogActions>
             </Dialog>
@@ -1148,7 +1162,7 @@ const CautionDeposite = () => {
                                 </Box>
                                 <Box sx={{ textAlign: 'right' }}>
                                     <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>AMOUNT RECEIVED:</Typography>
-                                    <Typography sx={{ fontWeight: 800, color: '#047857', fontSize: '1.2rem' }}>₹{receiptData.deposit?.amount || 2000}</Typography>
+                                    <Typography sx={{ fontWeight: 800, color: '#047857', fontSize: '1.2rem' }}>₹{Number(receiptData.deposit?.amount || 0).toLocaleString('en-IN')}</Typography>
                                 </Box>
                             </Box>
 
@@ -1181,9 +1195,9 @@ const CautionDeposite = () => {
                 <DialogContent>
                     <Typography variant="body2" sx={{ color: '#334155' }}>
                         {itemToRefund?.isCoach ? (
-                            <>Are you sure you want to mark the ₹2,000 caution deposit for Coach <strong>{itemToRefund?.coachName}</strong> ({itemToRefund?.universityName}) as refunded?</>
+                            <>Are you sure you want to mark the ₹{Number(itemToRefund?.deposit?.amount || 0).toLocaleString('en-IN')} caution deposit for Coach <strong>{itemToRefund?.coachName}</strong> ({itemToRefund?.universityName}) as refunded?</>
                         ) : (
-                            <>Are you sure you want to mark the ₹2,000 caution deposit for <strong>{itemToRefund?.universityName}</strong> as refunded?</>
+                            <>Are you sure you want to mark the ₹{Number(itemToRefund?.deposit?.amount || 0).toLocaleString('en-IN')} caution deposit for <strong>{itemToRefund?.universityName}</strong> as refunded?</>
                         )}
                     </Typography>
                     <Typography variant="caption" sx={{ color: '#64748b', mt: 1, display: 'block' }}>
