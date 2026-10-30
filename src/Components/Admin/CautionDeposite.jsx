@@ -3,6 +3,8 @@ import {
     Typography,
     Box,
     Paper,
+    Card,
+    CardContent,
     Table,
     TableBody,
     TableCell,
@@ -25,9 +27,10 @@ import {
     CircularProgress,
     Tooltip,
     Alert,
-    Tabs,
-    Tab
+    Divider,
+    Grid
 } from '@mui/material';
+import CustomTabs from '../Common/Tabs';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
@@ -38,6 +41,10 @@ import HotelIcon from '@mui/icons-material/Hotel';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import GroupsIcon from '@mui/icons-material/Groups';
 import PersonIcon from '@mui/icons-material/Person';
+import FilterListIcon from '@mui/icons-material/FilterList';
+import SchoolIcon from '@mui/icons-material/School';
+import CreditCardIcon from '@mui/icons-material/CreditCard';
+import CalendarTodayOutlinedIcon from '@mui/icons-material/CalendarTodayOutlined';
 import io from 'socket.io-client';
 import { toast } from 'sonner';
 import { registrationAPI, SOCKET_URL } from '../../utils/api';
@@ -432,8 +439,32 @@ const CautionDeposite = () => {
         }
     };
 
+    // Convert amount to words
+    const getAmountInWords = (num) => {
+        const n = Number(num);
+        if (!n) return 'Rupees Zero Only';
+        if (n === 2000) return 'Rupees Two Thousand Only';
+        if (n === 1000) return 'Rupees One Thousand Only';
+        if (n === 3000) return 'Rupees Three Thousand Only';
+        if (n === 4000) return 'Rupees Four Thousand Only';
+        if (n === 5000) return 'Rupees Five Thousand Only';
+        const a = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+        const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+        const toWords = (val) => {
+            if (val === 0) return '';
+            if (val < 20) return a[val] + ' ';
+            if (val < 100) return b[Math.floor(val / 10)] + (val % 10 !== 0 ? ' ' + a[val % 10] : '') + ' ';
+            if (val < 1000) return toWords(Math.floor(val / 100)) + 'Hundred ' + toWords(val % 100);
+            if (val < 100000) return toWords(Math.floor(val / 1000)) + 'Thousand ' + toWords(val % 1000);
+            if (val < 10000000) return toWords(Math.floor(val / 100000)) + 'Lakh ' + toWords(val % 100000);
+            return toWords(Math.floor(val / 10000000)) + 'Crore ' + toWords(val % 10000000);
+        };
+        return `Rupees ${toWords(n).trim()} Only`;
+    };
+
     // Open Receipt
     const handleOpenReceipt = (item, isCoach = false) => {
+        const primaryRoom = item.roomNumber || item.deposit?.paidBy?.roomNumber || (item.rooms && item.rooms.length > 0 ? (item.rooms[0]?.roomNumber || item.rooms[0]) : null);
         setReceiptData({
             isCoach,
             universityName: item.universityName,
@@ -441,9 +472,15 @@ const CautionDeposite = () => {
             coachName: item.coachName,
             coachRole: item.coachRole,
             coachPhone: item.coachPhone,
-            roomNumber: item.roomNumber || item.deposit?.paidBy?.roomNumber
+            rooms: item.rooms,
+            roomNumber: primaryRoom
         });
         setReceiptModalOpen(true);
+    };
+
+    // Clean Receipt Printer (Controlled via @media print in index.css)
+    const handlePrintReceipt = () => {
+        window.print();
     };
 
     return (
@@ -476,87 +513,207 @@ const CautionDeposite = () => {
             </Box>
 
             {/* Navigation Tabs (Team vs Coaches) */}
-            <Paper variant="outlined" sx={{ borderRadius: 2.5, mb: 3, bgcolor: '#ffffff', px: 2, pt: 1 }}>
-                <Tabs
-                    value={activeTab}
-                    onChange={(e, val) => {
+            <Box sx={{ mb: 3, display: 'flex', justifyContent: 'center' }}>
+                <CustomTabs
+                    tabs={[
+                        {
+                            label: `Team Caution Deposits (${universityDepositList.length})`,
+                            value: 'team',
+                            icon: <GroupsIcon sx={{ fontSize: 20 }} />
+                        },
+                        {
+                            label: `Coach Caution Deposits (${coachDepositList.length})`,
+                            value: 'coach',
+                            icon: <PersonIcon sx={{ fontSize: 20 }} />
+                        }
+                    ]}
+                    activeTab={activeTab}
+                    setActiveTab={(val) => {
                         setActiveTab(val);
                         setFilterStatus('all');
                     }}
-                    sx={{
-                        '& .MuiTab-root': {
-                            textTransform: 'none',
-                            fontWeight: 700,
-                            fontSize: '0.96rem',
-                            minHeight: 48,
-                            gap: 1
-                        },
-                        '& .Mui-selected': {
-                            color: '#0b5299 !important'
-                        },
-                        '& .MuiTabs-indicator': {
-                            backgroundColor: '#0b5299',
-                            height: 3,
-                            borderRadius: '3px 3px 0 0'
-                        }
-                    }}
-                >
-                    <Tab
-                        icon={<GroupsIcon />}
-                        iconPosition="start"
-                        label={`Team Caution Deposits (${universityDepositList.length})`}
-                        value="team"
-                    />
-                    <Tab
-                        icon={<PersonIcon />}
-                        iconPosition="start"
-                        label={`Coach Caution Deposits (${coachDepositList.length})`}
-                        value="coach"
-                    />
-                </Tabs>
-            </Paper>
+                />
+            </Box>
 
             {/* KPI Cards */}
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 2, mb: 3 }}>
-                <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5, bgcolor: '#ffffff' }}>
-                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>TOTAL COLLECTED (CASH)</Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 800, color: '#059669', mt: 0.5 }}>
-                        ₹{activeKpi.totalCollected.toLocaleString('en-IN')}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: '#047857' }}>
-                        From {activeKpi.paidCount} {activeTab === 'team' ? 'universities' : 'coaches'}
-                    </Typography>
-                </Paper>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 2, mb: 3, width: '100%' }}>
+                {[
+                    {
+                        title: 'Total Collected (Cash)',
+                        count: `₹${activeKpi.totalCollected.toLocaleString('en-IN')}`,
+                        subtitle: `From ${activeKpi.paidCount} ${activeTab === 'team' ? 'universities' : 'coaches'}`,
+                        badge: 'Collected',
+                        icon: <PaymentsIcon sx={{ fontSize: 26, color: '#ffffff' }} />,
+                        bgIcon: <PaymentsIcon sx={{ fontSize: 90, color: '#059669' }} />,
+                        gradient: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                        shadow: 'rgba(5, 150, 105, 0.22)',
+                        bgGradient: 'linear-gradient(145deg, #ffffff 0%, #f6fdf9 100%)',
+                        borderColor: '#e2e8f0',
+                        hoverBorder: '#a7f3d0',
+                        badgeBg: '#ecfdf5',
+                        badgeColor: '#047857'
+                    },
+                    {
+                        title: 'Deposits Paid',
+                        count: activeKpi.paidCount,
+                        subtitle: 'Active holding deposit',
+                        badge: 'Paid',
+                        icon: <CheckCircleIcon sx={{ fontSize: 26, color: '#ffffff' }} />,
+                        bgIcon: <CheckCircleIcon sx={{ fontSize: 90, color: '#0b5299' }} />,
+                        gradient: 'linear-gradient(135deg, #0b5299 0%, #1e40af 100%)',
+                        shadow: 'rgba(11, 82, 153, 0.22)',
+                        bgGradient: 'linear-gradient(145deg, #ffffff 0%, #f0f7ff 100%)',
+                        borderColor: '#e2e8f0',
+                        hoverBorder: '#93c5fd',
+                        badgeBg: '#eff6ff',
+                        badgeColor: '#1d4ed8'
+                    },
+                    {
+                        title: 'Pending Collection',
+                        count: activeKpi.pendingCount,
+                        subtitle: 'Hostel room allotted, cash unpaid',
+                        badge: 'Pending',
+                        icon: <HotelIcon sx={{ fontSize: 26, color: '#ffffff' }} />,
+                        bgIcon: <HotelIcon sx={{ fontSize: 90, color: '#d97706' }} />,
+                        gradient: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)',
+                        shadow: 'rgba(217, 119, 6, 0.22)',
+                        bgGradient: 'linear-gradient(145deg, #ffffff 0%, #fffbeb 100%)',
+                        borderColor: '#e2e8f0',
+                        hoverBorder: '#fde68a',
+                        badgeBg: '#fffbeb',
+                        badgeColor: '#b45309'
+                    },
+                    {
+                        title: 'Refunded on Checkout',
+                        count: activeKpi.refundedCount,
+                        subtitle: 'Successfully returned',
+                        badge: 'Refunded',
+                        icon: <ReceiptIcon sx={{ fontSize: 26, color: '#ffffff' }} />,
+                        bgIcon: <ReceiptIcon sx={{ fontSize: 90, color: '#6366f1' }} />,
+                        gradient: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
+                        shadow: 'rgba(79, 70, 229, 0.22)',
+                        bgGradient: 'linear-gradient(145deg, #ffffff 0%, #f5f3ff 100%)',
+                        borderColor: '#e2e8f0',
+                        hoverBorder: '#ddd6fe',
+                        badgeBg: '#f5f3ff',
+                        badgeColor: '#4f46e5'
+                    }
+                ].map((stat, index) => (
+                    <Card
+                        key={index}
+                        sx={{
+                            position: 'relative',
+                            overflow: 'hidden',
+                            borderRadius: '16px',
+                            background: stat.bgGradient,
+                            border: `1px solid ${stat.borderColor}`,
+                            boxShadow: '0 2px 12px rgba(15, 23, 42, 0.04)',
+                            transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                            height: '100%',
+                            '&:hover': {
+                                transform: 'translateY(-3px)',
+                                boxShadow: '0 10px 24px rgba(15, 23, 42, 0.08)',
+                                borderColor: stat.hoverBorder
+                            }
+                        }}
+                    >
+                        {/* Corner Category Badge */}
+                        <Chip
+                            label={stat.badge}
+                            size="small"
+                            sx={{
+                                position: 'absolute',
+                                top: 12,
+                                right: 12,
+                                bgcolor: stat.badgeBg,
+                                color: stat.badgeColor,
+                                fontWeight: 600,
+                                fontSize: '0.72rem',
+                                height: '22px',
+                                borderRadius: '6px',
+                                zIndex: 1
+                            }}
+                        />
 
-                <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5, bgcolor: '#ffffff' }}>
-                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>DEPOSITS PAID</Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 800, color: '#0b5299', mt: 0.5 }}>
-                        {activeKpi.paidCount}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: '#64748b' }}>
-                        Active holding deposit
-                    </Typography>
-                </Paper>
+                        {/* Subtle decorative watermark icon */}
+                        <Box sx={{
+                            position: 'absolute',
+                            right: -8,
+                            bottom: -8,
+                            opacity: 0.04,
+                            pointerEvents: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}>
+                            {stat.bgIcon}
+                        </Box>
 
-                <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5, bgcolor: '#ffffff' }}>
-                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>PENDING COLLECTION</Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 800, color: '#d97706', mt: 0.5 }}>
-                        {activeKpi.pendingCount}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: '#b45309' }}>
-                        Hostel room allotted, cash unpaid
-                    </Typography>
-                </Paper>
+                        <CardContent sx={{ py: 2, pr: 2, pl: 1.5, '&:last-child': { pb: 2 } }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1.5 }}>
+                                {/* Icon badge */}
+                                <Box sx={{
+                                    width: 52,
+                                    height: 52,
+                                    borderRadius: '12px',
+                                    background: stat.gradient,
+                                    boxShadow: `0 4px 12px ${stat.shadow}`,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexShrink: 0,
+                                    transition: 'transform 0.2s',
+                                    '&:hover': { transform: 'scale(1.05)' }
+                                }}>
+                                    {stat.icon}
+                                </Box>
 
-                <Paper variant="outlined" sx={{ p: 2, borderRadius: 2.5, bgcolor: '#ffffff' }}>
-                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>REFUNDED ON CHECKOUT</Typography>
-                    <Typography variant="h4" sx={{ fontWeight: 800, color: '#64748b', mt: 0.5 }}>
-                        {activeKpi.refundedCount}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: '#64748b' }}>
-                        Successfully returned
-                    </Typography>
-                </Paper>
+                                <Box sx={{ minWidth: 0, flex: 1 }}>
+                                    <Typography
+                                        variant="caption"
+                                        sx={{
+                                            color: '#64748b',
+                                            fontWeight: 600,
+                                            fontSize: '0.75rem',
+                                            letterSpacing: '0.5px',
+                                            textTransform: 'uppercase',
+                                            display: 'block',
+                                            mb: 0.5,
+                                            whiteSpace: 'nowrap',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis'
+                                        }}
+                                    >
+                                        {stat.title}
+                                    </Typography>
+                                    <Typography
+                                        sx={{
+                                            fontWeight: 800,
+                                            color: '#0f172a',
+                                            fontSize: { xs: '1.5rem', sm: '1.75rem', md: '1.9rem' },
+                                            lineHeight: 1
+                                        }}
+                                    >
+                                        {stat.count}
+                                    </Typography>
+                                </Box>
+                            </Box>
+
+                            {/* Subtitle */}
+                            <Typography
+                                variant="caption"
+                                sx={{
+                                    color: '#94a3b8',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 500,
+                                    display: 'block'
+                                }}
+                            >
+                                {stat.subtitle}
+                            </Typography>
+                        </CardContent>
+                    </Card>
+                ))}
             </Box>
 
             {/* Filter Bar */}
@@ -583,34 +740,95 @@ const CautionDeposite = () => {
                     }}
                 />
 
-                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                    {[
-                        { label: 'All', value: 'all' },
-                        { label: `Paid (${activeKpi.paidCount})`, value: 'paid' },
-                        { label: `Pending (${activeKpi.pendingCount})`, value: 'pending' },
-                        { label: `Refunded (${activeKpi.refundedCount})`, value: 'refunded' }
-                    ].map(f => (
-                        <Button
-                            key={f.value}
-                            size="small"
-                            variant={filterStatus === f.value ? 'contained' : 'outlined'}
-                            onClick={() => setFilterStatus(f.value)}
-                            sx={{
-                                borderRadius: 2,
-                                textTransform: 'none',
-                                fontWeight: 600,
-                                bgcolor: filterStatus === f.value ? '#0b5299' : 'transparent',
-                                borderColor: '#cbd5e1',
-                                color: filterStatus === f.value ? '#ffffff' : '#475569',
-                                '&:hover': {
-                                    bgcolor: filterStatus === f.value ? '#093f77' : 'rgba(0,0,0,0.04)'
-                                }
-                            }}
-                        >
-                            {f.label}
-                        </Button>
-                    ))}
-                </Box>
+                <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 220 } }}>
+                    <InputLabel id="filter-status-label" sx={{ fontSize: '0.88rem', color: '#64748b' }}>
+                        Filter by Status
+                    </InputLabel>
+                    <Select
+                        labelId="filter-status-label"
+                        id="filter-status-select"
+                        value={filterStatus}
+                        label="Filter by Status"
+                        onChange={(e) => setFilterStatus(e.target.value)}
+                        startAdornment={
+                            <InputAdornment position="start">
+                                <FilterListIcon sx={{ color: '#64748b', fontSize: 20 }} />
+                            </InputAdornment>
+                        }
+                        renderValue={(selected) => {
+                            if (selected === 'all') return 'All Statuses';
+                            if (selected === 'paid') return `Paid (${activeKpi.paidCount})`;
+                            if (selected === 'pending') return `Pending (${activeKpi.pendingCount})`;
+                            if (selected === 'refunded') return `Refunded (${activeKpi.refundedCount})`;
+                            return selected;
+                        }}
+                        sx={{
+                            borderRadius: 2,
+                            bgcolor: '#ffffff',
+                            fontWeight: 600,
+                            fontSize: '0.88rem',
+                            color: '#0f172a',
+                            '& .MuiOutlinedInput-notchedOutline': {
+                                borderColor: '#cbd5e1'
+                            },
+                            '&:hover .MuiOutlinedInput-notchedOutline': {
+                                borderColor: '#94a3b8'
+                            },
+                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                borderColor: '#0b5299'
+                            }
+                        }}
+                    >
+                        <MenuItem value="all" sx={{ fontWeight: 600, fontSize: '0.88rem' }}>
+                            All Statuses
+                        </MenuItem>
+                        <MenuItem value="paid" sx={{ fontWeight: 600, fontSize: '0.88rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span>Paid</span>
+                            <Chip
+                                label={activeKpi.paidCount}
+                                size="small"
+                                sx={{
+                                    height: 20,
+                                    fontSize: '0.72rem',
+                                    fontWeight: 700,
+                                    bgcolor: '#eff6ff',
+                                    color: '#1d4ed8',
+                                    ml: 1.5
+                                }}
+                            />
+                        </MenuItem>
+                        <MenuItem value="pending" sx={{ fontWeight: 600, fontSize: '0.88rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span>Pending</span>
+                            <Chip
+                                label={activeKpi.pendingCount}
+                                size="small"
+                                sx={{
+                                    height: 20,
+                                    fontSize: '0.72rem',
+                                    fontWeight: 700,
+                                    bgcolor: '#fffbeb',
+                                    color: '#b45309',
+                                    ml: 1.5
+                                }}
+                            />
+                        </MenuItem>
+                        <MenuItem value="refunded" sx={{ fontWeight: 600, fontSize: '0.88rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span>Refunded</span>
+                            <Chip
+                                label={activeKpi.refundedCount}
+                                size="small"
+                                sx={{
+                                    height: 20,
+                                    fontSize: '0.72rem',
+                                    fontWeight: 700,
+                                    bgcolor: '#f5f3ff',
+                                    color: '#4f46e5',
+                                    ml: 1.5
+                                }}
+                            />
+                        </MenuItem>
+                    </Select>
+                </FormControl>
             </Paper>
 
             {/* Table Container */}
@@ -712,7 +930,7 @@ const CautionDeposite = () => {
                                             </TableCell>
                                             <TableCell>
                                                 {isRefunded ? (
-                                                    <Chip label="Refunded" size="small" sx={{ bgcolor: '#f1f5f9', color: '#64748b', fontWeight: 700, height: 24 }} />
+                                                    <Chip label="Refund Completed" size="small" sx={{ bgcolor: '#dcfce7', color: '#166534', fontWeight: 700, height: 24, border: '1px solid #86efac' }} />
                                                 ) : isPaid ? (
                                                     <Chip
                                                         icon={<CheckCircleIcon sx={{ fontSize: '14px !important' }} />}
@@ -755,14 +973,6 @@ const CautionDeposite = () => {
                                                             </Tooltip>
                                                         )}
 
-                                                        <Button
-                                                            size="small"
-                                                            variant="text"
-                                                            onClick={() => handleResetDeposit(item, false)}
-                                                            sx={{ textTransform: 'none', fontSize: '11px', color: '#94a3b8', minWidth: 'auto', p: 0.5, '&:hover': { color: '#ef4444' } }}
-                                                        >
-                                                            Reset
-                                                        </Button>
                                                     </Box>
                                                 ) : item.allottedMembers.length > 0 ? (
                                                     <Button
@@ -886,7 +1096,7 @@ const CautionDeposite = () => {
                                             </TableCell>
                                             <TableCell>
                                                 {isRefunded ? (
-                                                    <Chip label="Refunded" size="small" sx={{ bgcolor: '#f1f5f9', color: '#64748b', fontWeight: 700, height: 24 }} />
+                                                    <Chip label="Refund Completed" size="small" sx={{ bgcolor: '#dcfce7', color: '#166534', fontWeight: 700, height: 24, border: '1px solid #86efac' }} />
                                                 ) : isPaid ? (
                                                     <Chip
                                                         icon={<CheckCircleIcon sx={{ fontSize: '14px !important' }} />}
@@ -929,14 +1139,6 @@ const CautionDeposite = () => {
                                                             </Tooltip>
                                                         )}
 
-                                                        <Button
-                                                            size="small"
-                                                            variant="text"
-                                                            onClick={() => handleResetDeposit(item, true)}
-                                                            sx={{ textTransform: 'none', fontSize: '11px', color: '#94a3b8', minWidth: 'auto', p: 0.5, '&:hover': { color: '#ef4444' } }}
-                                                        >
-                                                            Reset
-                                                        </Button>
                                                     </Box>
                                                 ) : item.hasRoom ? (
                                                     <Button
@@ -1091,98 +1293,265 @@ const CautionDeposite = () => {
                 </DialogActions>
             </Dialog>
 
-            {/* Receipt Modal */}
+            {/* Modern Official Receipt Modal (Matching Image 2) */}
             <Dialog
                 open={receiptModalOpen}
                 onClose={() => setReceiptModalOpen(false)}
-                maxWidth="sm"
+                maxWidth="md"
                 fullWidth
-                slotProps={{ paper: { sx: { borderRadius: 3, p: 1 } } }}
+                slotProps={{ paper: { sx: { borderRadius: 3, maxWidth: 860, overflow: 'hidden' } } }}
             >
-                <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: '#f8fafc', py: 1.5, px: 3, borderBottom: '1px solid #e2e8f0' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <ReceiptIcon sx={{ color: '#059669' }} />
-                        <Typography sx={{ fontWeight: 700 }}>Hostel Caution Deposit Receipt</Typography>
+                        <Typography sx={{ fontWeight: 700, color: '#0f172a' }}>Hostel Caution Deposit Receipt</Typography>
                     </Box>
                     <IconButton size="small" onClick={() => setReceiptModalOpen(false)}>
                         <ClearIcon fontSize="small" />
                     </IconButton>
                 </DialogTitle>
-                <DialogContent dividers sx={{ p: 3 }}>
-                    {receiptData && (
-                        <Box sx={{ p: 2.5, border: '2px dashed #cbd5e1', borderRadius: 2, bgcolor: '#fcfdfd' }}>
-                            <Box sx={{ textAlign: 'center', pb: 2, borderBottom: '1px solid #e2e8f0', mb: 2 }}>
-                                <Typography variant="h6" sx={{ fontWeight: 800, color: '#0b5299' }}>
-                                    SOUTH ZONE INTER-UNIVERSITY TOURNAMENT
-                                </Typography>
-                                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#334155' }}>
-                                    HOSTEL ACCOMMODATION - {receiptData.isCoach ? 'COACH' : 'TEAM'} CAUTION DEPOSIT RECEIPT
-                                </Typography>
-                                <Typography variant="caption" sx={{ color: '#64748b' }}>
-                                    (Official Cash / Manual Payment Voucher)
-                                </Typography>
-                            </Box>
 
-                            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5, mb: 2, fontSize: '0.88rem' }}>
-                                <Box>
-                                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>RECEIPT NO:</Typography>
-                                    <Typography sx={{ fontWeight: 700, color: '#0f172a' }}>{receiptData.deposit?.receiptNo || 'CD-MANUAL'}</Typography>
-                                </Box>
-                                <Box sx={{ textAlign: 'right' }}>
-                                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>DATE & TIME:</Typography>
-                                    <Typography sx={{ fontWeight: 700, color: '#0f172a' }}>
-                                        {receiptData.deposit?.paidAt ? new Date(receiptData.deposit.paidAt).toLocaleDateString() : 'Today'}
-                                    </Typography>
-                                </Box>
-                                <Box sx={{ gridColumn: 'span 2' }}>
-                                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>UNIVERSITY / INSTITUTION:</Typography>
-                                    <Typography sx={{ fontWeight: 700, color: '#0b5299', fontSize: '1rem' }}>{receiptData.universityName}</Typography>
-                                </Box>
-                                <Box>
-                                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>RECEIVED FROM (PAID BY):</Typography>
-                                    <Typography sx={{ fontWeight: 700, color: '#0f172a' }}>
-                                        {receiptData.isCoach
-                                            ? `${receiptData.coachName} (${receiptData.coachRole || 'Coach'})`
-                                            : `${receiptData.deposit?.paidBy?.name || 'Representative'} (${receiptData.deposit?.paidBy?.role || 'Member'})`
-                                        }
-                                    </Typography>
-                                    <Typography variant="caption" sx={{ color: '#64748b' }}>
-                                        Phone: {receiptData.isCoach ? receiptData.coachPhone : (receiptData.deposit?.paidBy?.phone || 'N/A')}
-                                    </Typography>
-                                </Box>
-                                <Box sx={{ textAlign: 'right' }}>
-                                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>ALLOTTED HOSTEL ROOM:</Typography>
-                                    <Typography sx={{ fontWeight: 700, color: '#0f172a' }}>
-                                        Room {receiptData.roomNumber || receiptData.deposit?.paidBy?.roomNumber || 'Allotted'}
-                                    </Typography>
-                                </Box>
-                                <Box>
-                                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>PAYMENT MODE:</Typography>
-                                    <Typography sx={{ fontWeight: 700, color: '#047857' }}>{receiptData.deposit?.paymentMode || 'Cash'} (Manual Receipt)</Typography>
-                                </Box>
-                                <Box sx={{ textAlign: 'right' }}>
-                                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>AMOUNT RECEIVED:</Typography>
-                                    <Typography sx={{ fontWeight: 800, color: '#047857', fontSize: '1.2rem' }}>₹{Number(receiptData.deposit?.amount || 0).toLocaleString('en-IN')}</Typography>
-                                </Box>
-                            </Box>
+                <DialogContent sx={{ p: { xs: 2, sm: 3.5 }, bgcolor: '#ffffff' }}>
+                    {receiptData && (() => {
+                        const amount = Number(receiptData.deposit?.amount || 2000);
+                        const payerName = receiptData.isCoach
+                            ? `${receiptData.coachName || 'Coach'} (${receiptData.coachRole || 'Coach'})`
+                            : `${receiptData.deposit?.paidBy?.name || 'Representative'} (${receiptData.deposit?.paidBy?.role || 'Player'})`;
+                        const payerPhone = receiptData.isCoach
+                            ? (receiptData.coachPhone || 'N/A')
+                            : (receiptData.deposit?.paidBy?.phone || 'N/A');
+                        const rawRoom = receiptData.roomNumber || (receiptData.rooms && receiptData.rooms.length > 0 ? (receiptData.rooms[0]?.roomNumber || receiptData.rooms[0]) : null);
+                        const roomDisplay = rawRoom ? (String(rawRoom).toLowerCase().startsWith('room') ? rawRoom : `Room ${rawRoom}`) : 'Room 205';
+                        const receiptDate = receiptData.deposit?.paidAt
+                            ? new Date(receiptData.deposit.paidAt).toLocaleDateString('en-US')
+                            : new Date().toLocaleDateString('en-US');
 
-                            <Box sx={{ bgcolor: '#ecfdf5', p: 1.5, borderRadius: 1.5, border: '1px solid #a7f3d0' }}>
-                                <Typography variant="caption" sx={{ color: '#065f46', fontWeight: 600, display: 'block' }}>
-                                    Note: Refundable at checkout upon hostel room clearance and key return.
-                                </Typography>
+                        return (
+                            <Box sx={{ width: '100%' }}>
+                                <Box id="caution-deposit-printable-receipt" sx={{ bgcolor: '#ffffff', color: '#0f172a', p: { xs: 2, sm: 2.5 } }}>
+                                    {/* Top Header Section */}
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1.5, sm: 2.5 }, mb: 1, flexWrap: { xs: 'wrap', sm: 'nowrap' } }}>
+                                        {/* University Logo */}
+                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', pr: { xs: 0, sm: 2.5 }, borderRight: { xs: 'none', sm: '1.5px solid #e2e8f0' }, minWidth: { sm: 145 } }}>
+                                            <Box
+                                                component="img"
+                                                src="/ADITYA LOGO2.png"
+                                                alt="Aditya University"
+                                                sx={{ height: { xs: 46, sm: 58 }, width: 'auto', objectFit: 'contain' }}
+                                            />
+                                        </Box>
+
+                                        {/* Header Text */}
+                                        <Box sx={{ flex: 1, textAlign: { xs: 'left', sm: 'center' } }}>
+                                            <Typography sx={{ fontWeight: 900, color: '#0b3b80', fontSize: { xs: '1rem', sm: '1.2rem' }, letterSpacing: '0.4px', textTransform: 'uppercase', lineHeight: 1.2 }}>
+                                                SOUTH ZONE INTER-UNIVERSITY TOURNAMENT
+                                            </Typography>
+                                            <Typography sx={{ fontWeight: 800, color: '#334155', fontSize: { xs: '0.8rem', sm: '0.9rem' }, letterSpacing: '0.2px', textTransform: 'uppercase', mt: 0.35 }}>
+                                                HOSTEL ACCOMMODATION - {receiptData.isCoach ? 'COACH' : 'TEAM'} CAUTION DEPOSIT RECEIPT
+                                            </Typography>
+                                            <Typography sx={{ color: '#64748b', fontSize: '0.78rem', mt: 0.2 }}>
+                                                (Official Cash / Manual Payment Voucher)
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+
+                                    {/* 2-Tone Accent Line */}
+                                    <Box sx={{ display: 'flex', height: '3.5px', width: '130px', mx: 'auto', borderRadius: 2, overflow: 'hidden', mt: 0.8, mb: 1.25 }}>
+                                        <Box sx={{ flex: 1, bgcolor: '#ea580c' }} />
+                                        <Box sx={{ flex: 1, bgcolor: '#0284c7' }} />
+                                    </Box>
+                                    <Divider sx={{ borderColor: '#e2e8f0', mb: 1.5 }} />
+
+                                    {/* Receipt No & Date Banner */}
+                                    <Box sx={{
+                                        display: 'grid',
+                                        gridTemplateColumns: '1fr 1px 1fr',
+                                        alignItems: 'center',
+                                        bgcolor: '#f8fafc',
+                                        border: '1px solid #e2e8f0',
+                                        borderRadius: 2,
+                                        py: 1,
+                                        px: { xs: 2, sm: 3 },
+                                        mb: 1.75
+                                    }}>
+                                        <Box>
+                                            <Typography sx={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>Receipt No.</Typography>
+                                            <Typography sx={{ fontWeight: 900, color: '#0f172a', fontSize: { xs: '1rem', sm: '1.12rem' }, letterSpacing: '0.5px' }}>
+                                                {receiptData.deposit?.receiptNo || 'CD-MANUAL'}
+                                            </Typography>
+                                        </Box>
+                                        <Box sx={{ height: 32, bgcolor: '#cbd5e1' }} />
+                                        <Box sx={{ pl: { xs: 2, sm: 3 } }}>
+                                            <Typography sx={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>Date & Time</Typography>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                                                <CalendarTodayOutlinedIcon sx={{ color: '#0284c7', fontSize: 18 }} />
+                                                <Typography sx={{ fontWeight: 900, color: '#0f172a', fontSize: { xs: '1rem', sm: '1.12rem' } }}>
+                                                    {receiptDate}
+                                                </Typography>
+                                            </Box>
+                                        </Box>
+                                    </Box>
+
+                                    {/* Main Details: 2 Columns - 6*6 (50% / 50%) Alignment */}
+                                    <Box sx={{
+                                        display: 'grid',
+                                        gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                                        gap: { xs: 2, sm: 2.5 },
+                                        alignItems: 'start',
+                                        mb: 1.75
+                                    }}>
+                                        {/* Left Column (6 of 12): University, Paid By, Payment Mode */}
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.6 }}>
+                                            {/* University / Institution */}
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                    <SchoolIcon sx={{ color: '#0284c7', fontSize: 22 }} />
+                                                </Box>
+                                                <Box>
+                                                    <Typography sx={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>University / Institution</Typography>
+                                                    <Typography sx={{ fontWeight: 800, color: '#0b5299', fontSize: '1.02rem', lineHeight: 1.25 }}>
+                                                        {receiptData.universityName}
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+
+                                            {/* Received From (Paid By) */}
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                    <PersonIcon sx={{ color: '#0284c7', fontSize: 22 }} />
+                                                </Box>
+                                                <Box>
+                                                    <Typography sx={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>Received From (Paid By)</Typography>
+                                                    <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.98rem', lineHeight: 1.25 }}>
+                                                        {payerName}
+                                                    </Typography>
+                                                    <Typography sx={{ fontSize: '11.5px', color: '#64748b', mt: 0.15 }}>
+                                                        Phone: {payerPhone}
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+
+                                            {/* Payment Mode */}
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                    <CreditCardIcon sx={{ color: '#0284c7', fontSize: 22 }} />
+                                                </Box>
+                                                <Box>
+                                                    <Typography sx={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>Payment Mode</Typography>
+                                                    <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.98rem', lineHeight: 1.25 }}>
+                                                        {receiptData.deposit?.paymentMode || 'Cash'} (Manual Receipt)
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+                                        </Box>
+
+                                        {/* Right Column (6 of 12): Amount Received & Room */}
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                            {/* Mint Green Card */}
+                                            <Box sx={{ bgcolor: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 2.5, p: 1.6, px: 2, width: '100%', boxSizing: 'border-box' }}>
+                                                <Typography sx={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>Amount Received</Typography>
+                                                <Typography sx={{ fontSize: { xs: '1.9rem', sm: '2.25rem' }, fontWeight: 900, color: '#059669', lineHeight: 1.15, my: 0.35 }}>
+                                                    ₹{amount.toLocaleString('en-IN')}
+                                                </Typography>
+                                                <Divider sx={{ my: 0.8, borderColor: '#bbf7d0' }} />
+                                                <Typography sx={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>Amount in Words</Typography>
+                                                <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '12.5px' }}>
+                                                    {getAmountInWords(amount)}
+                                                </Typography>
+                                            </Box>
+
+                                            {/* Allotted Hostel Room */}
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                    <HotelIcon sx={{ color: '#0284c7', fontSize: 22 }} />
+                                                </Box>
+                                                <Box>
+                                                    <Typography sx={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>Allotted Hostel Room</Typography>
+                                                    <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '1.02rem', lineHeight: 1.25 }}>
+                                                        {roomDisplay}
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+                                        </Box>
+                                    </Box>
+
+                                    <Divider sx={{ borderColor: '#e2e8f0', my: 1.25 }} />
+
+                                    {/* Note Banner */}
+                                    <Box sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 1.25,
+                                        bgcolor: '#fffbeb',
+                                        border: '1px solid #fde68a',
+                                        borderRadius: 1.75,
+                                        p: 1.1,
+                                        px: 1.75,
+                                        mb: 1.75
+                                    }}>
+                                        <Box sx={{ width: 22, height: 22, borderRadius: '50%', bgcolor: '#ea580c', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#ffffff', fontWeight: 900, fontSize: '12px' }}>
+                                            !
+                                        </Box>
+                                        <Typography sx={{ fontSize: '12px', color: '#334155' }}>
+                                            <strong style={{ color: '#c2410c' }}>Note:</strong> Refundable at checkout upon hostel room clearance and key return.
+                                        </Typography>
+                                    </Box>
+
+                                    {/* Footer: University Address & Signature */}
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', pb: 1, flexWrap: 'wrap', gap: 2 }}>
+                                        <Box>
+                                            <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '13px' }}>Aditya University</Typography>
+                                            <Typography sx={{ color: '#64748b', fontSize: '11px', mt: 0.2 }}>
+                                                Surampalem, Kakinada District, Andhra Pradesh - 533437
+                                            </Typography>
+                                        </Box>
+                                        <Box sx={{ textAlign: 'center', minWidth: 170 }}>
+                                            <Box sx={{ borderBottom: '1.5px dotted #94a3b8', width: '100%', mb: 0.5 }} />
+                                            <Typography sx={{ color: '#64748b', fontSize: '11px', fontWeight: 600 }}>
+                                                Authorised Signature
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+
+                                    {/* Bottom Decorative Bar */}
+                                    <Box sx={{ display: 'flex', height: '3.5px', width: '100%', borderRadius: 1, overflow: 'hidden' }}>
+                                        <Box sx={{ flex: 1, bgcolor: '#ea580c' }} />
+                                        <Box sx={{ flex: 1, bgcolor: '#0284c7' }} />
+                                    </Box>
+                                </Box>
+
+                                {/* Half Page Cut Indicator (Only in Print, below the receipt box) */}
+                                <Box sx={{
+                                    display: 'none',
+                                    '@media print': {
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: 1.5,
+                                        mt: 1.5,
+                                        color: '#64748b',
+                                        fontSize: '11px',
+                                        fontWeight: 600
+                                    }
+                                }}>
+                                    <Box sx={{ flex: 1, borderTop: '1px dashed #94a3b8' }} />
+                                    <span>✂ Cut or Fold Here (A4 Half-Page / A5 Official Receipt)</span>
+                                    <Box sx={{ flex: 1, borderTop: '1px dashed #94a3b8' }} />
+                                </Box>
                             </Box>
-                        </Box>
-                    )}
+                        );
+                    })()}
                 </DialogContent>
-                <DialogActions sx={{ p: 2, display: 'flex', justifyContent: 'space-between' }}>
-                    <Button onClick={() => setReceiptModalOpen(false)} variant="outlined" sx={{ textTransform: 'none' }}>
+
+                <DialogActions sx={{ p: 2, px: 3, display: 'flex', justifyContent: 'space-between', bgcolor: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
+                    <Button onClick={() => setReceiptModalOpen(false)} variant="outlined" sx={{ textTransform: 'none', borderRadius: 2 }}>
                         Close
                     </Button>
                     <Button
                         variant="contained"
                         startIcon={<PrintIcon />}
-                        onClick={() => window.print()}
-                        sx={{ textTransform: 'none', bgcolor: '#059669', '&:hover': { bgcolor: '#047857' } }}
+                        onClick={handlePrintReceipt}
+                        sx={{ textTransform: 'none', bgcolor: '#059669', borderRadius: 2, fontWeight: 700, px: 2.5, '&:hover': { bgcolor: '#047857' } }}
                     >
                         Print Receipt
                     </Button>

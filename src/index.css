@@ -753,3 +753,86 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
     transform: rotate(360deg);
   }
 }
+
+/* =========================================================
+   Print Styles for Official Receipts & Vouchers
+   ========================================================= */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm 10mm;
+  }
+
+  /* 1. Hide everything on the page except the Dialog modal */
+  body > *:not(.MuiDialog-root),
+  #root,
+  header,
+  nav,
+  aside,
+  footer,
+  .mobile-bottom-bar,
+  .admin-sidebar,
+  .admin-header,
+  .MuiBackdrop-root,
+  .MuiDialogTitle-root,
+  .MuiDialogActions-root {
+    display: none !important;
+  }
+
+  /* 2. Reset html & body for single-page printing */
+  html,
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* 3. Force all dialog containers to 100% full width */
+  .MuiDialog-root,
+  .MuiDialog-container,
+  .MuiDialog-paper,
+  .MuiPaper-root,
+  .MuiDialogContent-root {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    overflow: visible !important;
+    box-sizing: border-box !important;
+  }
+
+  /* 4. Format the printable receipt into full-width top-half of A4 Portrait (Border-free) */
+  #caution-deposit-printable-receipt {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
+    box-sizing: border-box !important;
+    padding: 10px 12px 10px 12px !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    min-height: 132mm !important;
+    max-height: 136mm !important;
+  }
+}

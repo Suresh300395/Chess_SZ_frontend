@@ -19,8 +19,6 @@ const escapeHtml = (value) => {
  * Generate HTML markup for a single 80mm thermal food token receipt
  */
 const generateTokenHTML = (token, qrDataUrl) => {
-    const isReprint = Boolean(token.isReprint || (token.printCount && token.printCount > 1));
-    const locationInfo = [token.block, token.room ? `Room ${token.room}` : ''].filter(Boolean).join(' - ');
     const safeQr = (typeof qrDataUrl === 'string' && qrDataUrl.startsWith('data:image/')) ? qrDataUrl : '';
 
     return `
@@ -37,37 +35,18 @@ const generateTokenHTML = (token, qrDataUrl) => {
                 <div class="meal-date">${escapeHtml(formatDateDDMMYYYY(token.mealDate))}</div>
             </div>
 
-            <div class="details-section">
-                <div class="row">
-                    <span class="label">Name:</span>
-                    <span class="value name-val">${escapeHtml(token.name || 'Participant')}</span>
-                </div>
-                ${token.identifier ? `
-                <div class="row">
-                    <span class="label">ID/Mobile:</span>
-                    <span class="value">${escapeHtml(token.identifier)}</span>
-                </div>` : ''}
-                ${token.teamOrSport ? `
-                <div class="row">
-                    <span class="label">Team:</span>
-                    <span class="value">${escapeHtml(token.teamOrSport)}</span>
-                </div>` : ''}
-                ${locationInfo ? `
-                <div class="row">
-                    <span class="label">Stay:</span>
-                    <span class="value">${escapeHtml(locationInfo)}</span>
-                </div>` : ''}
-            </div>
-
             <div class="qr-section">
                 <img src="${safeQr}" alt="QR Code" class="qr-img" />
                 <div class="token-code">${escapeHtml(token.code)}</div>
             </div>
 
-            <div class="footer">
-                <div class="validity">Valid for one-time use only</div>
-                ${isReprint ? `<div class="reprint-badge">*** REPRINT (Copy #${escapeHtml(token.printCount)}) ***</div>` : ''}
-                <div class="timestamp">Printed: ${escapeHtml(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}</div>
+            <!-- Tear-off cut strip with scissors -->
+            <div class="cut-strip">
+                <span class="cut-scissors left">&#x2702;</span>
+                <span class="cut-line"></span>
+                <span class="cut-text">TEAR HERE</span>
+                <span class="cut-line"></span>
+                <span class="cut-scissors right">&#x2702;</span>
             </div>
         </div>
     `;
@@ -94,18 +73,14 @@ const thermalStyles = `
         width: calc(${PAPER_WIDTH} - 10mm);
         max-width: 72mm;
         margin: 0 auto;
-        padding: 5mm 2mm;
+        padding: 5mm 2mm 3mm 2mm;
         text-align: center;
-        page-break-after: always;
-        break-after: page;
+        page-break-inside: avoid;
+        break-inside: avoid;
         box-sizing: border-box;
     }
-    .token-container:last-child {
-        page-break-after: avoid;
-        break-after: avoid;
-    }
     .header {
-        margin-bottom: 3mm;
+        margin-bottom: 2mm;
     }
     .org-name {
         font-size: 14pt;
@@ -124,58 +99,32 @@ const thermalStyles = `
         margin: 2.5mm 0;
     }
     .meal-section {
-        margin: 2mm 0;
+        margin: 2mm 0 3mm 0;
     }
     .meal-badge {
-        font-size: 8pt;
+        font-size: 8.5pt;
         font-weight: 700;
-        letter-spacing: 1px;
+        letter-spacing: 1.5px;
     }
     .meal-type {
-        font-size: 19pt;
+        font-size: 20pt;
         font-weight: 900;
         margin: 1mm 0;
-        letter-spacing: 1px;
+        letter-spacing: 1.5px;
         text-transform: uppercase;
     }
     .meal-date {
-        font-size: 9.5pt;
-        font-weight: 600;
-    }
-    .details-section {
-        border-top: 1px dashed #000000;
-        border-bottom: 1px dashed #000000;
-        padding: 2.5mm 1mm;
-        margin: 2.5mm 0;
-        text-align: left;
-        font-size: 9pt;
-    }
-    .row {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 1mm;
-        line-height: 1.2;
-    }
-    .label {
+        font-size: 10pt;
         font-weight: 700;
-        width: 32%;
-    }
-    .value {
-        font-weight: 500;
-        width: 68%;
-        word-break: break-word;
-    }
-    .name-val {
-        font-weight: 800;
-        font-size: 9.5pt;
+        letter-spacing: 0.5px;
     }
     .qr-section {
         margin: 3mm auto 1mm auto;
         text-align: center;
     }
     .qr-img {
-        width: 38mm;
-        height: 38mm;
+        width: 44mm;
+        height: 44mm;
         image-rendering: pixelated;
         display: block;
         margin: 0 auto;
@@ -185,28 +134,36 @@ const thermalStyles = `
         font-size: 14pt;
         font-weight: 900;
         letter-spacing: 2.5px;
-        margin-top: 1.5mm;
+        margin-top: 2mm;
     }
-    .footer {
-        margin-top: 3mm;
-        font-size: 8pt;
-        line-height: 1.3;
+    .cut-strip {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 2mm;
+        margin-top: 5mm;
+        padding-top: 2mm;
+        color: #000000;
     }
-    .validity {
-        font-weight: 700;
-        text-transform: uppercase;
-        font-size: 8pt;
-        margin-bottom: 1mm;
+    .cut-line {
+        flex: 1;
+        border-bottom: 1.5px dashed #000000;
+        height: 0;
     }
-    .reprint-badge {
+    .cut-scissors {
+        font-size: 13pt;
+        line-height: 1;
+        display: inline-block;
+    }
+    .cut-scissors.left {
+        transform: scaleX(-1);
+    }
+    .cut-text {
+        font-size: 6.5pt;
         font-weight: 800;
-        font-size: 8pt;
-        margin-top: 1mm;
-    }
-    .timestamp {
-        font-size: 7pt;
-        color: #444;
-        margin-top: 1mm;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        padding: 0 1mm;
     }
 `;
 
@@ -270,14 +227,28 @@ const executeIframePrint = (contentHTML) => {
 };
 
 /**
+ * Build QR payload containing token unique ID, participant name, and meal/date details
+ */
+const buildQRPayload = (token) => {
+    const dataObj = {
+        code: token.code,
+        name: token.name || 'Participant',
+        meal: (token.mealType || '').toUpperCase(),
+        date: formatDateDDMMYYYY(token.mealDate)
+    };
+    return JSON.stringify(dataObj);
+};
+
+/**
  * Print a single food token
  * @param {Object} token - Token payload
  */
 export const printFoodToken = async (token) => {
     try {
         if (!token || !token.code) throw new Error('Invalid token payload for printing');
-        const qrDataUrl = await QRCode.toDataURL(token.code, {
-            width: 200,
+        const qrContent = buildQRPayload(token);
+        const qrDataUrl = await QRCode.toDataURL(qrContent, {
+            width: 220,
             margin: 1,
             color: { dark: '#000000', light: '#ffffff' },
             errorCorrectionLevel: 'M'
@@ -302,8 +273,9 @@ export const printMultipleFoodTokens = async (tokens) => {
 
         const htmlSnippets = [];
         for (const token of tokens) {
-            const qrDataUrl = await QRCode.toDataURL(token.code, {
-                width: 200,
+            const qrContent = buildQRPayload(token);
+            const qrDataUrl = await QRCode.toDataURL(qrContent, {
+                width: 220,
                 margin: 1,
                 color: { dark: '#000000', light: '#ffffff' },
                 errorCorrectionLevel: 'M'

@@ -546,7 +546,7 @@ const UserDashboard = () => {
                                             </Box>
                                             <Chip
                                                 icon={
-                                                    cd.refundStatus === 'Refunded' ? (
+                                                    (cd.refundStatus === 'Refunded' || cd.refundStatus === 'Refund Completed') ? (
                                                         <CheckCircleIcon sx={{ fontSize: '16px !important', color: '#166534 !important' }} />
                                                     ) : (cd.paid && cd.amount > 0) ? (
                                                         <CheckCircleIcon sx={{ fontSize: '16px !important', color: '#166534 !important' }} />
@@ -555,18 +555,18 @@ const UserDashboard = () => {
                                                     )
                                                 }
                                                 label={
-                                                    cd.refundStatus === 'Refunded'
-                                                        ? 'Refunded'
-                                                        : ((cd.paid && cd.amount > 0) ? (cd.refundStatus || 'Paid') : 'Unpaid')
+                                                    (cd.refundStatus === 'Refunded' || cd.refundStatus === 'Refund Completed')
+                                                        ? 'Refund Completed'
+                                                        : ((cd.paid && cd.amount > 0) ? 'Paid' : 'Unpaid')
                                                 }
                                                 size="small"
                                                 sx={{
-                                                    bgcolor: cd.refundStatus === 'Refunded' ? '#dcfce7' : ((cd.paid && cd.amount > 0) ? (cd.refundStatus === 'Refund Pending' ? '#fef3c7' : '#dcfce7') : '#f1f5f9'),
-                                                    color: cd.refundStatus === 'Refunded' ? '#166534' : ((cd.paid && cd.amount > 0) ? (cd.refundStatus === 'Refund Pending' ? '#b45309' : '#166534') : '#64748b'),
+                                                    bgcolor: (cd.refundStatus === 'Refunded' || cd.refundStatus === 'Refund Completed') ? '#dcfce7' : ((cd.paid && cd.amount > 0) ? '#dcfce7' : '#f1f5f9'),
+                                                    color: (cd.refundStatus === 'Refunded' || cd.refundStatus === 'Refund Completed') ? '#166534' : ((cd.paid && cd.amount > 0) ? '#166534' : '#64748b'),
                                                     fontWeight: 600,
-                                                    border: cd.refundStatus === 'Refunded' ? '1px solid #86efac' : ((cd.paid && cd.amount > 0) ? (cd.refundStatus === 'Refund Pending' ? '1px solid #fde68a' : '1px solid #86efac') : '1px solid #cbd5e1'),
+                                                    border: (cd.refundStatus === 'Refunded' || cd.refundStatus === 'Refund Completed') ? '1px solid #86efac' : ((cd.paid && cd.amount > 0) ? '1px solid #86efac' : '1px solid #cbd5e1'),
                                                     '& .MuiChip-icon': {
-                                                        color: cd.refundStatus === 'Refunded' ? '#166534' : ((cd.paid && cd.amount > 0) ? (cd.refundStatus === 'Refund Pending' ? '#b45309' : '#166534') : '#64748b')
+                                                        color: (cd.refundStatus === 'Refunded' || cd.refundStatus === 'Refund Completed') ? '#166534' : ((cd.paid && cd.amount > 0) ? '#166534' : '#64748b')
                                                     }
                                                 }}
                                             />
@@ -578,8 +578,8 @@ const UserDashboard = () => {
                                                         <Typography variant="h3" fontWeight="bold" color="#16a34a">
                                                             ₹{Number(cd.amount).toLocaleString('en-IN')}
                                                         </Typography>
-                                                        <Typography variant="subtitle1" fontWeight="600" color="#16a34a">
-                                                            Paid
+                                                        <Typography variant="subtitle1" fontWeight="600" color={(cd.refundStatus === 'Refunded' || cd.refundStatus === 'Refund Completed') ? '#0b5299' : '#16a34a'}>
+                                                            {(cd.refundStatus === 'Refunded' || cd.refundStatus === 'Refund Completed') ? 'Refund Completed' : 'Paid'}
                                                         </Typography>
                                                     </>
                                                 ) : (
@@ -627,7 +627,7 @@ const UserDashboard = () => {
                                                         Refund Information
                                                     </Typography>
                                                     <Typography variant="body2" color="#334155" sx={{ fontSize: '0.84rem', lineHeight: 1.55 }}>
-                                                        {cd.refundStatus === 'Refunded' ? (
+                                                        {(cd.refundStatus === 'Refunded' || cd.refundStatus === 'Refund Completed') ? (
                                                             <>
                                                                 Caution deposit of <strong>₹{Number(cd.amount || 0).toLocaleString('en-IN')}</strong> has been <strong>successfully refunded</strong>{(dashData?.userType === 'coach' || user?.role === 'coach') ? ' to Coach.' : ' to your university representative.'}
                                                             </>

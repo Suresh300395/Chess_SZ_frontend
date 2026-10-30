@@ -29,7 +29,9 @@ import {
     CircularProgress,
     Stack,
     Checkbox,
-    Avatar
+    Avatar,
+    Divider,
+    Grid
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
@@ -55,6 +57,8 @@ import PrintIcon from '@mui/icons-material/Print';
 import LocalAtmIcon from '@mui/icons-material/LocalAtm';
 import ReceiptIcon from '@mui/icons-material/Receipt';
 import PersonIcon from '@mui/icons-material/Person';
+import CreditCardIcon from '@mui/icons-material/CreditCard';
+import CalendarTodayOutlinedIcon from '@mui/icons-material/CalendarTodayOutlined';
 import io from 'socket.io-client';
 import { toast } from 'sonner';
 import CustomTabs from '../Common/Tabs';
@@ -75,6 +79,7 @@ const HostelProvision = () => {
     // Modal state for Mapping Room
     const [mapDialogOpen, setMapDialogOpen] = useState(false);
     const [selectedPerson, setSelectedPerson] = useState(null);
+    const [selectedHostel, setSelectedHostel] = useState('');
     const [selectedBuilding, setSelectedBuilding] = useState('Boys Hostel Block A');
     const [selectedFloor, setSelectedFloor] = useState('Floor 1');
     const [selectedRoom, setSelectedRoom] = useState('');
@@ -83,6 +88,7 @@ const HostelProvision = () => {
     // Modal state for Bulk University Room Allotment
     const [bulkModalOpen, setBulkModalOpen] = useState(false);
     const [bulkSelectedUniversity, setBulkSelectedUniversity] = useState('');
+    const [bulkHostel, setBulkHostel] = useState('');
     const [bulkBuilding, setBulkBuilding] = useState('');
     const [bulkFloor, setBulkFloor] = useState('');
     const [bulkRoom, setBulkRoom] = useState('');
@@ -299,7 +305,7 @@ const HostelProvision = () => {
         return tabFilteredList.filter(person =>
             person.accommodation === 'Yes' &&
             ((person.name && person.name.toLowerCase().includes(query)) ||
-            (person.university && person.university.toLowerCase().includes(query)))
+                (person.university && person.university.toLowerCase().includes(query)))
         );
     }, [tabFilteredList, searchQuery]);
 
@@ -360,14 +366,22 @@ const HostelProvision = () => {
         }
         setSelectedPerson(person);
 
+        const hostels = Array.from(new Set(dbBlocks.map(b => b.block).filter(Boolean)));
+
         // Pre-fill building
-        if (person.roomAllocation) {
-            setSelectedBuilding(person.roomAllocation.building || (dbBlocks.length > 0 ? dbBlocks[0].name : ''));
+        if (person.roomAllocation && person.roomAllocation.building) {
+            const currentBldg = dbBlocks.find(b => b.name === person.roomAllocation.building);
+            if (currentBldg?.block) setSelectedHostel(currentBldg.block);
+            else if (hostels.length > 0) setSelectedHostel(hostels[0]);
+            setSelectedBuilding(person.roomAllocation.building);
             setSelectedFloor(person.roomAllocation.floor || '');
             setSelectedRoom(person.roomAllocation.roomNumber || '');
         } else {
             // Suggest default building
-            const defaultBuilding = dbBlocks.length > 0 ? dbBlocks[0].name : '';
+            const defHostel = hostels.length > 0 ? hostels[0] : '';
+            setSelectedHostel(defHostel);
+            const matchingBldgs = dbBlocks.filter(b => b.block === defHostel);
+            const defaultBuilding = matchingBldgs.length > 0 ? matchingBldgs[0].name : (dbBlocks.length > 0 ? dbBlocks[0].name : '');
             setSelectedBuilding(defaultBuilding);
             const defaultBuildingObj = dbBlocks.find(b => b.name === defaultBuilding);
             const defaultFloor = defaultBuildingObj?.floors?.length > 0 ? defaultBuildingObj.floors[0].floorName : '';
@@ -549,6 +563,45 @@ const HostelProvision = () => {
 
     const currentRoomMaxSlots = selectedBulkRoomDetails ? selectedBulkRoomDetails.availableSlots : bulkRoomCapacity;
 
+    const availableHostels = useMemo(() => {
+        return Array.from(new Set(dbBlocks.map(b => b.block).filter(Boolean)));
+    }, [dbBlocks]);
+
+    const filteredBuildingsForHostel = useMemo(() => {
+        if (!bulkHostel) return dbBlocks;
+        const match = dbBlocks.filter(b => b.block === bulkHostel);
+        return match.length > 0 ? match : dbBlocks;
+    }, [dbBlocks, bulkHostel]);
+
+    const handleBulkHostelChange = (newHostel) => {
+        setBulkHostel(newHostel);
+        const match = dbBlocks.filter(b => b.block === newHostel);
+        const firstBldg = match.length > 0 ? match[0].name : '';
+        setBulkBuilding(firstBldg);
+        const bldgObj = match.find(b => b.name === firstBldg);
+        const firstFl = bldgObj?.floors?.length > 0 ? bldgObj.floors[0].floorName : '';
+        setBulkFloor(firstFl);
+        setBulkRoom('');
+        setBulkSelectedMemberIds([]);
+    };
+
+    const filteredBuildingsForSingle = useMemo(() => {
+        if (!selectedHostel) return dbBlocks;
+        const match = dbBlocks.filter(b => b.block === selectedHostel);
+        return match.length > 0 ? match : dbBlocks;
+    }, [dbBlocks, selectedHostel]);
+
+    const handleSingleHostelChange = (newHostel) => {
+        setSelectedHostel(newHostel);
+        const match = dbBlocks.filter(b => b.block === newHostel);
+        const firstBldg = match.length > 0 ? match[0].name : '';
+        setSelectedBuilding(firstBldg);
+        const bldgObj = match.find(b => b.name === firstBldg);
+        const firstFl = bldgObj?.floors?.length > 0 ? bldgObj.floors[0].floorName : '';
+        setSelectedFloor(firstFl);
+        setSelectedRoom('');
+    };
+
     const handleOpenBulkModal = (universityName = null) => {
         if (document.activeElement instanceof HTMLElement) {
             document.activeElement.blur();
@@ -567,7 +620,12 @@ const HostelProvision = () => {
         setBulkSelectedMemberIds([]);
         setModalActiveTab(activeTab === 'Coaches / Managers' ? 'Coaches / Managers' : 'Players');
 
-        const defaultBuilding = dbBlocks.length > 0 ? dbBlocks[0].name : '';
+        const hostels = Array.from(new Set(dbBlocks.map(b => b.block).filter(Boolean)));
+        const defaultHostel = hostels.length > 0 ? hostels[0] : '';
+        setBulkHostel(defaultHostel);
+
+        const buildingsInDefaultHostel = dbBlocks.filter(b => b.block === defaultHostel);
+        const defaultBuilding = buildingsInDefaultHostel.length > 0 ? buildingsInDefaultHostel[0].name : (dbBlocks.length > 0 ? dbBlocks[0].name : '');
         setBulkBuilding(defaultBuilding);
         const defaultBuildingObj = dbBlocks.find(b => b.name === defaultBuilding);
         const defaultFloor = defaultBuildingObj?.floors?.length > 0 ? defaultBuildingObj.floors[0].floorName : '';
@@ -1100,7 +1158,7 @@ const HostelProvision = () => {
                                     </Typography>
                                 </Box>
                             </Box>
-                            
+
                             {/* Subtitle */}
                             <Typography
                                 variant="caption"
@@ -1389,132 +1447,132 @@ const HostelProvision = () => {
                                 )}
                             </Box>
                         ) : (
-                        <TableContainer component={Paper} sx={{ borderRadius: 2, border: '1px solid #e2e8f0', boxShadow: 'none', overflowX: 'auto', width: '100%' }}>
-                            <Table sx={{ minWidth: 700 }} size="medium">
-                                <TableHead sx={{ bgcolor: '#f1f5f9' }}>
-                                    <TableRow>
-                                        <TableCell sx={{ fontWeight: 700, color: '#334155', width: 60 }}>S.No</TableCell>
-                                        <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Name</TableCell>
-                                        <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Role</TableCell>
-                                        <TableCell sx={{ fontWeight: 700, color: '#334155' }}>University</TableCell>
-                                        <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Gender</TableCell>
-                                        <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Phone</TableCell>
-                                        <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Accommodation</TableCell>
-                                        <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Room Mapping</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {searchResults.length > 0 ? (
-                                        searchResults.map((person, index) => (
-                                            <TableRow
-                                                key={person.id}
-                                                sx={{
-                                                    '&:last-child td, &:last-child th': { border: 0 },
-                                                    '&:hover': { bgcolor: '#f8fafc' }
-                                                }}
-                                            >
-                                                <TableCell>{index + 1}</TableCell>
-                                                <TableCell sx={{ fontWeight: 600, color: '#0f172a' }}>{person.name}</TableCell>
-                                                <TableCell>
-                                                    <Chip
-                                                        label={person.role}
-                                                        size="small"
-                                                        color={person.role === 'Coach' ? 'secondary' : 'primary'}
-                                                        variant="outlined"
-                                                    />
-                                                </TableCell>
-                                                <TableCell>{person.university}</TableCell>
-                                                <TableCell>{person.gender}</TableCell>
-                                                <TableCell>{person.phone}</TableCell>
-                                                {/* Accommodation Column: Yes / No from DB */}
-                                                <TableCell>
-                                                    {person.accommodation === 'Yes' ? (
+                            <TableContainer component={Paper} sx={{ borderRadius: 2, border: '1px solid #e2e8f0', boxShadow: 'none', overflowX: 'auto', width: '100%' }}>
+                                <Table sx={{ minWidth: 700 }} size="medium">
+                                    <TableHead sx={{ bgcolor: '#f1f5f9' }}>
+                                        <TableRow>
+                                            <TableCell sx={{ fontWeight: 700, color: '#334155', width: 60 }}>S.No</TableCell>
+                                            <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Name</TableCell>
+                                            <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Role</TableCell>
+                                            <TableCell sx={{ fontWeight: 700, color: '#334155' }}>University</TableCell>
+                                            <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Gender</TableCell>
+                                            <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Phone</TableCell>
+                                            <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Accommodation</TableCell>
+                                            <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Room Mapping</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {searchResults.length > 0 ? (
+                                            searchResults.map((person, index) => (
+                                                <TableRow
+                                                    key={person.id}
+                                                    sx={{
+                                                        '&:last-child td, &:last-child th': { border: 0 },
+                                                        '&:hover': { bgcolor: '#f8fafc' }
+                                                    }}
+                                                >
+                                                    <TableCell>{index + 1}</TableCell>
+                                                    <TableCell sx={{ fontWeight: 600, color: '#0f172a' }}>{person.name}</TableCell>
+                                                    <TableCell>
                                                         <Chip
-                                                            icon={<CheckCircleIcon sx={{ fontSize: '16px !important' }} />}
-                                                            label="Yes"
+                                                            label={person.role}
                                                             size="small"
-                                                            sx={{
-                                                                bgcolor: '#ecfdf5',
-                                                                color: '#065f46',
-                                                                fontWeight: 600,
-                                                                borderColor: '#a7f3d0'
-                                                            }}
+                                                            color={person.role === 'Coach' ? 'secondary' : 'primary'}
                                                             variant="outlined"
                                                         />
-                                                    ) : (
-                                                        <Chip
-                                                            icon={<CancelIcon sx={{ fontSize: '16px !important' }} />}
-                                                            label="No"
-                                                            size="small"
-                                                            sx={{
-                                                                bgcolor: '#f1f5f9',
-                                                                color: '#64748b',
-                                                                fontWeight: 600,
-                                                                borderColor: '#cbd5e1'
-                                                            }}
-                                                            variant="outlined"
-                                                        />
-                                                    )}
-                                                </TableCell>
-                                                {/* Room Mapping Column */}
-                                                <TableCell>
-                                                    {person.roomAllocation ? (
-                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                                                    </TableCell>
+                                                    <TableCell>{person.university}</TableCell>
+                                                    <TableCell>{person.gender}</TableCell>
+                                                    <TableCell>{person.phone}</TableCell>
+                                                    {/* Accommodation Column: Yes / No from DB */}
+                                                    <TableCell>
+                                                        {person.accommodation === 'Yes' ? (
                                                             <Chip
-                                                                icon={<HotelIcon sx={{ fontSize: '15px !important' }} />}
-                                                                label={`${person.roomAllocation.roomNumber} (${person.roomAllocation.building.split(' ')[0]} ${person.roomAllocation.floor.replace('Floor ', 'F')})`}
+                                                                icon={<CheckCircleIcon sx={{ fontSize: '16px !important' }} />}
+                                                                label="Yes"
                                                                 size="small"
-                                                                sx={{ bgcolor: '#eff6ff', color: '#1d4ed8', fontWeight: 600, border: '1px solid #bfdbfe' }}
+                                                                sx={{
+                                                                    bgcolor: '#ecfdf5',
+                                                                    color: '#065f46',
+                                                                    fontWeight: 600,
+                                                                    borderColor: '#a7f3d0'
+                                                                }}
+                                                                variant="outlined"
                                                             />
-                                                            <Tooltip title="Change Room Allocation">
-                                                                <IconButton
+                                                        ) : (
+                                                            <Chip
+                                                                icon={<CancelIcon sx={{ fontSize: '16px !important' }} />}
+                                                                label="No"
+                                                                size="small"
+                                                                sx={{
+                                                                    bgcolor: '#f1f5f9',
+                                                                    color: '#64748b',
+                                                                    fontWeight: 600,
+                                                                    borderColor: '#cbd5e1'
+                                                                }}
+                                                                variant="outlined"
+                                                            />
+                                                        )}
+                                                    </TableCell>
+                                                    {/* Room Mapping Column */}
+                                                    <TableCell>
+                                                        {person.roomAllocation ? (
+                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                                                                <Chip
+                                                                    icon={<HotelIcon sx={{ fontSize: '15px !important' }} />}
+                                                                    label={`${person.roomAllocation.roomNumber} (${person.roomAllocation.building.split(' ')[0]} ${person.roomAllocation.floor.replace('Floor ', 'F')})`}
                                                                     size="small"
-                                                                    onClick={(e) => {
-                                                                        e.currentTarget.blur();
-                                                                        handleOpenMapDialog(person);
-                                                                    }}
-                                                                    sx={{ color: '#2563eb', bgcolor: '#f0fdf4', p: 0.5 }}
-                                                                >
-                                                                    <EditIcon sx={{ fontSize: 16 }} />
-                                                                </IconButton>
-                                                            </Tooltip>
-                                                        </Box>
-                                                    ) : (
-                                                        <Button
-                                                            size="small"
-                                                            variant="contained"
-                                                            startIcon={<MeetingRoomIcon sx={{ fontSize: 16 }} />}
-                                                            onClick={(e) => {
-                                                                e.currentTarget.blur();
-                                                                handleOpenMapDialog(person);
-                                                            }}
-                                                            sx={{
-                                                                bgcolor: '#0b5299',
-                                                                color: '#ffffff',
-                                                                fontWeight: 600,
-                                                                textTransform: 'none',
-                                                                borderRadius: 1.5,
-                                                                px: 1.8,
-                                                                py: 0.6,
-                                                                '&:hover': { bgcolor: '#093f77' }
-                                                            }}
-                                                        >
-                                                            Map a Room
-                                                        </Button>
-                                                    )}
+                                                                    sx={{ bgcolor: '#eff6ff', color: '#1d4ed8', fontWeight: 600, border: '1px solid #bfdbfe' }}
+                                                                />
+                                                                <Tooltip title="Change Room Allocation">
+                                                                    <IconButton
+                                                                        size="small"
+                                                                        onClick={(e) => {
+                                                                            e.currentTarget.blur();
+                                                                            handleOpenMapDialog(person);
+                                                                        }}
+                                                                        sx={{ color: '#2563eb', bgcolor: '#f0fdf4', p: 0.5 }}
+                                                                    >
+                                                                        <EditIcon sx={{ fontSize: 16 }} />
+                                                                    </IconButton>
+                                                                </Tooltip>
+                                                            </Box>
+                                                        ) : (
+                                                            <Button
+                                                                size="small"
+                                                                variant="contained"
+                                                                startIcon={<MeetingRoomIcon sx={{ fontSize: 16 }} />}
+                                                                onClick={(e) => {
+                                                                    e.currentTarget.blur();
+                                                                    handleOpenMapDialog(person);
+                                                                }}
+                                                                sx={{
+                                                                    bgcolor: '#0b5299',
+                                                                    color: '#ffffff',
+                                                                    fontWeight: 600,
+                                                                    textTransform: 'none',
+                                                                    borderRadius: 1.5,
+                                                                    px: 1.8,
+                                                                    py: 0.6,
+                                                                    '&:hover': { bgcolor: '#093f77' }
+                                                                }}
+                                                            >
+                                                                Map a Room
+                                                            </Button>
+                                                        )}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        ) : (
+                                            <TableRow>
+                                                <TableCell colSpan={8} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                                                    No {activeTab.toLowerCase()} requesting accommodation found matching "{searchQuery}".
                                                 </TableCell>
                                             </TableRow>
-                                        ))
-                                    ) : (
-                                        <TableRow>
-                                            <TableCell colSpan={8} align="center" sx={{ py: 4, color: 'text.secondary' }}>
-                                                No {activeTab.toLowerCase()} requesting accommodation found matching "{searchQuery}".
-                                            </TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
                         )}
                     </Box>
                 )}
@@ -1547,46 +1605,46 @@ const HostelProvision = () => {
                         </Typography>
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, bgcolor: '#ffffff', p: 0.4, borderRadius: 2, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-                            <Tooltip title="Cards View">
-                                <IconButton
-                                    size="small"
-                                    onClick={() => setMappedViewMode('cards')}
-                                    sx={{
-                                        p: 0.6,
-                                        borderRadius: 1.5,
-                                        bgcolor: mappedViewMode === 'cards' ? '#0b5299' : 'transparent',
-                                        color: mappedViewMode === 'cards' ? '#ffffff' : '#64748b',
-                                        boxShadow: mappedViewMode === 'cards' ? '0 1px 3px rgba(11,82,153,0.3)' : 'none',
-                                        '&:hover': {
-                                            bgcolor: mappedViewMode === 'cards' ? '#0b5299' : 'rgba(0,0,0,0.06)',
-                                            color: mappedViewMode === 'cards' ? '#ffffff' : '#0b5299'
-                                        }
-                                    }}
-                                >
-                                    <GridViewRoundedIcon sx={{ fontSize: 18 }} />
-                                </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Table View">
-                                <IconButton
-                                    size="small"
-                                    onClick={() => setMappedViewMode('table')}
-                                    sx={{
-                                        p: 0.6,
-                                        borderRadius: 1.5,
-                                        bgcolor: mappedViewMode === 'table' ? '#0b5299' : 'transparent',
-                                        color: mappedViewMode === 'table' ? '#ffffff' : '#64748b',
-                                        boxShadow: mappedViewMode === 'table' ? '0 1px 3px rgba(11,82,153,0.3)' : 'none',
-                                        '&:hover': {
-                                            bgcolor: mappedViewMode === 'table' ? '#0b5299' : 'rgba(0,0,0,0.06)',
-                                            color: mappedViewMode === 'table' ? '#ffffff' : '#0b5299'
-                                        }
-                                    }}
-                                >
-                                    <TableRowsRoundedIcon sx={{ fontSize: 18 }} />
-                                </IconButton>
-                            </Tooltip>
-                        </Box>
+                        <Tooltip title="Cards View">
+                            <IconButton
+                                size="small"
+                                onClick={() => setMappedViewMode('cards')}
+                                sx={{
+                                    p: 0.6,
+                                    borderRadius: 1.5,
+                                    bgcolor: mappedViewMode === 'cards' ? '#0b5299' : 'transparent',
+                                    color: mappedViewMode === 'cards' ? '#ffffff' : '#64748b',
+                                    boxShadow: mappedViewMode === 'cards' ? '0 1px 3px rgba(11,82,153,0.3)' : 'none',
+                                    '&:hover': {
+                                        bgcolor: mappedViewMode === 'cards' ? '#0b5299' : 'rgba(0,0,0,0.06)',
+                                        color: mappedViewMode === 'cards' ? '#ffffff' : '#0b5299'
+                                    }
+                                }}
+                            >
+                                <GridViewRoundedIcon sx={{ fontSize: 18 }} />
+                            </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Table View">
+                            <IconButton
+                                size="small"
+                                onClick={() => setMappedViewMode('table')}
+                                sx={{
+                                    p: 0.6,
+                                    borderRadius: 1.5,
+                                    bgcolor: mappedViewMode === 'table' ? '#0b5299' : 'transparent',
+                                    color: mappedViewMode === 'table' ? '#ffffff' : '#64748b',
+                                    boxShadow: mappedViewMode === 'table' ? '0 1px 3px rgba(11,82,153,0.3)' : 'none',
+                                    '&:hover': {
+                                        bgcolor: mappedViewMode === 'table' ? '#0b5299' : 'rgba(0,0,0,0.06)',
+                                        color: mappedViewMode === 'table' ? '#ffffff' : '#0b5299'
+                                    }
+                                }}
+                            >
+                                <TableRowsRoundedIcon sx={{ fontSize: 18 }} />
+                            </IconButton>
+                        </Tooltip>
                     </Box>
+                </Box>
 
                 {mappedViewMode === 'cards' ? (
                     <Box>
@@ -1703,135 +1761,135 @@ const HostelProvision = () => {
                     </Box>
                 ) : (
                     <TableContainer component={Paper} sx={{ boxShadow: '0 4px 16px rgba(0,0,0,0.05)', borderRadius: 2.5, border: '1px solid #e2e8f0', overflowX: 'auto', width: '100%' }}>
-                    <Table sx={{ minWidth: 700 }} aria-label="mapped accommodations table">
-                        <TableHead sx={{ bgcolor: '#f8fafc' }}>
-                            <TableRow>
-                                <TableCell sx={{ fontWeight: 700, color: '#334155', width: 60 }}>S.No</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Name</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Role</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: '#334155' }}>University</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Gender</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Phone</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Accommodation</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Allocated Room</TableCell>
-                                <TableCell sx={{ fontWeight: 700, color: '#334155', width: 140 }}>Actions</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {loading ? (
+                        <Table sx={{ minWidth: 700 }} aria-label="mapped accommodations table">
+                            <TableHead sx={{ bgcolor: '#f8fafc' }}>
                                 <TableRow>
-                                    <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
-                                        <CircularProgress size={32} sx={{ color: '#0b5299', mb: 1 }} />
-                                        <Typography sx={{ color: 'text.secondary' }}>Loading allocations...</Typography>
-                                    </TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: '#334155', width: 60 }}>S.No</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Name</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Role</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: '#334155' }}>University</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Gender</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Phone</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Accommodation</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Allocated Room</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: '#334155', width: 140 }}>Actions</TableCell>
                                 </TableRow>
-                            ) : mappedList.length > 0 ? (
-                                mappedList.map((person, index) => (
-                                    <TableRow
-                                        key={person.id}
-                                        sx={{
-                                            '&:last-child td, &:last-child th': { border: 0 },
-                                            '&:hover': { bgcolor: '#f8fafc' }
-                                        }}
-                                    >
-                                        <TableCell>{index + 1}</TableCell>
-                                        <TableCell sx={{ fontWeight: 600, color: '#0f172a' }}>{person.name}</TableCell>
-                                        <TableCell>
-                                            <Chip
-                                                label={person.role}
-                                                size="small"
-                                                color={person.role === 'Coach' ? 'secondary' : 'primary'}
-                                                variant="outlined"
-                                            />
+                            </TableHead>
+                            <TableBody>
+                                {loading ? (
+                                    <TableRow>
+                                        <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
+                                            <CircularProgress size={32} sx={{ color: '#0b5299', mb: 1 }} />
+                                            <Typography sx={{ color: 'text.secondary' }}>Loading allocations...</Typography>
                                         </TableCell>
-                                        <TableCell>{person.university}</TableCell>
-                                        <TableCell>{person.gender}</TableCell>
-                                        <TableCell>{person.phone}</TableCell>
-                                        <TableCell>
-                                            {person.accommodation === 'Yes' ? (
+                                    </TableRow>
+                                ) : mappedList.length > 0 ? (
+                                    mappedList.map((person, index) => (
+                                        <TableRow
+                                            key={person.id}
+                                            sx={{
+                                                '&:last-child td, &:last-child th': { border: 0 },
+                                                '&:hover': { bgcolor: '#f8fafc' }
+                                            }}
+                                        >
+                                            <TableCell>{index + 1}</TableCell>
+                                            <TableCell sx={{ fontWeight: 600, color: '#0f172a' }}>{person.name}</TableCell>
+                                            <TableCell>
                                                 <Chip
-                                                    icon={<CheckCircleIcon sx={{ fontSize: '15px !important' }} />}
-                                                    label="Yes"
+                                                    label={person.role}
                                                     size="small"
-                                                    sx={{ bgcolor: '#ecfdf5', color: '#065f46', fontWeight: 600 }}
+                                                    color={person.role === 'Coach' ? 'secondary' : 'primary'}
+                                                    variant="outlined"
                                                 />
-                                            ) : (
-                                                <Chip
-                                                    icon={<CancelIcon sx={{ fontSize: '15px !important' }} />}
-                                                    label="No"
-                                                    size="small"
-                                                    sx={{ bgcolor: '#f1f5f9', color: '#64748b' }}
-                                                />
-                                            )}
-                                        </TableCell>
-                                        {/* Allocated Room Column */}
-                                        <TableCell>
-                                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                                                <Chip
-                                                    icon={<HotelIcon sx={{ fontSize: '15px !important' }} />}
-                                                    label={person.roomAllocation.roomNumber}
-                                                    size="small"
-                                                    sx={{
-                                                        bgcolor: '#dbeafe',
-                                                        color: '#1e40af',
-                                                        fontWeight: 700,
-                                                        width: 'fit-content'
-                                                    }}
-                                                />
-                                                <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500 }}>
-                                                    {person.roomAllocation.building} • {person.roomAllocation.floor}
+                                            </TableCell>
+                                            <TableCell>{person.university}</TableCell>
+                                            <TableCell>{person.gender}</TableCell>
+                                            <TableCell>{person.phone}</TableCell>
+                                            <TableCell>
+                                                {person.accommodation === 'Yes' ? (
+                                                    <Chip
+                                                        icon={<CheckCircleIcon sx={{ fontSize: '15px !important' }} />}
+                                                        label="Yes"
+                                                        size="small"
+                                                        sx={{ bgcolor: '#ecfdf5', color: '#065f46', fontWeight: 600 }}
+                                                    />
+                                                ) : (
+                                                    <Chip
+                                                        icon={<CancelIcon sx={{ fontSize: '15px !important' }} />}
+                                                        label="No"
+                                                        size="small"
+                                                        sx={{ bgcolor: '#f1f5f9', color: '#64748b' }}
+                                                    />
+                                                )}
+                                            </TableCell>
+                                            {/* Allocated Room Column */}
+                                            <TableCell>
+                                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                                    <Chip
+                                                        icon={<HotelIcon sx={{ fontSize: '15px !important' }} />}
+                                                        label={person.roomAllocation.roomNumber}
+                                                        size="small"
+                                                        sx={{
+                                                            bgcolor: '#dbeafe',
+                                                            color: '#1e40af',
+                                                            fontWeight: 700,
+                                                            width: 'fit-content'
+                                                        }}
+                                                    />
+                                                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500 }}>
+                                                        {person.roomAllocation.building} • {person.roomAllocation.floor}
+                                                    </Typography>
+                                                </Box>
+                                            </TableCell>
+                                            {/* Actions Column */}
+                                            <TableCell>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                    <Tooltip title="Change Room">
+                                                        <IconButton
+                                                            size="small"
+                                                            onClick={(e) => {
+                                                                e.currentTarget.blur();
+                                                                handleOpenMapDialog(person);
+                                                            }}
+                                                            sx={{ color: '#2563eb', bgcolor: '#eff6ff', '&:hover': { bgcolor: '#dbeafe' } }}
+                                                        >
+                                                            <EditIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                    <Tooltip title="Unassign Room">
+                                                        <IconButton
+                                                            size="small"
+                                                            onClick={(e) => {
+                                                                e.currentTarget.blur();
+                                                                handleOpenUnassignDialog(person);
+                                                            }}
+                                                            sx={{ color: '#dc2626', bgcolor: '#fef2f2', '&:hover': { bgcolor: '#fee2e2' } }}
+                                                        >
+                                                            <DeleteIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                </Box>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                ) : (
+                                    <TableRow>
+                                        <TableCell colSpan={9} align="center" sx={{ py: 6, color: 'text.secondary' }}>
+                                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                                                <HotelIcon sx={{ fontSize: 44, color: '#cbd5e1' }} />
+                                                <Typography sx={{ fontWeight: 600, color: '#475569' }}>
+                                                    No {activeTab.toLowerCase()} mapped to rooms yet.
+                                                </Typography>
+                                                <Typography variant="body2" sx={{ color: '#94a3b8' }}>
+                                                    Use the search box above to search by name or university and click "Map a Room".
                                                 </Typography>
                                             </Box>
                                         </TableCell>
-                                        {/* Actions Column */}
-                                        <TableCell>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                <Tooltip title="Change Room">
-                                                    <IconButton
-                                                        size="small"
-                                                        onClick={(e) => {
-                                                            e.currentTarget.blur();
-                                                            handleOpenMapDialog(person);
-                                                        }}
-                                                        sx={{ color: '#2563eb', bgcolor: '#eff6ff', '&:hover': { bgcolor: '#dbeafe' } }}
-                                                    >
-                                                        <EditIcon fontSize="small" />
-                                                    </IconButton>
-                                                </Tooltip>
-                                                <Tooltip title="Unassign Room">
-                                                    <IconButton
-                                                        size="small"
-                                                        onClick={(e) => {
-                                                            e.currentTarget.blur();
-                                                            handleOpenUnassignDialog(person);
-                                                        }}
-                                                        sx={{ color: '#dc2626', bgcolor: '#fef2f2', '&:hover': { bgcolor: '#fee2e2' } }}
-                                                    >
-                                                        <DeleteIcon fontSize="small" />
-                                                    </IconButton>
-                                                </Tooltip>
-                                            </Box>
-                                        </TableCell>
                                     </TableRow>
-                                ))
-                            ) : (
-                                <TableRow>
-                                    <TableCell colSpan={9} align="center" sx={{ py: 6, color: 'text.secondary' }}>
-                                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                                            <HotelIcon sx={{ fontSize: 44, color: '#cbd5e1' }} />
-                                            <Typography sx={{ fontWeight: 600, color: '#475569' }}>
-                                                No {activeTab.toLowerCase()} mapped to rooms yet.
-                                            </Typography>
-                                            <Typography variant="body2" sx={{ color: '#94a3b8' }}>
-                                                Use the search box above to search by name or university and click "Map a Room".
-                                            </Typography>
-                                        </Box>
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
                 )}
             </Box>
 
@@ -2161,13 +2219,35 @@ const HostelProvision = () => {
                                 </Alert>
                             )}
 
+                            {/* Hostel Selector */}
+                            <FormControl fullWidth size="small">
+                                <InputLabel id="single-hostel-select-label">Hostel</InputLabel>
+                                <Select
+                                    labelId="single-hostel-select-label"
+                                    value={selectedHostel}
+                                    label="Hostel"
+                                    onChange={(e) => handleSingleHostelChange(e.target.value)}
+                                    startAdornment={
+                                        <InputAdornment position="start">
+                                            <HotelIcon sx={{ color: '#0b5299', fontSize: 18 }} />
+                                        </InputAdornment>
+                                    }
+                                >
+                                    {availableHostels.map(h => (
+                                        <MenuItem key={h} value={h}>
+                                            {h}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+
                             {/* Building Selector */}
                             <FormControl fullWidth size="small">
-                                <InputLabel id="building-select-label">Building Name</InputLabel>
+                                <InputLabel id="building-select-label">Building / Block</InputLabel>
                                 <Select
                                     labelId="building-select-label"
                                     value={selectedBuilding}
-                                    label="Building Name"
+                                    label="Building / Block"
                                     onChange={(e) => {
                                         setSelectedBuilding(e.target.value);
                                         setSelectedRoom(''); // Reset room on building change
@@ -2178,9 +2258,9 @@ const HostelProvision = () => {
                                         </InputAdornment>
                                     }
                                 >
-                                    {dbBlocks.map(bldg => (
+                                    {filteredBuildingsForSingle.map(bldg => (
                                         <MenuItem key={bldg.name} value={bldg.name}>
-                                            {bldg.name}
+                                            {bldg.name} {bldg.capacityPerRoom ? `(${bldg.capacityPerRoom} beds/room)` : ''}
                                         </MenuItem>
                                     ))}
                                 </Select>
@@ -2537,7 +2617,25 @@ const HostelProvision = () => {
                                     Step 1: Select Room to Allot
                                 </Typography>
 
-                                {/* Building */}
+                                {/* Hostel Selector */}
+                                <FormControl fullWidth size="small">
+                                    <InputLabel id="bulk-hostel-label">Hostel</InputLabel>
+                                    <Select
+                                        labelId="bulk-hostel-label"
+                                        value={bulkHostel}
+                                        label="Hostel"
+                                        onChange={(e) => handleBulkHostelChange(e.target.value)}
+                                        startAdornment={<InputAdornment position="start"><HotelIcon sx={{ color: '#0b5299', fontSize: 18 }} /></InputAdornment>}
+                                    >
+                                        {availableHostels.map(hostelName => (
+                                            <MenuItem key={hostelName} value={hostelName}>
+                                                {hostelName}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+
+                                {/* Building / Block */}
                                 <FormControl fullWidth size="small">
                                     <InputLabel id="bulk-building-label">Building / Block</InputLabel>
                                     <Select
@@ -2547,7 +2645,7 @@ const HostelProvision = () => {
                                         onChange={(e) => handleBulkBuildingChange(e.target.value)}
                                         startAdornment={<InputAdornment position="start"><ApartmentIcon sx={{ color: '#0b5299', fontSize: 18 }} /></InputAdornment>}
                                     >
-                                        {dbBlocks.map(bldg => (
+                                        {filteredBuildingsForHostel.map(bldg => (
                                             <MenuItem key={bldg.name} value={bldg.name}>
                                                 {bldg.name} {bldg.capacityPerRoom ? `(${bldg.capacityPerRoom} beds/room)` : ''}
                                             </MenuItem>
@@ -3175,8 +3273,8 @@ const HostelProvision = () => {
                         Close
                     </Button>
                     {((modalActiveTab === 'Players' && cautionDepositData.paid && allAllottedPlayers.length > 0) ||
-                      (modalActiveTab === 'Coaches / Managers' && currentRegistration?.coaches?.length > 0 && currentRegistration.coaches.every(c => c.cautionDeposit?.paid))) &&
-                      bulkSelectedMemberIds.length === 0 ? (
+                        (modalActiveTab === 'Coaches / Managers' && currentRegistration?.coaches?.length > 0 && currentRegistration.coaches.every(c => c.cautionDeposit?.paid))) &&
+                        bulkSelectedMemberIds.length === 0 ? (
                         <Button
                             onClick={() => {
                                 handleCloseBulkModal();
@@ -3226,21 +3324,21 @@ const HostelProvision = () => {
                 </DialogActions>
             </Dialog>
 
-            {/* Printable Caution Deposit Receipt Modal */}
+            {/* Modern Official Receipt Modal (Matching Image 2) */}
             <Dialog
                 open={cautionReceiptModalOpen}
                 onClose={() => {
                     setCautionReceiptModalOpen(false);
                     setSelectedCoachReceipt(null);
                 }}
-                maxWidth="sm"
+                maxWidth="md"
                 fullWidth
-                slotProps={{ paper: { sx: { borderRadius: 3, p: 1 } } }}
+                slotProps={{ paper: { sx: { borderRadius: 3, maxWidth: 860, overflow: 'hidden' } } }}
             >
-                <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
+                <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: '#f8fafc', py: 1.5, px: 3, borderBottom: '1px solid #e2e8f0' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <ReceiptIcon sx={{ color: '#059669', fontSize: 24 }} />
-                        <Typography sx={{ fontWeight: 700, fontSize: '1.1rem' }}>
+                        <Typography sx={{ fontWeight: 700, fontSize: '1.05rem', color: '#0f172a' }}>
                             {selectedCoachReceipt ? 'Coach Caution Deposit Receipt' : 'Hostel Caution Deposit Receipt'}
                         </Typography>
                     </Box>
@@ -3251,106 +3349,264 @@ const HostelProvision = () => {
                         <ClearIcon fontSize="small" />
                     </IconButton>
                 </DialogTitle>
-                <DialogContent dividers sx={{ p: 3 }}>
-                    <Box id="caution-deposit-printable-receipt" sx={{ p: 2, border: '2px dashed #cbd5e1', borderRadius: 2, bgcolor: '#fcfdfd' }}>
-                        <Box sx={{ textAlign: 'center', pb: 2, borderBottom: '1px solid #e2e8f0', mb: 2 }}>
-                            <Typography variant="h6" sx={{ fontWeight: 800, color: '#0b5299' }}>
-                                SOUTH ZONE INTER-UNIVERSITY TOURNAMENT
-                            </Typography>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#334155' }}>
-                                HOSTEL ACCOMMODATION - {selectedCoachReceipt ? 'COACH' : 'TEAM'} CAUTION DEPOSIT RECEIPT
-                            </Typography>
-                            <Typography variant="caption" sx={{ color: '#64748b' }}>
-                                (Official Cash / Manual Payment Voucher)
-                            </Typography>
-                        </Box>
+                <DialogContent sx={{ p: { xs: 2, sm: 3.5 }, bgcolor: '#ffffff' }}>
+                    {(() => {
+                        const amount = Number(selectedCoachReceipt ? (selectedCoachReceipt.cautionDeposit?.amount || 2000) : (cautionDepositData.amount || 2000));
+                        const payerName = selectedCoachReceipt
+                            ? `${selectedCoachReceipt.name} (${selectedCoachReceipt.role || 'Coach'})`
+                            : `${cautionDepositData.paidBy?.name || 'Representative'} (${cautionDepositData.paidBy?.role || 'Player'})`;
+                        const payerPhone = selectedCoachReceipt
+                            ? (selectedCoachReceipt.mobileNo || selectedCoachReceipt.phone || 'N/A')
+                            : (cautionDepositData.paidBy?.phone || 'N/A');
+                        const rawRoom = selectedCoachReceipt
+                            ? (selectedCoachReceipt.roomAllocation?.roomNumber || 'Allotted')
+                            : (cautionDepositData.paidBy?.roomNumber || 'Allotted');
+                        const roomDisplay = rawRoom ? (String(rawRoom).toLowerCase().startsWith('room') ? rawRoom : `Room ${rawRoom}`) : 'Room 205';
+                        const paymentMode = selectedCoachReceipt
+                            ? (selectedCoachReceipt.cautionDeposit?.paymentMode || 'Cash')
+                            : (cautionDepositData.paymentMode || 'Cash');
+                        const receiptNo = selectedCoachReceipt
+                            ? (selectedCoachReceipt.cautionDeposit?.receiptNo || 'CD-COACH')
+                            : (cautionDepositData.receiptNo || 'CD-MANUAL');
+                        const receiptDate = selectedCoachReceipt
+                            ? (selectedCoachReceipt.cautionDeposit?.paidAt ? new Date(selectedCoachReceipt.cautionDeposit.paidAt).toLocaleDateString('en-US') : new Date().toLocaleDateString('en-US'))
+                            : (cautionDepositData.paidAt ? new Date(cautionDepositData.paidAt).toLocaleDateString('en-US') : new Date().toLocaleDateString('en-US'));
 
-                        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5, mb: 2, fontSize: '0.88rem' }}>
-                            <Box>
-                                <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>RECEIPT NO:</Typography>
-                                <Typography sx={{ fontWeight: 700, color: '#0f172a' }}>
-                                    {selectedCoachReceipt ? (selectedCoachReceipt.cautionDeposit?.receiptNo || 'CD-COACH') : (cautionDepositData.receiptNo || 'CD-MANUAL')}
-                                </Typography>
-                            </Box>
-                            <Box sx={{ textAlign: 'right' }}>
-                                <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>DATE & TIME:</Typography>
-                                <Typography sx={{ fontWeight: 700, color: '#0f172a' }}>
-                                    {selectedCoachReceipt
-                                        ? (selectedCoachReceipt.cautionDeposit?.paidAt ? new Date(selectedCoachReceipt.cautionDeposit.paidAt).toLocaleDateString() : 'Today')
-                                        : (cautionDepositData.paidAt ? (new Date(cautionDepositData.paidAt).toLocaleDateString() + ' ' + new Date(cautionDepositData.paidAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) : 'Pending Collection')
+                        const getAmountWords = (num) => {
+                            if (num === 2000) return 'Rupees Two Thousand Only';
+                            if (num === 1000) return 'Rupees One Thousand Only';
+                            if (num === 3000) return 'Rupees Three Thousand Only';
+                            return `Rupees ${num} Only`;
+                        };
+
+                        return (
+                            <Box sx={{ width: '100%' }}>
+                                <Box id="caution-deposit-printable-receipt" sx={{ bgcolor: '#ffffff', color: '#0f172a', p: { xs: 2, sm: 2.5 } }}>
+                                    {/* Top Header Section */}
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1.5, sm: 2.5 }, mb: 1, flexWrap: { xs: 'wrap', sm: 'nowrap' } }}>
+                                        {/* University Logo */}
+                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', pr: { xs: 0, sm: 2.5 }, borderRight: { xs: 'none', sm: '1.5px solid #e2e8f0' }, minWidth: { sm: 145 } }}>
+                                            <Box
+                                                component="img"
+                                                src="/ADITYA LOGO2.png"
+                                                alt="Aditya University"
+                                                sx={{ height: { xs: 46, sm: 58 }, width: 'auto', objectFit: 'contain' }}
+                                            />
+                                        </Box>
+
+                                        {/* Header Text */}
+                                        <Box sx={{ flex: 1, textAlign: { xs: 'left', sm: 'center' } }}>
+                                            <Typography sx={{ fontWeight: 900, color: '#0b3b80', fontSize: { xs: '1rem', sm: '1.2rem' }, letterSpacing: '0.4px', textTransform: 'uppercase', lineHeight: 1.2 }}>
+                                                SOUTH ZONE INTER-UNIVERSITY TOURNAMENT
+                                            </Typography>
+                                            <Typography sx={{ fontWeight: 800, color: '#334155', fontSize: { xs: '0.8rem', sm: '0.9rem' }, letterSpacing: '0.2px', textTransform: 'uppercase', mt: 0.35 }}>
+                                                HOSTEL ACCOMMODATION - {selectedCoachReceipt ? 'COACH' : 'TEAM'} CAUTION DEPOSIT RECEIPT
+                                            </Typography>
+                                            <Typography sx={{ color: '#64748b', fontSize: '0.78rem', mt: 0.2 }}>
+                                                (Official Cash / Manual Payment Voucher)
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+
+                                    {/* 2-Tone Accent Line */}
+                                    <Box sx={{ display: 'flex', height: '3.5px', width: '130px', mx: 'auto', borderRadius: 2, overflow: 'hidden', mt: 0.8, mb: 1.25 }}>
+                                        <Box sx={{ flex: 1, bgcolor: '#ea580c' }} />
+                                        <Box sx={{ flex: 1, bgcolor: '#0284c7' }} />
+                                    </Box>
+                                    <Divider sx={{ borderColor: '#e2e8f0', mb: 1.5 }} />
+
+                                    {/* Receipt No & Date Banner */}
+                                    <Box sx={{
+                                        display: 'grid',
+                                        gridTemplateColumns: '1fr 1px 1fr',
+                                        alignItems: 'center',
+                                        bgcolor: '#f8fafc',
+                                        border: '1px solid #e2e8f0',
+                                        borderRadius: 2,
+                                        py: 1,
+                                        px: { xs: 2, sm: 3 },
+                                        mb: 1.75
+                                    }}>
+                                        <Box>
+                                            <Typography sx={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>Receipt No.</Typography>
+                                            <Typography sx={{ fontWeight: 900, color: '#0f172a', fontSize: { xs: '1rem', sm: '1.12rem' }, letterSpacing: '0.5px' }}>
+                                                {receiptNo}
+                                            </Typography>
+                                        </Box>
+                                        <Box sx={{ height: 32, bgcolor: '#cbd5e1' }} />
+                                        <Box sx={{ pl: { xs: 2, sm: 3 } }}>
+                                            <Typography sx={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>Date & Time</Typography>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                                                <CalendarTodayOutlinedIcon sx={{ color: '#0284c7', fontSize: 18 }} />
+                                                <Typography sx={{ fontWeight: 900, color: '#0f172a', fontSize: { xs: '1rem', sm: '1.12rem' } }}>
+                                                    {receiptDate}
+                                                </Typography>
+                                            </Box>
+                                        </Box>
+                                    </Box>
+
+                                    {/* Main Details: 2 Columns - 6*6 (50% / 50%) Alignment */}
+                                    <Box sx={{
+                                        display: 'grid',
+                                        gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                                        gap: { xs: 2, sm: 2.5 },
+                                        alignItems: 'start',
+                                        mb: 1.75
+                                    }}>
+                                        {/* Left Column (6 of 12): University, Paid By, Payment Mode */}
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.6 }}>
+                                            {/* University / Institution */}
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                    <SchoolIcon sx={{ color: '#0284c7', fontSize: 22 }} />
+                                                </Box>
+                                                <Box>
+                                                    <Typography sx={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>University / Institution</Typography>
+                                                    <Typography sx={{ fontWeight: 800, color: '#0b5299', fontSize: '1.02rem', lineHeight: 1.25 }}>
+                                                        {bulkSelectedUniversity || (selectedCoachReceipt?.universityName || 'University')}
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+
+                                            {/* Received From (Paid By) */}
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                    <PersonIcon sx={{ color: '#0284c7', fontSize: 22 }} />
+                                                </Box>
+                                                <Box>
+                                                    <Typography sx={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>Received From (Paid By)</Typography>
+                                                    <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.98rem', lineHeight: 1.25 }}>
+                                                        {payerName}
+                                                    </Typography>
+                                                    <Typography sx={{ fontSize: '11.5px', color: '#64748b', mt: 0.15 }}>
+                                                        Phone: {payerPhone}
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+
+                                            {/* Payment Mode */}
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                    <CreditCardIcon sx={{ color: '#0284c7', fontSize: 22 }} />
+                                                </Box>
+                                                <Box>
+                                                    <Typography sx={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>Payment Mode</Typography>
+                                                    <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.98rem', lineHeight: 1.25 }}>
+                                                        {paymentMode} (Manual Receipt)
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+                                        </Box>
+
+                                        {/* Right Column (6 of 12): Amount Received & Room */}
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                            {/* Mint Green Card */}
+                                            <Box sx={{ bgcolor: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 2.5, p: 1.6, px: 2, width: '100%', boxSizing: 'border-box' }}>
+                                                <Typography sx={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>Amount Received</Typography>
+                                                <Typography sx={{ fontSize: { xs: '1.9rem', sm: '2.25rem' }, fontWeight: 900, color: '#059669', lineHeight: 1.15, my: 0.35 }}>
+                                                    ₹{amount.toLocaleString('en-IN')}
+                                                </Typography>
+                                                <Divider sx={{ my: 0.8, borderColor: '#bbf7d0' }} />
+                                                <Typography sx={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>Amount in Words</Typography>
+                                                <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '12.5px' }}>
+                                                    {getAmountWords(amount)}
+                                                </Typography>
+                                            </Box>
+
+                                            {/* Allotted Hostel Room */}
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                    <HotelIcon sx={{ color: '#0284c7', fontSize: 22 }} />
+                                                </Box>
+                                                <Box>
+                                                    <Typography sx={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>Allotted Hostel Room</Typography>
+                                                    <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '1.02rem', lineHeight: 1.25 }}>
+                                                        {roomDisplay}
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+                                        </Box>
+                                    </Box>
+
+                                    <Divider sx={{ borderColor: '#e2e8f0', my: 1.25 }} />
+
+                                    {/* Note Banner */}
+                                    <Box sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 1.25,
+                                        bgcolor: '#fffbeb',
+                                        border: '1px solid #fde68a',
+                                        borderRadius: 1.75,
+                                        p: 1.1,
+                                        px: 1.75,
+                                        mb: 1.75
+                                    }}>
+                                        <Box sx={{ width: 22, height: 22, borderRadius: '50%', bgcolor: '#ea580c', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#ffffff', fontWeight: 900, fontSize: '12px' }}>
+                                            !
+                                        </Box>
+                                        <Typography sx={{ fontSize: '12px', color: '#334155' }}>
+                                            <strong style={{ color: '#c2410c' }}>Note:</strong> Refundable at checkout upon hostel room clearance and key return.
+                                        </Typography>
+                                    </Box>
+
+                                    {/* Footer: University Address & Signature */}
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', pb: 1, flexWrap: 'wrap', gap: 2 }}>
+                                        <Box>
+                                            <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '13px' }}>Aditya University</Typography>
+                                            <Typography sx={{ color: '#64748b', fontSize: '11px', mt: 0.2 }}>
+                                                Surampalem, Kakinada District, Andhra Pradesh - 533437
+                                            </Typography>
+                                        </Box>
+                                        <Box sx={{ textAlign: 'center', minWidth: 170 }}>
+                                            <Box sx={{ borderBottom: '1.5px dotted #94a3b8', width: '100%', mb: 0.5 }} />
+                                            <Typography sx={{ color: '#64748b', fontSize: '11px', fontWeight: 600 }}>
+                                                Authorised Signature
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+
+                                    {/* Bottom Decorative Bar */}
+                                    <Box sx={{ display: 'flex', height: '3.5px', width: '100%', borderRadius: 1, overflow: 'hidden' }}>
+                                        <Box sx={{ flex: 1, bgcolor: '#ea580c' }} />
+                                        <Box sx={{ flex: 1, bgcolor: '#0284c7' }} />
+                                    </Box>
+                                </Box>
+
+                                {/* Half Page Cut Indicator (Only in Print, below the receipt box) */}
+                                <Box sx={{
+                                    display: 'none',
+                                    '@media print': {
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: 1.5,
+                                        mt: 1.5,
+                                        color: '#64748b',
+                                        fontSize: '11px',
+                                        fontWeight: 600
                                     }
-                                </Typography>
+                                }}>
+                                    <Box sx={{ flex: 1, borderTop: '1px dashed #94a3b8' }} />
+                                    <span>✂ Cut or Fold Here (A4 Half-Page / A5 Official Receipt)</span>
+                                    <Box sx={{ flex: 1, borderTop: '1px dashed #94a3b8' }} />
+                                </Box>
                             </Box>
-                            <Box sx={{ gridColumn: 'span 2' }}>
-                                <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>UNIVERSITY / INSTITUTION:</Typography>
-                                <Typography sx={{ fontWeight: 700, color: '#0b5299', fontSize: '1rem' }}>{bulkSelectedUniversity}</Typography>
-                            </Box>
-                            <Box>
-                                <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>RECEIVED FROM (PAID BY):</Typography>
-                                <Typography sx={{ fontWeight: 700, color: '#0f172a' }}>
-                                    {selectedCoachReceipt
-                                        ? `${selectedCoachReceipt.name} (${selectedCoachReceipt.role || 'Coach'})`
-                                        : `${cautionDepositData.paidBy?.name || 'Representative'} (${cautionDepositData.paidBy?.role || 'Member'})`
-                                    }
-                                </Typography>
-                                <Typography variant="caption" sx={{ color: '#64748b' }}>
-                                    Phone: {selectedCoachReceipt ? (selectedCoachReceipt.mobileNo || selectedCoachReceipt.phone || 'N/A') : (cautionDepositData.paidBy?.phone || 'N/A')}
-                                </Typography>
-                            </Box>
-                            <Box sx={{ textAlign: 'right' }}>
-                                <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>ALLOTTED HOSTEL ROOM:</Typography>
-                                <Typography sx={{ fontWeight: 700, color: '#0f172a' }}>
-                                    Room {selectedCoachReceipt ? (selectedCoachReceipt.roomAllocation?.roomNumber || 'Allotted') : (cautionDepositData.paidBy?.roomNumber || 'Allotted')}
-                                </Typography>
-                            </Box>
-                            <Box>
-                                <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>PAYMENT MODE:</Typography>
-                                <Typography sx={{ fontWeight: 700, color: '#047857' }}>
-                                    {selectedCoachReceipt ? (selectedCoachReceipt.cautionDeposit?.paymentMode || 'Cash') : (cautionDepositData.paymentMode || 'Cash')} (Manual Desk Receipt)
-                                </Typography>
-                            </Box>
-                            <Box sx={{ textAlign: 'right' }}>
-                                <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>AMOUNT RECEIVED:</Typography>
-                                <Typography sx={{ fontWeight: 800, color: '#047857', fontSize: '1.2rem' }}>
-                                    ₹{selectedCoachReceipt ? (selectedCoachReceipt.cautionDeposit?.amount || 2000) : (cautionDepositData.amount || 2000)}
-                                </Typography>
-                            </Box>
-                        </Box>
-
-                        <Box sx={{ bgcolor: '#ecfdf5', p: 1.5, borderRadius: 1.5, border: '1px solid #a7f3d0', mb: 2 }}>
-                            <Typography variant="caption" sx={{ color: '#065f46', fontWeight: 600, display: 'block', mb: 0.5 }}>
-                                Amount in Words: Rupees Two Thousand Only (Refundable Deposit)
-                            </Typography>
-                            <Typography variant="caption" sx={{ color: '#047857', fontSize: '0.75rem', display: 'block' }}>
-                                Note: This caution deposit is refundable at the time of vacating the hostel room and returning the keys, subject to room clearance and no property damage.
-                            </Typography>
-                        </Box>
-
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', pt: 3, borderTop: '1px dashed #cbd5e1' }}>
-                            <Box sx={{ textAlign: 'center' }}>
-                                <Typography variant="caption" sx={{ color: '#64748b' }}>Payer Signature</Typography>
-                            </Box>
-                            <Box sx={{ textAlign: 'center' }}>
-                                <Typography sx={{ fontWeight: 700, fontSize: '0.82rem', color: '#1e293b' }}>
-                                    {selectedCoachReceipt ? (selectedCoachReceipt.cautionDeposit?.collectedBy || 'Hostel Desk In-charge') : (cautionDepositData.collectedBy || 'Hostel Desk In-charge')}
-                                </Typography>
-                                <Typography variant="caption" sx={{ color: '#64748b' }}>Authorized Signature & Stamp</Typography>
-                            </Box>
-                        </Box>
-                    </Box>
+                        );
+                    })()}
                 </DialogContent>
-                <DialogActions sx={{ p: 2, display: 'flex', justifyContent: 'space-between' }}>
+                <DialogActions sx={{ p: 2, px: 3, display: 'flex', justifyContent: 'space-between', bgcolor: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
                     <Button onClick={() => {
                         setCautionReceiptModalOpen(false);
                         setSelectedCoachReceipt(null);
-                    }} variant="outlined" sx={{ textTransform: 'none' }}>
+                    }} variant="outlined" sx={{ textTransform: 'none', borderRadius: 2 }}>
                         Close
                     </Button>
                     <Button
                         variant="contained"
                         startIcon={<PrintIcon />}
                         onClick={() => window.print()}
-                        sx={{ textTransform: 'none', bgcolor: '#059669', '&:hover': { bgcolor: '#047857' } }}
+                        sx={{ textTransform: 'none', bgcolor: '#059669', borderRadius: 2, fontWeight: 700, px: 2.5, '&:hover': { bgcolor: '#047857' } }}
                     >
                         Print Receipt
                     </Button>

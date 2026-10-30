@@ -2,6 +2,11 @@ import { Tabs as MuiTabs, Tab, Box, styled, IconButton, useMediaQuery, useTheme 
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
+const getTabValue = (tab) => (typeof tab === 'object' && tab !== null ? (tab.value !== undefined ? tab.value : tab.label) : tab);
+const getTabLabel = (tab) => (typeof tab === 'object' && tab !== null ? tab.label : tab);
+const getTabIcon = (tab) => (typeof tab === 'object' && tab !== null ? tab.icon : undefined);
+const getTabIconPosition = (tab) => (typeof tab === 'object' && tab !== null && tab.iconPosition ? tab.iconPosition : 'start');
+
 const StyledTabs = styled(MuiTabs)({
     backgroundColor: '#ffffff',
     borderRadius: '50px',
@@ -32,18 +37,38 @@ const StyledTab = styled((props) => <Tab disableRipple {...props} />)({
     fontWeight: 600,
     fontSize: '16px',
     color: '#0b5299', // var(--color-navy)
-    minHeight: '40px',
+    minHeight: '42px',
     minWidth: 'unset',
     borderRadius: '50px',
     zIndex: 2,
-    padding: '8px 24px',
+    padding: '8px 22px',
     fontFamily: 'inherit',
-    transition: 'color 0.3s ease',
+    transition: 'all 0.3s ease',
+    display: 'inline-flex',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    '& .MuiTab-iconWrapper': {
+        margin: '0 !important',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: 'inherit',
+        fontSize: '1.25rem',
+        transition: 'color 0.3s ease',
+    },
     '&.Mui-selected': {
         color: '#ffffff',
+        '& .MuiTab-iconWrapper': {
+            color: '#ffffff',
+        }
     },
     '&:hover:not(.Mui-selected)': {
         color: '#d06c38',
+        '& .MuiTab-iconWrapper': {
+            color: '#d06c38',
+        }
     },
     '@media (max-width: 768px)': {
         fontSize: '15px',
@@ -54,25 +79,33 @@ const StyledTab = styled((props) => <Tab disableRipple {...props} />)({
     }
 });
 
-const Tabs = ({ tabs, activeTab, setActiveTab }) => {
+const Tabs = ({ tabs = [], activeTab, setActiveTab, onChange, sx }) => {
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
     // MUI Tabs takes an index for value, so we find the index of activeTab
-    const value = tabs.indexOf(activeTab) !== -1 ? tabs.indexOf(activeTab) : 0;
+    const value = tabs.findIndex(tab => getTabValue(tab) === activeTab);
+    const activeIndex = value !== -1 ? value : 0;
 
-    const handleChange = (event, newValue) => {
-        setActiveTab(tabs[newValue]);
+    const handleChange = (event, newIndex) => {
+        const selected = tabs[newIndex];
+        const val = getTabValue(selected);
+        if (setActiveTab) setActiveTab(val);
+        if (onChange) onChange(event, val);
     };
 
     const handlePrev = () => {
-        const newIndex = Math.max(0, value - 1);
-        setActiveTab(tabs[newIndex]);
+        const newIndex = Math.max(0, activeIndex - 1);
+        const val = getTabValue(tabs[newIndex]);
+        if (setActiveTab) setActiveTab(val);
+        if (onChange) onChange(null, val);
     };
 
     const handleNext = () => {
-        const newIndex = Math.min(tabs.length - 1, value + 1);
-        setActiveTab(tabs[newIndex]);
+        const newIndex = Math.min(tabs.length - 1, activeIndex + 1);
+        const val = getTabValue(tabs[newIndex]);
+        if (setActiveTab) setActiveTab(val);
+        if (onChange) onChange(null, val);
     };
 
     return (
@@ -84,12 +117,13 @@ const Tabs = ({ tabs, activeTab, setActiveTab }) => {
             py: 0.5,
             px: 0,
             gap: { xs: 0.75, sm: 1 },
-            boxSizing: 'border-box'
+            boxSizing: 'border-box',
+            ...sx
         }}>
             {isMobile && (
                 <IconButton
                     onClick={handlePrev}
-                    disabled={value === 0}
+                    disabled={activeIndex === 0}
                     sx={{
                         bgcolor: '#ffffff',
                         color: '#0b5299',
@@ -106,7 +140,7 @@ const Tabs = ({ tabs, activeTab, setActiveTab }) => {
             )}
 
             <StyledTabs
-                value={value}
+                value={activeIndex}
                 onChange={handleChange}
                 variant={isMobile ? "standard" : "scrollable"}
                 scrollButtons={false}
@@ -114,9 +148,11 @@ const Tabs = ({ tabs, activeTab, setActiveTab }) => {
                 {tabs.map((tab, index) => (
                     <StyledTab
                         key={index}
-                        label={tab}
+                        icon={getTabIcon(tab)}
+                        iconPosition={getTabIconPosition(tab)}
+                        label={getTabLabel(tab)}
                         sx={{
-                            display: (isMobile && value !== index) ? 'none' : 'inline-flex'
+                            display: (isMobile && activeIndex !== index) ? 'none' : 'inline-flex'
                         }}
                     />
                 ))}
@@ -125,7 +161,7 @@ const Tabs = ({ tabs, activeTab, setActiveTab }) => {
             {isMobile && (
                 <IconButton
                     onClick={handleNext}
-                    disabled={value === tabs.length - 1}
+                    disabled={activeIndex === tabs.length - 1}
                     sx={{
                         bgcolor: '#ffffff',
                         color: '#0b5299',

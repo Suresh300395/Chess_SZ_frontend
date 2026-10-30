@@ -9,6 +9,9 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import MapIcon from '@mui/icons-material/Map';
 import CloseIcon from '@mui/icons-material/Close';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import DownloadIcon from '@mui/icons-material/Download';
 import Tabs from './Common/Tabs';
 import CommitteeCard from './Common/CommitteeCard';
 import io from 'socket.io-client';
@@ -68,12 +71,40 @@ const Home = () => {
     const [liveBoard, setLiveBoard] = useState(null);
     const [routeMap, setRouteMap] = useState(null);
     const [isMapModalOpen, setIsMapModalOpen] = useState(false);
+    const [selectedMapIndex, setSelectedMapIndex] = useState(0);
     const tabs = ['Live Board', 'Route Map', 'Organizing Committee'];
 
     const resolveImgUrl = (path) => {
         if (!path) return '';
         if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:')) return path;
         return `${SOCKET_URL}${path.startsWith('/') ? '' : '/'}${path}`;
+    };
+
+    const handleDownloadMap = async (imgUrl, filename = 'campus-route-map') => {
+        if (!imgUrl) return;
+        try {
+            const fullUrl = resolveImgUrl(imgUrl);
+            const response = await fetch(fullUrl);
+            const blob = await response.blob();
+            const blobUrl = window.URL.createObjectURL(blob);
+            const ext = fullUrl.includes('.png') ? 'png' : (fullUrl.includes('.webp') ? 'webp' : 'jpg');
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = `${filename}.${ext}`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(blobUrl);
+        } catch {
+            const fullUrl = resolveImgUrl(imgUrl);
+            const link = document.createElement('a');
+            link.href = fullUrl;
+            link.download = `${filename}.jpg`;
+            link.target = '_blank';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
     };
 
     const fetchMembers = async () => {
@@ -756,89 +787,179 @@ const Home = () => {
                                     </Typography>
                                 )}
 
-                                {routeMap?.mapImage ? (
-                                    <Box sx={{ mb: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                        <Box
-                                            onClick={() => setIsMapModalOpen(true)}
-                                            sx={{
-                                                width: '100%',
-                                                maxWidth: { xs: '100%', sm: '480px', md: '540px' },
-                                                maxHeight: { xs: '260px', sm: '320px', md: '360px' },
-                                                borderRadius: 3,
-                                                overflow: 'hidden',
-                                                border: '2px solid #e2e8f0',
-                                                boxShadow: '0 4px 18px rgba(0,0,0,0.06)',
-                                                bgcolor: '#f8fafc',
-                                                display: 'flex',
-                                                justifyContent: 'center',
-                                                alignItems: 'center',
-                                                cursor: 'pointer',
-                                                position: 'relative',
-                                                p: 1,
-                                                transition: 'all 0.25s ease',
-                                                '&:hover': {
-                                                    boxShadow: '0 10px 28px rgba(11,82,153,0.18)',
-                                                    borderColor: '#0b5299',
-                                                    transform: 'translateY(-2px)'
-                                                }
-                                            }}
-                                        >
+                                {(() => {
+                                    const mapImagesList = (Array.isArray(routeMap?.mapImages) && routeMap.mapImages.length > 0)
+                                        ? routeMap.mapImages
+                                        : (routeMap?.mapImage ? [routeMap.mapImage] : []);
+                                    const currentMapImg = mapImagesList[selectedMapIndex] || mapImagesList[0] || '';
+
+                                    if (mapImagesList.length === 0) {
+                                        return (
+                                            <Box sx={{ textAlign: 'center', py: 6, bgcolor: '#f8fafc', borderRadius: 3, border: '1px dashed #cbd5e1', mb: 3 }}>
+                                                <MapIcon sx={{ fontSize: 48, color: '#94a3b8', mb: 1 }} />
+                                                <Typography variant="subtitle1" fontWeight="bold" color="#334155">
+                                                    Route Map Coming Soon
+                                                </Typography>
+                                                <Typography variant="body2" color="#64748b">
+                                                    The campus route map will be uploaded here shortly.
+                                                </Typography>
+                                            </Box>
+                                        );
+                                    }
+
+                                    return (
+                                        <Box sx={{ mb: 4 }}>
+                                            {/* Gallery Grid */}
                                             <Box
-                                                component="img"
-                                                src={resolveImgUrl(routeMap.mapImage)}
-                                                alt="Aditya University Route Map"
                                                 sx={{
-                                                    maxWidth: '100%',
-                                                    maxHeight: { xs: '240px', sm: '300px', md: '340px' },
-                                                    width: 'auto',
-                                                    height: 'auto',
-                                                    objectFit: 'contain',
-                                                    display: 'block',
-                                                    borderRadius: 1.5
-                                                }}
-                                            />
-                                        </Box>
-                                        <Box sx={{ mt: 1.5, display: 'flex', gap: 1.5, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
-                                            <Button
-                                                size="small"
-                                                onClick={() => setIsMapModalOpen(true)}
-                                                startIcon={<ZoomInIcon />}
-                                                sx={{
-                                                    textTransform: 'none',
-                                                    color: '#0b5299',
-                                                    fontWeight: 600,
-                                                    bgcolor: '#f1f5f9',
-                                                    borderRadius: 2,
-                                                    px: 2,
-                                                    '&:hover': { bgcolor: '#e2e8f0' }
+                                                    display: 'grid',
+                                                    gridTemplateColumns: {
+                                                        xs: '1fr',
+                                                        sm: mapImagesList.length === 1 ? '1fr' : 'repeat(2, 1fr)',
+                                                        md: mapImagesList.length === 1 ? '1fr' : (mapImagesList.length === 2 ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)')
+                                                    },
+                                                    gap: { xs: 2, sm: 2.5, md: 3 },
+                                                    width: '100%',
+                                                    maxWidth: mapImagesList.length === 1 ? '820px' : '100%',
+                                                    mx: 'auto'
                                                 }}
                                             >
-                                                Click to Enlarge / Full View
-                                            </Button>
-                                            <Button
-                                                size="small"
-                                                component="a"
-                                                href={resolveImgUrl(routeMap.mapImage)}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                startIcon={<OpenInNewIcon />}
-                                                sx={{ textTransform: 'none', color: '#64748b', fontWeight: 500 }}
-                                            >
-                                                Open Original
-                                            </Button>
+                                                {mapImagesList.map((img, idx) => (
+                                                    <Box
+                                                        key={idx}
+                                                        onClick={() => {
+                                                            setSelectedMapIndex(idx);
+                                                            setIsMapModalOpen(true);
+                                                        }}
+                                                        sx={{
+                                                            position: 'relative',
+                                                            borderRadius: 3,
+                                                            overflow: 'hidden',
+                                                            bgcolor: '#f8fafc',
+                                                            border: '1.5px solid #e2e8f0',
+                                                            boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                            height: { xs: 260, sm: 300, md: mapImagesList.length === 1 ? 460 : 320 },
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            p: 1.5,
+                                                            '&:hover': {
+                                                                transform: 'translateY(-4px)',
+                                                                boxShadow: '0 12px 28px rgba(11,82,153,0.18)',
+                                                                borderColor: '#0b5299',
+                                                                '& .gallery-hover-overlay': { opacity: 1 },
+                                                                '& .gallery-image': { transform: 'scale(1.025)' }
+                                                            }
+                                                        }}
+                                                    >
+                                                        {/* Top-Left Corner: Download Button */}
+                                                        <Tooltip title="Download Map">
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleDownloadMap(img, `campus-route-map-${idx + 1}`);
+                                                                }}
+                                                                sx={{
+                                                                    position: 'absolute',
+                                                                    left: 12,
+                                                                    top: 12,
+                                                                    zIndex: 4,
+                                                                    bgcolor: 'rgba(255, 255, 255, 0.95)',
+                                                                    backdropFilter: 'blur(6px)',
+                                                                    color: '#0b5299',
+                                                                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                                                                    transition: 'all 0.2s ease',
+                                                                    '&:hover': {
+                                                                        bgcolor: '#0b5299',
+                                                                        color: '#ffffff',
+                                                                        transform: 'scale(1.1)'
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <DownloadIcon sx={{ fontSize: 20 }} />
+                                                            </IconButton>
+                                                        </Tooltip>
+
+                                                        {/* Top-Right Corner: Map Badge */}
+                                                        {mapImagesList.length > 1 && (
+                                                            <Chip
+                                                                label={`Map ${idx + 1}`}
+                                                                size="small"
+                                                                sx={{
+                                                                    position: 'absolute',
+                                                                    right: 12,
+                                                                    top: 12,
+                                                                    zIndex: 4,
+                                                                    bgcolor: 'rgba(15, 23, 42, 0.78)',
+                                                                    backdropFilter: 'blur(4px)',
+                                                                    color: '#ffffff',
+                                                                    fontWeight: 700,
+                                                                    fontSize: 11,
+                                                                    height: 24
+                                                                }}
+                                                            />
+                                                        )}
+
+                                                        {/* Gallery Image */}
+                                                        <Box
+                                                            component="img"
+                                                            src={resolveImgUrl(img)}
+                                                            alt={`Campus Route Map ${idx + 1}`}
+                                                            className="gallery-image"
+                                                            sx={{
+                                                                maxWidth: '100%',
+                                                                maxHeight: '100%',
+                                                                width: 'auto',
+                                                                height: 'auto',
+                                                                objectFit: 'contain',
+                                                                borderRadius: 1.5,
+                                                                transition: 'transform 0.3s ease'
+                                                            }}
+                                                        />
+
+                                                        {/* Hover Overlay Hint */}
+                                                        <Box
+                                                            className="gallery-hover-overlay"
+                                                            sx={{
+                                                                position: 'absolute',
+                                                                inset: 0,
+                                                                bgcolor: 'rgba(11, 82, 153, 0.08)',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                opacity: 0,
+                                                                transition: 'opacity 0.2s ease',
+                                                                pointerEvents: 'none'
+                                                            }}
+                                                        >
+                                                            <Box
+                                                                sx={{
+                                                                    bgcolor: 'rgba(255, 255, 255, 0.95)',
+                                                                    color: '#0b5299',
+                                                                    px: 2,
+                                                                    py: 0.8,
+                                                                    borderRadius: 2,
+                                                                    fontWeight: 700,
+                                                                    fontSize: '13px',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: 0.8,
+                                                                    boxShadow: '0 4px 14px rgba(0,0,0,0.15)'
+                                                                }}
+                                                            >
+                                                                <ZoomInIcon sx={{ fontSize: 18 }} />
+                                                                Click to Enlarge
+                                                            </Box>
+                                                        </Box>
+                                                    </Box>
+                                                ))}
+                                            </Box>
                                         </Box>
-                                    </Box>
-                                ) : (
-                                    <Box sx={{ textAlign: 'center', py: 6, bgcolor: '#f8fafc', borderRadius: 3, border: '1px dashed #cbd5e1', mb: 3 }}>
-                                        <MapIcon sx={{ fontSize: 48, color: '#94a3b8', mb: 1 }} />
-                                        <Typography variant="subtitle1" fontWeight="bold" color="#334155">
-                                            Route Map Coming Soon
-                                        </Typography>
-                                        <Typography variant="body2" color="#64748b">
-                                            The campus route map will be uploaded here shortly.
-                                        </Typography>
-                                    </Box>
-                                )}
+                                    );
+                                })()}
 
                                 {routeMap?.directions && (
                                     <Paper sx={{ p: 3, borderRadius: 3, bgcolor: '#f8fafc', border: '1px solid #e2e8f0' }}>
@@ -911,28 +1032,131 @@ const Home = () => {
                     }
                 }}
             >
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 1, py: 0.5 }}>
-                    <Typography variant="h6" fontWeight="bold" sx={{ color: '#0b5299' }}>
-                        {routeMap?.title || 'Campus Route Map'}
-                    </Typography>
-                    <IconButton onClick={() => setIsMapModalOpen(false)} size="small">
-                        <CloseIcon />
-                    </IconButton>
-                </Box>
-                <DialogContent sx={{ p: 1, textAlign: 'center' }}>
-                    <Box
-                        component="img"
-                        src={resolveImgUrl(routeMap?.mapImage)}
-                        alt="Route Map Full Size"
-                        sx={{
-                            width: '100%',
-                            height: 'auto',
-                            maxHeight: '82vh',
-                            objectFit: 'contain',
-                            borderRadius: 2
-                        }}
-                    />
-                </DialogContent>
+                {(() => {
+                    const mapImagesList = (Array.isArray(routeMap?.mapImages) && routeMap.mapImages.length > 0)
+                        ? routeMap.mapImages
+                        : (routeMap?.mapImage ? [routeMap.mapImage] : []);
+                    const currentMapImg = mapImagesList[selectedMapIndex] || mapImagesList[0] || '';
+
+                    return (
+                        <>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 2, py: 1.2, borderBottom: '1px solid #f1f5f9', gap: 1.5 }}>
+                                {/* Left Side Top Corner: Download Button */}
+                                <Button
+                                    variant="contained"
+                                    size="small"
+                                    startIcon={<DownloadIcon />}
+                                    onClick={() => handleDownloadMap(currentMapImg, `campus-route-map-${selectedMapIndex + 1}`)}
+                                    sx={{
+                                        bgcolor: '#0b5299',
+                                        color: '#ffffff',
+                                        borderRadius: 2,
+                                        textTransform: 'none',
+                                        fontWeight: 700,
+                                        fontSize: '13px',
+                                        px: 2,
+                                        py: 0.6,
+                                        boxShadow: '0 2px 8px rgba(11,82,153,0.25)',
+                                        '&:hover': {
+                                            bgcolor: '#083d73'
+                                        }
+                                    }}
+                                >
+                                    Download Map
+                                </Button>
+
+                                {/* Center: Title & Map Index */}
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                    <Typography variant="h6" fontWeight="bold" sx={{ color: '#0b5299', fontSize: { xs: '1rem', sm: '1.15rem' } }}>
+                                        {routeMap?.title || 'Campus Route Map'}
+                                    </Typography>
+                                    {mapImagesList.length > 1 && (
+                                        <Chip
+                                            label={`Map ${selectedMapIndex + 1} of ${mapImagesList.length}`}
+                                            size="small"
+                                            sx={{ height: 22, fontSize: 11, fontWeight: 700, bgcolor: '#eff6ff', color: '#1d4ed8' }}
+                                        />
+                                    )}
+                                </Box>
+
+                                {/* Right Side: Close Button */}
+                                <IconButton onClick={() => setIsMapModalOpen(false)} size="small" sx={{ color: '#64748b' }}>
+                                    <CloseIcon />
+                                </IconButton>
+                            </Box>
+                            <DialogContent sx={{ p: 1, textAlign: 'center', position: 'relative' }}>
+                                {/* Floating Top-Left Download Shortcut over Image */}
+                                <Tooltip title="Download High-Res Map">
+                                    <IconButton
+                                        onClick={() => handleDownloadMap(currentMapImg, `campus-route-map-${selectedMapIndex + 1}`)}
+                                        sx={{
+                                            position: 'absolute',
+                                            left: 20,
+                                            top: 20,
+                                            zIndex: 6,
+                                            bgcolor: 'rgba(255, 255, 255, 0.95)',
+                                            backdropFilter: 'blur(4px)',
+                                            color: '#0b5299',
+                                            boxShadow: '0 2px 10px rgba(0,0,0,0.18)',
+                                            '&:hover': {
+                                                bgcolor: '#0b5299',
+                                                color: '#ffffff'
+                                            }
+                                        }}
+                                    >
+                                        <DownloadIcon />
+                                    </IconButton>
+                                </Tooltip>
+
+                                <Box
+                                    component="img"
+                                    src={resolveImgUrl(currentMapImg)}
+                                    alt={`Route Map Full Size ${selectedMapIndex + 1}`}
+                                    sx={{
+                                        width: '100%',
+                                        height: 'auto',
+                                        maxHeight: '82vh',
+                                        objectFit: 'contain',
+                                        borderRadius: 2
+                                    }}
+                                />
+
+                                {mapImagesList.length > 1 && (
+                                    <>
+                                        <IconButton
+                                            onClick={() => setSelectedMapIndex(i => (i - 1 + mapImagesList.length) % mapImagesList.length)}
+                                            sx={{
+                                                position: 'absolute',
+                                                left: 16,
+                                                top: '50%',
+                                                transform: 'translateY(-50%)',
+                                                bgcolor: 'rgba(255,255,255,0.9)',
+                                                boxShadow: '0 2px 10px rgba(0,0,0,0.18)',
+                                                '&:hover': { bgcolor: '#ffffff' }
+                                            }}
+                                        >
+                                            <ArrowBackIcon />
+                                        </IconButton>
+                                        <IconButton
+                                            onClick={() => setSelectedMapIndex(i => (i + 1) % mapImagesList.length)}
+                                            sx={{
+                                                position: 'absolute',
+                                                right: 16,
+                                                top: '50%',
+                                                transform: 'translateY(-50%)',
+                                                bgcolor: 'rgba(255,255,255,0.9)',
+                                                boxShadow: '0 2px 10px rgba(0,0,0,0.18)',
+                                                '&:hover': { bgcolor: '#ffffff' }
+                                            }}
+                                        >
+                                            <ArrowForwardIcon />
+                                        </IconButton>
+                                    </>
+                                )}
+                            </DialogContent>
+                        </>
+                    );
+                })()}
             </Dialog>
         </Box>
     );

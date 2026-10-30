@@ -22,9 +22,46 @@ import { authAPI } from '../../utils/api';
 import { isMealTokenExpired, getMealExpiryCutoffLabel } from '../../config/foodTokenConfig';
 
 /**
- * Authentic Food Cloche (Serving Platter with Lid and Steam) SVG icon matching reference design
+ * Steaming Coffee / Tea Cup for Breakfast
  */
-const FoodClocheIcon = ({ size = 68, color = '#ffffff' }) => (
+const BreakfastIcon = ({ size = 52, color = '#ffffff' }) => (
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* Steam Wisps */}
+        <path d="M22 10C20.5 13.5 24.5 15.5 22.5 19" stroke={color} strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M28 8C26.5 12 30.5 14.5 28.5 19" stroke={color} strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M34 10C32.5 13.5 36.5 15.5 34.5 19" stroke={color} strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+        {/* Cup Body */}
+        <path d="M14 22H42V36C42 43.7 35.7 50 28 50C20.3 50 14 43.7 14 36V22Z" fill={color} />
+        {/* Cup Handle */}
+        <path d="M41 26H46C49.3 26 52 28.7 52 32C52 35.3 49.3 38 46 38H41" stroke={color} strokeWidth="4.2" strokeLinecap="round" />
+        {/* Saucer / Plate */}
+        <rect x="8" y="53" width="40" height="4.5" rx="2.25" fill={color} />
+    </svg>
+);
+
+/**
+ * Dining Plate with Fork & Spoon for Lunch
+ */
+const LunchIcon = ({ size = 52, color = '#ffffff' }) => (
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* Fork on Left */}
+        <path d="M12 14V24C12 27 14.5 29 17 29.5V52" stroke={color} strokeWidth="3" strokeLinecap="round" />
+        <path d="M17 14V24" stroke={color} strokeWidth="3" strokeLinecap="round" />
+        <path d="M22 14V24C22 27 19.5 29 17 29.5" stroke={color} strokeWidth="3" strokeLinecap="round" />
+        {/* Plate in Center */}
+        <circle cx="32" cy="33" r="16.5" stroke={color} strokeWidth="3.2" />
+        <circle cx="32" cy="33" r="10.5" stroke={color} strokeWidth="1.8" strokeDasharray="3 2" />
+        <circle cx="32" cy="33" r="4.5" fill={color} />
+        {/* Spoon on Right */}
+        <ellipse cx="47" cy="21" rx="5" ry="7.5" fill={color} />
+        <path d="M47 28V52" stroke={color} strokeWidth="3" strokeLinecap="round" />
+    </svg>
+);
+
+/**
+ * Authentic Food Cloche / Serving Dome for Dinner
+ */
+const DinnerIcon = ({ size = 52, color = '#ffffff' }) => (
     <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
         {/* Steam Wisps */}
         <path d="M26 12C24.5 15.5 28.5 17.5 26.5 21" stroke={color} strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -38,6 +75,37 @@ const FoodClocheIcon = ({ size = 68, color = '#ffffff' }) => (
         <rect x="9" y="45" width="46" height="5" rx="2.5" fill={color} />
     </svg>
 );
+
+/**
+ * Snack Cup with Straw for Snacks
+ */
+const SnacksIcon = ({ size = 52, color = '#ffffff' }) => (
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M38 8L34 22" stroke={color} strokeWidth="3" strokeLinecap="round" />
+        <rect x="18" y="21" width="28" height="4.5" rx="2" fill={color} />
+        <path d="M20 25.5L23.5 51C23.8 53 25.5 54.5 27.5 54.5H36.5C38.5 54.5 40.2 53 40.5 51L44 25.5H20Z" fill={color} />
+    </svg>
+);
+
+/**
+ * Dispatches the matching separate icon for each meal type
+ */
+const MealTypeIcon = ({ mealType, size = 52, color = '#ffffff' }) => {
+    const key = (mealType || '').trim().toLowerCase();
+    if (key.includes('breakfast')) {
+        return <BreakfastIcon size={size} color={color} />;
+    }
+    if (key.includes('lunch')) {
+        return <LunchIcon size={size} color={color} />;
+    }
+    if (key.includes('dinner')) {
+        return <DinnerIcon size={size} color={color} />;
+    }
+    if (key.includes('snack')) {
+        return <SnacksIcon size={size} color={color} />;
+    }
+    return <DinnerIcon size={size} color={color} />;
+};
 
 /**
  * Format date like "16 OCT 2026" to match reference ticket
@@ -317,7 +385,7 @@ const MealCouponCard = ({ token, onOpenDetails }) => {
                 ))}
             </Box>
 
-            {/* --- Left Stub with Cloche Icon --- */}
+            {/* --- Left Stub with Meal-specific Icon --- */}
             <Box
                 sx={{
                     width: { xs: '84px', sm: '100px', md: '110px' },
@@ -332,7 +400,8 @@ const MealCouponCard = ({ token, onOpenDetails }) => {
                     position: 'relative'
                 }}
             >
-                <FoodClocheIcon
+                <MealTypeIcon
+                    mealType={token.mealType}
                     size={52}
                     color="#ffffff"
                 />

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { 
-    Box, Typography, Button, Card, CardContent, Divider, Avatar, Chip, 
+import {
+    Box, Typography, Button, Card, CardContent, Divider, Avatar, Chip,
     CircularProgress, Alert, Grid
 } from '@mui/material';
 // Need icons
@@ -34,6 +34,7 @@ const DEFAULT_GUIDELINES = [
 
 const AccommodationDetails = ({ onBack }) => {
     const [details, setDetails] = useState(null);
+    const [notAllocated, setNotAllocated] = useState(false);
     const [guidelines, setGuidelines] = useState(DEFAULT_GUIDELINES);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -44,15 +45,34 @@ const AccommodationDetails = ({ onBack }) => {
         const fetchDetails = async () => {
             try {
                 const res = await authAPI.getAccommodationDetails();
-                if (!res.ok) throw new Error('Failed to load accommodation details');
+                if (res.status === 404) {
+                    setNotAllocated(true);
+                    return;
+                }
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    if (errData.message?.toLowerCase().includes('not allocated') || errData.message?.toLowerCase().includes('not found')) {
+                        setNotAllocated(true);
+                        return;
+                    }
+                    throw new Error(errData.message || 'Failed to load accommodation details');
+                }
                 const data = await res.json();
-                setDetails(data);
+                if (data.allocated === false || !data.roomNumber) {
+                    setNotAllocated(true);
+                } else {
+                    setDetails(data);
+                }
                 if (data.guidelines && Array.isArray(data.guidelines) && data.guidelines.length > 0) {
                     setGuidelines(data.guidelines);
                 }
             } catch (err) {
                 console.error(err);
-                setError(err.message);
+                if (err.message?.toLowerCase().includes('not allocated')) {
+                    setNotAllocated(true);
+                } else {
+                    setError(err.message);
+                }
             } finally {
                 setLoading(false);
             }
@@ -96,10 +116,159 @@ const AccommodationDetails = ({ onBack }) => {
         );
     }
 
+    if (notAllocated) {
+        return (
+            <Box sx={{ width: '100%', boxSizing: 'border-box', p: { xs: 1, sm: 2 }, mt: { xs: 1, sm: 2 } }}>
+                {/* Header */}
+                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, mb: { xs: 2.5, sm: 3.5 }, gap: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Box sx={{ bgcolor: '#e0f2fe', p: { xs: 1.25, sm: 1.5 }, borderRadius: 2, color: '#0369a1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <HotelIcon sx={{ fontSize: { xs: 26, sm: 32 } }} />
+                        </Box>
+                        <Box>
+                            <Typography sx={{ fontSize: { xs: '1.15rem', sm: '1.4rem' }, fontWeight: 700, color: '#1e293b', lineHeight: 1.2 }}>Accommodation Details</Typography>
+                            <Typography sx={{ fontSize: { xs: '11.5px', sm: '13px' }, color: '#64748b', mt: 0.25 }}>Your allotted hostel room information and related details</Typography>
+                        </Box>
+                    </Box>
+                    <Button
+                        variant="outlined"
+                        startIcon={<ArrowBackIosNewIcon sx={{ fontSize: '13px !important' }} />}
+                        onClick={onBack}
+                        sx={{
+                            textTransform: 'none',
+                            borderRadius: 2,
+                            fontWeight: 600,
+                            color: '#0b5299',
+                            borderColor: '#0b5299',
+                            fontSize: { xs: '12.5px', sm: '13.5px' },
+                            py: { xs: 0.75, sm: 1 },
+                            px: { xs: 2, sm: 2.5 },
+                            width: { xs: '100%', sm: 'auto' }
+                        }}
+                    >
+                        Back to Dashboard
+                    </Button>
+                </Box>
+
+                {/* Not Allotted Info Hero Card */}
+                <Card sx={{
+                    borderRadius: 3,
+                    border: '1px solid #bfdbfe',
+                    bgcolor: '#f0f9ff',
+                    boxShadow: '0 4px 20px rgba(11, 82, 153, 0.06)',
+                    mb: 3,
+                    overflow: 'hidden'
+                }}>
+                    <CardContent sx={{ p: { xs: 3, sm: 4 }, textAlign: 'center' }}>
+                        <Box sx={{
+                            width: 72,
+                            height: 72,
+                            borderRadius: '50%',
+                            bgcolor: '#e0f2fe',
+                            color: '#0284c7',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            mx: 'auto',
+                            mb: 2,
+                            boxShadow: '0 4px 14px rgba(2, 132, 199, 0.15)'
+                        }}>
+                            <HotelIcon sx={{ fontSize: 38 }} />
+                        </Box>
+
+                        <Chip
+                            label="Room Allotment Pending"
+                            size="small"
+                            sx={{
+                                height: 26,
+                                fontSize: '12px',
+                                fontWeight: 700,
+                                bgcolor: '#fef3c7',
+                                color: '#b45309',
+                                border: '1px solid #fde68a',
+                                mb: 1.5,
+                                px: 1
+                            }}
+                        />
+
+                        <Typography sx={{ fontSize: { xs: '1.25rem', sm: '1.45rem' }, fontWeight: 800, color: '#0f172a', mb: 2.5 }}>
+                            Accommodation Not Allotted Yet
+                        </Typography>
+
+                        <Box sx={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 1,
+                            bgcolor: '#ffffff',
+                            p: 1.5,
+                            px: 2.5,
+                            borderRadius: 2.5,
+                            border: '1px solid #e2e8f0',
+                            color: '#0b5299',
+                            fontSize: '13px',
+                            fontWeight: 600
+                        }}>
+                            <InfoIcon sx={{ fontSize: 18 }} />
+                            <span>Room allocation will update automatically once assigned by the Help Desk.</span>
+                        </Box>
+                    </CardContent>
+                </Card>
+
+                {/* Important Guidelines Card */}
+                <Card sx={{ borderRadius: { xs: 2.5, sm: 3 }, boxShadow: '0 4px 20px rgba(0,0,0,0.05)', border: '1px solid #f1f5f9' }}>
+                    <CardContent sx={{ p: { xs: '16px !important', sm: 3 } }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: { xs: 2, sm: 2.5 } }}>
+                            <AssignmentIcon sx={{ color: '#0b5299', mr: 1.25, fontSize: { xs: 22, sm: 24 } }} />
+                            <Typography sx={{ fontSize: { xs: '1rem', sm: '1.15rem' }, fontWeight: 700, color: '#0f172a' }}>Important Hostel Guidelines</Typography>
+                        </Box>
+
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+                            {(guidelines && guidelines.length > 0 ? guidelines : DEFAULT_GUIDELINES).map((rule, idx) => (
+                                <Box
+                                    key={idx}
+                                    sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 1.5,
+                                        p: { xs: 1.25, sm: 1.5 },
+                                        bgcolor: '#f8fafc',
+                                        borderRadius: '12px',
+                                        border: '1px solid #e2e8f0'
+                                    }}
+                                >
+                                    <Box
+                                        sx={{
+                                            width: 28,
+                                            height: 28,
+                                            borderRadius: '50%',
+                                            bgcolor: '#e0f2fe',
+                                            color: '#0284c7',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontWeight: 700,
+                                            fontSize: '12.5px',
+                                            flexShrink: 0
+                                        }}
+                                    >
+                                        {idx + 1}
+                                    </Box>
+                                    <Typography sx={{ fontSize: { xs: '12.5px', sm: '13.5px' }, color: '#1e293b', fontWeight: 500, lineHeight: 1.45 }}>
+                                        {rule}
+                                    </Typography>
+                                </Box>
+                            ))}
+                        </Box>
+                    </CardContent>
+                </Card>
+            </Box>
+        );
+    }
+
     if (error) {
         return (
             <Box sx={{ p: 4 }}>
-                <Button startIcon={<ArrowBackIosNewIcon sx={{ fontSize: '14px !important' }}/>} onClick={onBack} sx={{ mb: 2 }}>Back</Button>
+                <Button startIcon={<ArrowBackIosNewIcon sx={{ fontSize: '14px !important' }} />} onClick={onBack} sx={{ mb: 2 }}>Back</Button>
                 <Alert severity="error">{error}</Alert>
             </Box>
         );
@@ -120,15 +289,15 @@ const AccommodationDetails = ({ onBack }) => {
                         <Typography sx={{ fontSize: { xs: '11.5px', sm: '13px' }, color: '#64748b', mt: 0.25 }}>Your allotted hostel room information and related details</Typography>
                     </Box>
                 </Box>
-                <Button 
-                    variant="outlined" 
-                    startIcon={<ArrowBackIosNewIcon sx={{ fontSize: '13px !important' }}/>} 
+                <Button
+                    variant="outlined"
+                    startIcon={<ArrowBackIosNewIcon sx={{ fontSize: '13px !important' }} />}
                     onClick={onBack}
-                    sx={{ 
-                        textTransform: 'none', 
-                        borderRadius: 2, 
-                        fontWeight: 600, 
-                        color: '#0b5299', 
+                    sx={{
+                        textTransform: 'none',
+                        borderRadius: 2,
+                        fontWeight: 600,
+                        color: '#0b5299',
                         borderColor: '#0b5299',
                         fontSize: { xs: '12.5px', sm: '13.5px' },
                         py: { xs: 0.75, sm: 1 },
@@ -178,12 +347,12 @@ const AccommodationDetails = ({ onBack }) => {
                                             value: details.allocatedAt ? formatDateDDMMYYYY(details.allocatedAt) : 'Academic Year'
                                         }
                                     ].map((row, idx) => (
-                                        <Box 
-                                            key={idx} 
-                                            sx={{ 
-                                                display: 'grid', 
-                                                gridTemplateColumns: { xs: '115px 12px 1fr', sm: '140px 16px 1fr' }, 
-                                                gap: { xs: 0.75, sm: 1.25 }, 
+                                        <Box
+                                            key={idx}
+                                            sx={{
+                                                display: 'grid',
+                                                gridTemplateColumns: { xs: '115px 12px 1fr', sm: '140px 16px 1fr' },
+                                                gap: { xs: 0.75, sm: 1.25 },
                                                 alignItems: 'center',
                                                 py: { xs: 0.75, sm: 1 },
                                                 borderBottom: idx < 4 ? '1px solid #f8fafc' : 'none'
@@ -199,10 +368,10 @@ const AccommodationDetails = ({ onBack }) => {
                                             </Box>
                                             <Typography sx={{ fontSize: { xs: '12.5px', sm: '13.5px' }, color: '#94a3b8', textAlign: 'center' }}>-</Typography>
                                             {row.isChip ? (
-                                                <Chip 
-                                                    label={row.value} 
-                                                    size="small" 
-                                                    sx={{ bgcolor: '#dcfce7', color: '#166534', fontWeight: 600, borderRadius: 1.5, width: 'fit-content', fontSize: '11.5px', height: 24 }} 
+                                                <Chip
+                                                    label={row.value}
+                                                    size="small"
+                                                    sx={{ bgcolor: '#dcfce7', color: '#166534', fontWeight: 600, borderRadius: 1.5, width: 'fit-content', fontSize: '11.5px', height: 24 }}
                                                 />
                                             ) : (
                                                 <Typography sx={{ fontSize: { xs: '12.5px', sm: '13.5px' }, fontWeight: 600, color: '#0f172a', wordBreak: 'break-word' }}>
@@ -225,30 +394,30 @@ const AccommodationDetails = ({ onBack }) => {
                                 <GroupIcon sx={{ color: '#0b5299', mr: 1.25, fontSize: { xs: 22, sm: 24 } }} />
                                 <Typography sx={{ fontSize: { xs: '1rem', sm: '1.15rem' }, fontWeight: 700, color: '#0f172a' }}>Room Occupancy</Typography>
                             </Box>
-                            
+
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                                 {details.roommates && details.roommates.map((rm, idx) => {
                                     const currentUserMobile = getCurrentUser()?.username;
                                     const isMe = rm.regNo === currentUserMobile;
                                     return (
-                                        <Box 
-                                            key={idx} 
-                                            sx={{ 
-                                                display: 'flex', 
+                                        <Box
+                                            key={idx}
+                                            sx={{
+                                                display: 'flex',
                                                 alignItems: 'flex-start',
-                                                justifyContent: 'space-between', 
-                                                p: { xs: '16px', sm: 2 }, 
-                                                bgcolor: '#ffffff', 
-                                                borderRadius: 2, 
+                                                justifyContent: 'space-between',
+                                                p: { xs: '16px', sm: 2 },
+                                                bgcolor: '#ffffff',
+                                                borderRadius: 2,
                                                 border: '1px solid #e2e8f0',
                                                 gap: 1.5,
                                                 boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
                                             }}
                                         >
                                             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, minWidth: 0, flex: 1 }}>
-                                                <Avatar sx={{ 
-                                                    bgcolor: '#e0f2fe', 
-                                                    color: '#0369a1', 
+                                                <Avatar sx={{
+                                                    bgcolor: '#e0f2fe',
+                                                    color: '#0369a1',
                                                     fontWeight: 700,
                                                     width: { xs: 38, sm: 42 },
                                                     height: { xs: 38, sm: 42 },
@@ -264,10 +433,10 @@ const AccommodationDetails = ({ onBack }) => {
                                                             {rm.name}
                                                         </Typography>
                                                         {isMe && (
-                                                            <Chip 
-                                                                label="You" 
-                                                                size="small" 
-                                                                sx={{ height: 18, fontSize: '10px', bgcolor: '#0b5299', color: '#fff', fontWeight: 700, px: 0.5 }} 
+                                                            <Chip
+                                                                label="You"
+                                                                size="small"
+                                                                sx={{ height: 18, fontSize: '10px', bgcolor: '#0b5299', color: '#fff', fontWeight: 700, px: 0.5 }}
                                                             />
                                                         )}
                                                     </Box>
@@ -292,17 +461,17 @@ const AccommodationDetails = ({ onBack }) => {
                                                 </Box>
                                             </Box>
                                             <Box sx={{ flexShrink: 0, alignSelf: 'flex-start' }}>
-                                                <Chip 
-                                                    label={rm.status || 'Allocated'} 
-                                                    size="small" 
-                                                    sx={{ 
-                                                        bgcolor: '#dcfce7', 
-                                                        color: '#166534', 
-                                                        fontWeight: 600, 
+                                                <Chip
+                                                    label={rm.status || 'Allocated'}
+                                                    size="small"
+                                                    sx={{
+                                                        bgcolor: '#dcfce7',
+                                                        color: '#166534',
+                                                        fontWeight: 600,
                                                         borderRadius: 1.5,
                                                         fontSize: '11px',
                                                         height: 24
-                                                    }} 
+                                                    }}
                                                 />
                                             </Box>
                                         </Box>
@@ -326,7 +495,7 @@ const AccommodationDetails = ({ onBack }) => {
                                 <InfoIcon sx={{ color: '#0b5299', mr: 1.25, fontSize: { xs: 22, sm: 24 } }} />
                                 <Typography sx={{ fontSize: { xs: '1rem', sm: '1.15rem' }, fontWeight: 700, color: '#0f172a' }}>Hostel Information</Typography>
                             </Box>
-                            
+
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 0.5, sm: 0.75 } }}>
                                 {[
                                     { label: 'Hostel Name', value: details.hostelInfo?.name || details.building || 'Not Assigned', icon: <BusinessIcon fontSize="small" sx={{ color: '#0b5299' }} /> },
@@ -337,12 +506,12 @@ const AccommodationDetails = ({ onBack }) => {
                                     { label: 'Address', value: details.hostelInfo?.address || 'Not Assigned', icon: <LocationOnIcon fontSize="small" sx={{ color: '#0b5299' }} /> },
                                 ].map((item, idx) => (
                                     <React.Fragment key={idx}>
-                                        <Box sx={{ 
-                                            display: 'grid', 
-                                            gridTemplateColumns: { xs: '115px 12px 1fr', sm: '140px 16px 1fr' }, 
-                                            gap: { xs: 0.75, sm: 1.25 }, 
-                                            py: { xs: 0.75, sm: 1 }, 
-                                            alignItems: 'flex-start' 
+                                        <Box sx={{
+                                            display: 'grid',
+                                            gridTemplateColumns: { xs: '115px 12px 1fr', sm: '140px 16px 1fr' },
+                                            gap: { xs: 0.75, sm: 1.25 },
+                                            py: { xs: 0.75, sm: 1 },
+                                            alignItems: 'flex-start'
                                         }}>
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#64748b', minWidth: 0 }}>
                                                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -373,7 +542,7 @@ const AccommodationDetails = ({ onBack }) => {
                                 <AssignmentIcon sx={{ color: '#0b5299', mr: 1.25, fontSize: { xs: 22, sm: 24 } }} />
                                 <Typography sx={{ fontSize: { xs: '1rem', sm: '1.15rem' }, fontWeight: 700, color: '#0f172a' }}>Important Guidelines</Typography>
                             </Box>
-                            
+
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
                                 {(guidelines && guidelines.length > 0 ? guidelines : DEFAULT_GUIDELINES).map((rule, idx) => (
                                     <Box
