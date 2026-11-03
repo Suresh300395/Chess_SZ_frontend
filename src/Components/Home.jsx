@@ -14,6 +14,7 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import DownloadIcon from '@mui/icons-material/Download';
 import Tabs from './Common/Tabs';
 import CommitteeCard from './Common/CommitteeCard';
+import PublicBottomBar from './Common/PublicBottomBar';
 import io from 'socket.io-client';
 import { committeeAPI, routeMapAPI, liveBoardAPI, SOCKET_URL } from '../utils/api';
 
@@ -203,7 +204,7 @@ const Home = () => {
                     sx={{
                         mt: { xs: 2, sm: 5 },
                         mb: { xs: 1.5, sm: 4 },
-                        display: 'flex',
+                        display: { xs: 'none', md: 'flex' },
                         justifyContent: 'center',
                         position: { xs: 'sticky', md: 'static' },
                         top: { xs: 0, md: 'auto' },
@@ -218,7 +219,7 @@ const Home = () => {
                     <Tabs tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} />
                 </Box>
 
-                <Box component="section" className="tab-content-section" sx={{ px: { xs: 1.5, sm: 2, md: '96px' }, pb: { xs: 4, md: 8 } }}>
+                <Box component="section" className="tab-content-section" sx={{ mt: { xs: 2.5, sm: 3.5, md: 0 }, px: { xs: 1.5, sm: 2, md: '96px' }, pb: { xs: 4, md: 8 } }}>
                     <Box className="tab-content-card" sx={{ p: { xs: 2, sm: 3, md: 5 }, bgcolor: 'white', borderRadius: 4, boxShadow: '0px 4px 20px rgba(0,0,0,0.05)', height: 'auto', minHeight: 'auto' }}>
                         <Box
                             component="h2"
@@ -226,11 +227,6 @@ const Home = () => {
                             sx={{
                                 mb: 3,
                                 mt: 0,
-                                position: { xs: 'sticky', md: 'static' },
-                                top: { xs: '54px', md: 'auto' },
-                                zIndex: { xs: 1090, md: 'auto' },
-                                bgcolor: { xs: 'white', md: 'transparent' },
-                                py: { xs: 1, md: 0 },
                                 color: '#0b5299',
                                 fontSize: { xs: '1.45rem', sm: '1.75rem', md: '2rem' },
                                 fontWeight: 700
@@ -788,9 +784,7 @@ const Home = () => {
                                 )}
 
                                 {(() => {
-                                    const mapImagesList = (Array.isArray(routeMap?.mapImages) && routeMap.mapImages.length > 0)
-                                        ? routeMap.mapImages
-                                        : (routeMap?.mapImage ? [routeMap.mapImage] : []);
+                                    const mapImagesList = Array.isArray(routeMap?.mapImages) ? routeMap.mapImages : [];
                                     const currentMapImg = mapImagesList[selectedMapIndex] || mapImagesList[0] || '';
 
                                     if (mapImagesList.length === 0) {
@@ -1033,9 +1027,7 @@ const Home = () => {
                 }}
             >
                 {(() => {
-                    const mapImagesList = (Array.isArray(routeMap?.mapImages) && routeMap.mapImages.length > 0)
-                        ? routeMap.mapImages
-                        : (routeMap?.mapImage ? [routeMap.mapImage] : []);
+                    const mapImagesList = Array.isArray(routeMap?.mapImages) ? routeMap.mapImages : [];
                     const currentMapImg = mapImagesList[selectedMapIndex] || mapImagesList[0] || '';
 
                     return (
@@ -1158,6 +1150,12 @@ const Home = () => {
                     );
                 })()}
             </Dialog>
+
+            {/* Bottom Spacing on Mobile so nav bar does not cover content */}
+            <Box sx={{ height: { xs: '80px', md: '0px' } }} />
+
+            {/* Mobile Bottom Navigation Bar */}
+            <PublicBottomBar activeTab={activeTab} setActiveTab={setActiveTab} />
         </Box>
     );
 };

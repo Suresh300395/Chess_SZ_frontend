@@ -24,11 +24,30 @@ const StyledTabs = styled(MuiTabs)({
         gap: '4px',
         width: '100%',
         justifyContent: 'center',
+        alignItems: 'center',
     },
-    '@media (max-width: 768px)': {
+    '@media (max-width: 899.95px)': {
         flex: 1,
         width: '100%',
         maxWidth: '100%',
+        '& .MuiTabs-scroller': {
+            width: '100%',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+        '& .MuiTabs-flexContainer': {
+            width: '100%',
+            display: 'flex',
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+        },
+        '& .MuiTabs-indicator': {
+            width: '100% !important',
+            left: '0 !important',
+            transform: 'none !important',
+        }
     }
 });
 
@@ -39,15 +58,17 @@ const StyledTab = styled((props) => <Tab disableRipple {...props} />)({
     color: '#0b5299', // var(--color-navy)
     minHeight: '42px',
     minWidth: 'unset',
+    maxWidth: 'none',
     borderRadius: '50px',
     zIndex: 2,
     padding: '8px 22px',
     fontFamily: 'inherit',
     transition: 'all 0.3s ease',
-    display: 'inline-flex',
+    display: 'flex',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    textAlign: 'center',
     gap: '8px',
     '& .MuiTab-iconWrapper': {
         margin: '0 !important',
@@ -70,12 +91,22 @@ const StyledTab = styled((props) => <Tab disableRipple {...props} />)({
             color: '#d06c38',
         }
     },
-    '@media (max-width: 768px)': {
+    '@media (max-width: 899.95px)': {
         fontSize: '15px',
         padding: '8px 16px',
         minWidth: 'unset',
-        width: '100%',
-        flex: 1,
+        maxWidth: 'none !important',
+        width: '100% !important',
+        flex: '1 1 100% !important',
+        display: 'flex !important',
+        alignItems: 'center !important',
+        justifyContent: 'center !important',
+        textAlign: 'center !important',
+        margin: '0 auto !important',
+        '&.Mui-selected': {
+            backgroundColor: '#d06c38',
+            borderRadius: '50px',
+        }
     }
 });
 
@@ -142,7 +173,7 @@ const Tabs = ({ tabs = [], activeTab, setActiveTab, onChange, sx }) => {
             <StyledTabs
                 value={activeIndex}
                 onChange={handleChange}
-                variant={isMobile ? "standard" : "scrollable"}
+                variant={isMobile ? "fullWidth" : "scrollable"}
                 scrollButtons={false}
             >
                 {tabs.map((tab, index) => (
@@ -152,7 +183,14 @@ const Tabs = ({ tabs = [], activeTab, setActiveTab, onChange, sx }) => {
                         iconPosition={getTabIconPosition(tab)}
                         label={getTabLabel(tab)}
                         sx={{
-                            display: (isMobile && activeIndex !== index) ? 'none' : 'inline-flex'
+                            display: (isMobile && activeIndex !== index) ? 'none !important' : 'flex !important',
+                            justifyContent: 'center !important',
+                            alignItems: 'center !important',
+                            textAlign: 'center !important',
+                            width: isMobile ? '100% !important' : 'auto',
+                            maxWidth: 'none !important',
+                            flex: isMobile ? '1 1 100% !important' : 'initial',
+                            margin: '0 auto !important',
                         }}
                     />
                 ))}

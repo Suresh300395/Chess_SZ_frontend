@@ -82,6 +82,30 @@ export const authAPI = {
             body: JSON.stringify({ mobile }),
         }),
 
+    forgotPassword: (identifier) =>
+        apiFetch('/auth/forgot-password', {
+            method: 'POST',
+            body: JSON.stringify({ identifier }),
+        }),
+
+    verifyResetOtp: (identifier, otp) =>
+        apiFetch('/auth/verify-reset-otp', {
+            method: 'POST',
+            body: JSON.stringify({ identifier, otp }),
+        }),
+
+    resetPassword: (resetToken, newPassword, confirmPassword) =>
+        apiFetch('/auth/reset-password', {
+            method: 'POST',
+            body: JSON.stringify({ resetToken, newPassword, confirmPassword }),
+        }),
+
+    resendResetOtp: (identifier) =>
+        apiFetch('/auth/resend-reset-otp', {
+            method: 'POST',
+            body: JSON.stringify({ identifier }),
+        }),
+
     getDashboard: () => apiFetch('/auth/dashboard', {}, true),
     updateProfilePhoto: (photo) =>
         apiFetch('/auth/profile-photo', {

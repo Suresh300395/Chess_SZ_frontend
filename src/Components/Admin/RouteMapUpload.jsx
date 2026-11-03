@@ -51,10 +51,8 @@ const RouteMapUpload = () => {
                 });
 
                 let rawList = [];
-                if (Array.isArray(data.mapImages) && data.mapImages.length > 0) {
+                if (Array.isArray(data.mapImages)) {
                     rawList = data.mapImages;
-                } else if (data.mapImage) {
-                    rawList = [data.mapImage];
                 }
 
                 setImages(rawList.map((path, idx) => ({
@@ -131,9 +129,7 @@ const RouteMapUpload = () => {
                 const data = await res.json();
                 toast.success(`Successfully uploaded and saved ${validFiles.length} map image(s)!`);
                 if (data.routeMap) {
-                    const rawList = Array.isArray(data.routeMap.mapImages) && data.routeMap.mapImages.length > 0
-                        ? data.routeMap.mapImages
-                        : (data.routeMap.mapImage ? [data.routeMap.mapImage] : []);
+                    const rawList = Array.isArray(data.routeMap?.mapImages) ? data.routeMap.mapImages : [];
 
                     setImages(rawList.map((path, idx) => ({
                         id: `server-${idx}-${Date.now()}`,

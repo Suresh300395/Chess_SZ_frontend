@@ -493,7 +493,8 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   object-fit: contain;
 }
 
-.chess-logo {
+.chess-logo,
+.aiu-logo {
   max-height: 55px;
 }
 
@@ -544,7 +545,8 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
     max-height: 55px;
   }
 
-  .chess-logo {
+  .chess-logo,
+  .aiu-logo {
     max-height: 40px;
   }
 

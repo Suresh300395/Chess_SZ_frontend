@@ -20,6 +20,7 @@ import UserDashboard from './Components/User/UserDashboard'
 import FrontendLayout from './Components/FrontendLayout'
 import ProtectedRoute from './Components/Common/ProtectedRoute'
 import InactivityTracker from './Components/Common/InactivityTracker'
+import ForgotPasswordPage from './Components/Common/ForgotPasswordPage'
 
 const theme = createTheme({
   typography: {
@@ -182,6 +183,8 @@ function App() {
         <Route element={<FrontendLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="/registration" element={<Registration />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ForgotPasswordPage />} />
             <Route path="/user/dashboard" element={
                 <ProtectedRoute allowedRoles={['player', 'coach']}>
                     <UserDashboard />
