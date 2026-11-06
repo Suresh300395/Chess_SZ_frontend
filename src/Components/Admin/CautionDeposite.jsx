@@ -48,6 +48,7 @@ import CalendarTodayOutlinedIcon from '@mui/icons-material/CalendarTodayOutlined
 import io from 'socket.io-client';
 import { toast } from 'sonner';
 import { registrationAPI, SOCKET_URL } from '../../utils/api';
+import { AnimatedCard, AnimatedText } from '../animations';
 
 const CautionDeposite = () => {
     const [registrations, setRegistrations] = useState([]);
@@ -487,19 +488,19 @@ const CautionDeposite = () => {
         <Box sx={{ width: '100%', pb: 6 }}>
             {/* Header */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    <Box sx={{ width: 48, height: 48, borderRadius: 2.5, bgcolor: '#eff6ff', color: '#0b5299', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <PaymentsIcon sx={{ fontSize: 30 }} />
+                <AnimatedText direction="down" delay={0.03}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <PaymentsIcon sx={{ color: '#0b5299', fontSize: { xs: 32, md: 38 } }} />
+                        <Box>
+                            <Typography variant="h5" sx={{ color: '#0f172a', fontWeight: '800', fontSize: { xs: '1.3rem', md: '1.75rem' } }}>
+                                Caution Deposit Management
+                            </Typography>
+                            <Typography sx={{ color: '#64748b', fontSize: '0.88rem' }}>
+                                Collect, track, and refund security deposits separately for Teams & Coaches
+                            </Typography>
+                        </Box>
                     </Box>
-                    <Box>
-                        <Typography variant="h5" sx={{ color: '#0f172a', fontWeight: '800', fontSize: { xs: '1.3rem', md: '1.75rem' } }}>
-                            Caution Deposit Management
-                        </Typography>
-                        <Typography sx={{ color: '#64748b', fontSize: '0.88rem' }}>
-                            Collect, track, and refund security deposits separately for Teams & Coaches
-                        </Typography>
-                    </Box>
-                </Box>
+                </AnimatedText>
 
                 <Button
                     variant="outlined"
@@ -536,7 +537,7 @@ const CautionDeposite = () => {
             </Box>
 
             {/* KPI Cards */}
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 2, mb: 3, width: '100%' }}>
+            <Box key={activeTab} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 2, mb: 3, width: '100%' }}>
                 {[
                     {
                         title: 'Total Collected (Cash)',
@@ -599,8 +600,8 @@ const CautionDeposite = () => {
                         badgeColor: '#4f46e5'
                     }
                 ].map((stat, index) => (
-                    <Card
-                        key={index}
+                    <AnimatedCard key={index} style={{ height: '100%' }}>
+                        <Card
                         sx={{
                             position: 'relative',
                             overflow: 'hidden',
@@ -713,6 +714,7 @@ const CautionDeposite = () => {
                             </Typography>
                         </CardContent>
                     </Card>
+                    </AnimatedCard>
                 ))}
             </Box>
 
@@ -724,19 +726,21 @@ const CautionDeposite = () => {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     size="small"
                     sx={{ minWidth: { xs: '100%', sm: 340 } }}
-                    InputProps={{
-                        startAdornment: (
-                            <InputAdornment position="start">
-                                <SearchIcon sx={{ color: '#94a3b8' }} />
-                            </InputAdornment>
-                        ),
-                        endAdornment: searchQuery ? (
-                            <InputAdornment position="end">
-                                <IconButton size="small" onClick={() => setSearchQuery('')}>
-                                    <ClearIcon fontSize="small" />
-                                </IconButton>
-                            </InputAdornment>
-                        ) : null
+                    slotProps={{
+                        input: {
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <SearchIcon sx={{ color: '#94a3b8' }} />
+                                </InputAdornment>
+                            ),
+                            endAdornment: searchQuery ? (
+                                <InputAdornment position="end">
+                                    <IconButton size="small" onClick={() => setSearchQuery('')}>
+                                        <ClearIcon fontSize="small" />
+                                    </IconButton>
+                                </InputAdornment>
+                            ) : null
+                        }
                     }}
                 />
 
@@ -1255,9 +1259,11 @@ const CautionDeposite = () => {
                             onChange={(e) => setDepositAmount(e.target.value)}
                             size="small"
                             placeholder="e.g. 2000"
-                            InputProps={{
-                                startAdornment: <InputAdornment position="start">₹</InputAdornment>,
-                                sx: { fontWeight: 700, bgcolor: '#ffffff' }
+                            slotProps={{
+                                input: {
+                                    startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                                    sx: { fontWeight: 700, bgcolor: '#ffffff' }
+                                }
                             }}
                             helperText="Enter collected deposit amount"
                         />

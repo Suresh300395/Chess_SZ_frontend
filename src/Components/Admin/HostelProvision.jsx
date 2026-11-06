@@ -63,12 +63,14 @@ import io from 'socket.io-client';
 import { toast } from 'sonner';
 import CustomTabs from '../Common/Tabs';
 import { registrationAPI, blocksAPI, SOCKET_URL } from '../../utils/api';
+import { AnimatedText, AnimatedCard } from '../animations';
 
 const HostelProvision = () => {
     const [mappedViewMode, setMappedViewMode] = useState('table');
     const [searchViewMode, setSearchViewMode] = useState('table');
     const [accommodationList, setAccommodationList] = useState([]);
     const [dbBlocks, setDbBlocks] = useState([]);
+    const [dbCategories, setDbCategories] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('Players');
     const tabsList = ['Players', 'Coaches / Managers'];
@@ -80,8 +82,8 @@ const HostelProvision = () => {
     const [mapDialogOpen, setMapDialogOpen] = useState(false);
     const [selectedPerson, setSelectedPerson] = useState(null);
     const [selectedHostel, setSelectedHostel] = useState('');
-    const [selectedBuilding, setSelectedBuilding] = useState('Boys Hostel Block A');
-    const [selectedFloor, setSelectedFloor] = useState('Floor 1');
+    const [selectedBuilding, setSelectedBuilding] = useState('');
+    const [selectedFloor, setSelectedFloor] = useState('');
     const [selectedRoom, setSelectedRoom] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
@@ -240,14 +242,8 @@ const HostelProvision = () => {
                 toast.error('Failed to load participants list');
             }
 
-            // Fetch dynamic blocks
-            // Using API_BASE import is preferred, but using fetch from similar endpoints
-            const API_BASE = SOCKET_URL.replace(/:3001$/, ':3003') + '/api';
-            const blocksRes = await fetch(`${API_BASE}/blocks`);
-            if (blocksRes.ok) {
-                const blocksData = await blocksRes.json();
-                setDbBlocks(blocksData);
-            }
+            // Fetch dynamic blocks & categories
+            await fetchBlocksAndCategories();
         } catch (err) {
             console.error('Error fetching registrations:', err);
             toast.error('Error connecting to server', { id: 'error-connecting-to-server' });
@@ -256,13 +252,41 @@ const HostelProvision = () => {
         }
     };
 
+    const fetchBlocksAndCategories = async () => {
+        try {
+            const [blocksRes, categoriesRes] = await Promise.all([
+                blocksAPI.getAll(),
+                blocksAPI.getCategories()
+            ]);
+            let blocksData = [];
+            let catData = [];
+            if (blocksRes.ok) {
+                blocksData = await blocksRes.json();
+                setDbBlocks(blocksData);
+            }
+            if (categoriesRes.ok) {
+                catData = await categoriesRes.json();
+                setDbCategories(catData);
+            }
+            return { blocks: blocksData, categories: catData };
+        } catch (err) {
+            console.error('Error fetching blocks and categories:', err);
+            return { blocks: [], categories: [] };
+        }
+    };
+
     useEffect(() => {
         fetchRegistrations();
         fetchGuidelines();
+        fetchBlocksAndCategories();
 
         const socket = io(SOCKET_URL);
         socket.on('dataUpdated', () => {
             fetchRegistrations();
+            fetchBlocksAndCategories();
+        });
+        socket.on('blocks_updated', () => {
+            fetchBlocksAndCategories();
         });
         socket.on('caution_deposit_updated', () => {
             fetchRegistrations();
@@ -284,7 +308,7 @@ const HostelProvision = () => {
             p.roomAllocation &&
             p.roomAllocation.building === building &&
             p.roomAllocation.floor === floor &&
-            p.roomAllocation.roomNumber === roomNumber &&
+            String(p.roomAllocation.roomNumber) === String(roomNumber) &&
             p.id !== excludePersonId
         ).length;
     }, [accommodationList]);
@@ -333,21 +357,25 @@ const HostelProvision = () => {
     // "okavela aa room fill aipotey db lo manam aa room chupinchamu"
     const availableRooms = useMemo(() => {
         const currentBuildingObj = dbBlocks.find(b => b.name === selectedBuilding);
-        const floorObj = currentBuildingObj?.floors?.find(f => f.floorName === selectedFloor);
-        const rooms = floorObj?.rooms || [];
+        const floorObj = currentBuildingObj?.floors?.find(f => f.floorName?.trim().toLowerCase() === selectedFloor?.trim().toLowerCase());
+        let rooms = floorObj?.rooms || [];
+        if ((!rooms || rooms.length === 0) && floorObj?.roomCount > 0) {
+            rooms = Array.from({ length: floorObj.roomCount }, (_, i) => String(i + 1));
+        }
         const capacity = currentBuildingObj?.capacityPerRoom || 4;
 
         return rooms
             .map(room => {
-                const occupancy = getRoomOccupancy(selectedBuilding, selectedFloor, room, selectedPerson?.id);
-                const actualTotalOccupancy = getRoomOccupancy(selectedBuilding, selectedFloor, room, null);
+                const roomStr = String(room);
+                const occupancy = getRoomOccupancy(selectedBuilding, selectedFloor, roomStr, selectedPerson?.id);
+                const actualTotalOccupancy = getRoomOccupancy(selectedBuilding, selectedFloor, roomStr, null);
                 const isCurrentPersonsRoom =
                     selectedPerson?.roomAllocation?.building === selectedBuilding &&
                     selectedPerson?.roomAllocation?.floor === selectedFloor &&
-                    selectedPerson?.roomAllocation?.roomNumber === room;
+                    String(selectedPerson?.roomAllocation?.roomNumber) === roomStr;
 
                 return {
-                    roomNumber: room,
+                    roomNumber: roomStr,
                     occupancy,
                     actualTotalOccupancy,
                     isCurrentPersonsRoom,
@@ -360,30 +388,47 @@ const HostelProvision = () => {
     }, [selectedBuilding, selectedFloor, getRoomOccupancy, selectedPerson, dbBlocks]);
 
     // Handle Open Map Room Modal
-    const handleOpenMapDialog = (person) => {
+    const handleOpenMapDialog = async (person) => {
         if (document.activeElement instanceof HTMLElement) {
             document.activeElement.blur();
         }
         setSelectedPerson(person);
 
-        const hostels = Array.from(new Set(dbBlocks.map(b => b.block).filter(Boolean)));
+        // Fetch fresh blocks & categories immediately from DB
+        const fresh = await fetchBlocksAndCategories();
+        const currentBlocks = fresh.blocks && fresh.blocks.length > 0 ? fresh.blocks : dbBlocks;
+        const currentCategories = fresh.categories && fresh.categories.length > 0 ? fresh.categories : dbCategories;
+
+        const hostels = Array.from(new Set([
+            ...currentCategories.map(c => c.name?.trim()),
+            ...currentBlocks.map(b => b.block?.trim())
+        ].filter(Boolean)));
+        const allHostels = hostels.length > 0 ? hostels : ['Boys Hostel', 'Girls Hostel', 'Staff Hostel', 'Guest House'];
 
         // Pre-fill building
         if (person.roomAllocation && person.roomAllocation.building) {
-            const currentBldg = dbBlocks.find(b => b.name === person.roomAllocation.building);
+            const currentBldg = currentBlocks.find(b => b.name === person.roomAllocation.building);
             if (currentBldg?.block) setSelectedHostel(currentBldg.block);
-            else if (hostels.length > 0) setSelectedHostel(hostels[0]);
+            else if (allHostels.length > 0) setSelectedHostel(allHostels[0]);
             setSelectedBuilding(person.roomAllocation.building);
             setSelectedFloor(person.roomAllocation.floor || '');
             setSelectedRoom(person.roomAllocation.roomNumber || '');
         } else {
-            // Suggest default building
-            const defHostel = hostels.length > 0 ? hostels[0] : '';
+            // Suggest default building based on person gender if available
+            let defHostel = '';
+            const isFemale = person.gender && String(person.gender).toLowerCase().includes('female');
+            if (isFemale) {
+                defHostel = allHostels.find(h => h.toLowerCase().includes('girl') || h.toLowerCase().includes('women')) || allHostels[0] || '';
+            } else {
+                defHostel = allHostels.find(h => h.toLowerCase().includes('boy') || h.toLowerCase().includes('men')) || allHostels[0] || '';
+            }
+            if (!defHostel && allHostels.length > 0) defHostel = allHostels[0];
+
             setSelectedHostel(defHostel);
-            const matchingBldgs = dbBlocks.filter(b => b.block === defHostel);
-            const defaultBuilding = matchingBldgs.length > 0 ? matchingBldgs[0].name : (dbBlocks.length > 0 ? dbBlocks[0].name : '');
+            const matchingBldgs = currentBlocks.filter(b => b.block?.trim().toLowerCase() === defHostel.trim().toLowerCase());
+            const defaultBuilding = matchingBldgs.length > 0 ? matchingBldgs[0].name : '';
             setSelectedBuilding(defaultBuilding);
-            const defaultBuildingObj = dbBlocks.find(b => b.name === defaultBuilding);
+            const defaultBuildingObj = currentBlocks.find(b => b.name === defaultBuilding);
             const defaultFloor = defaultBuildingObj?.floors?.length > 0 ? defaultBuildingObj.floors[0].floorName : '';
             setSelectedFloor(defaultFloor);
             setSelectedRoom('');
@@ -539,15 +584,19 @@ const HostelProvision = () => {
 
     const bulkAvailableRooms = useMemo(() => {
         const buildingObj = dbBlocks.find(b => b.name === bulkBuilding);
-        const floorObj = buildingObj?.floors?.find(f => f.floorName === bulkFloor);
-        const rooms = floorObj?.rooms || [];
+        const floorObj = buildingObj?.floors?.find(f => f.floorName?.trim().toLowerCase() === bulkFloor?.trim().toLowerCase());
+        let rooms = floorObj?.rooms || [];
+        if ((!rooms || rooms.length === 0) && floorObj?.roomCount > 0) {
+            rooms = Array.from({ length: floorObj.roomCount }, (_, i) => String(i + 1));
+        }
         const capacity = buildingObj?.capacityPerRoom || 4;
 
         return rooms.map(room => {
-            const occupancy = getRoomOccupancy(bulkBuilding, bulkFloor, room, null);
+            const roomStr = String(room);
+            const occupancy = getRoomOccupancy(bulkBuilding, bulkFloor, roomStr, null);
             const availableSlots = Math.max(0, capacity - occupancy);
             return {
-                roomNumber: room,
+                roomNumber: roomStr,
                 occupancy,
                 capacity,
                 availableSlots,
@@ -564,18 +613,20 @@ const HostelProvision = () => {
     const currentRoomMaxSlots = selectedBulkRoomDetails ? selectedBulkRoomDetails.availableSlots : bulkRoomCapacity;
 
     const availableHostels = useMemo(() => {
-        return Array.from(new Set(dbBlocks.map(b => b.block).filter(Boolean)));
-    }, [dbBlocks]);
+        const fromCategories = dbCategories.map(c => c.name?.trim()).filter(Boolean);
+        const fromBlocks = dbBlocks.map(b => b.block?.trim()).filter(Boolean);
+        const combined = Array.from(new Set([...fromCategories, ...fromBlocks]));
+        return combined.length > 0 ? combined : ['Boys Hostel', 'Girls Hostel', 'Staff Hostel', 'Guest House'];
+    }, [dbCategories, dbBlocks]);
 
     const filteredBuildingsForHostel = useMemo(() => {
         if (!bulkHostel) return dbBlocks;
-        const match = dbBlocks.filter(b => b.block === bulkHostel);
-        return match.length > 0 ? match : dbBlocks;
+        return dbBlocks.filter(b => b.block?.trim().toLowerCase() === bulkHostel.trim().toLowerCase());
     }, [dbBlocks, bulkHostel]);
 
     const handleBulkHostelChange = (newHostel) => {
         setBulkHostel(newHostel);
-        const match = dbBlocks.filter(b => b.block === newHostel);
+        const match = dbBlocks.filter(b => b.block?.trim().toLowerCase() === newHostel?.trim().toLowerCase());
         const firstBldg = match.length > 0 ? match[0].name : '';
         setBulkBuilding(firstBldg);
         const bldgObj = match.find(b => b.name === firstBldg);
@@ -587,13 +638,12 @@ const HostelProvision = () => {
 
     const filteredBuildingsForSingle = useMemo(() => {
         if (!selectedHostel) return dbBlocks;
-        const match = dbBlocks.filter(b => b.block === selectedHostel);
-        return match.length > 0 ? match : dbBlocks;
+        return dbBlocks.filter(b => b.block?.trim().toLowerCase() === selectedHostel?.trim().toLowerCase());
     }, [dbBlocks, selectedHostel]);
 
     const handleSingleHostelChange = (newHostel) => {
         setSelectedHostel(newHostel);
-        const match = dbBlocks.filter(b => b.block === newHostel);
+        const match = dbBlocks.filter(b => b.block?.trim().toLowerCase() === newHostel?.trim().toLowerCase());
         const firstBldg = match.length > 0 ? match[0].name : '';
         setSelectedBuilding(firstBldg);
         const bldgObj = match.find(b => b.name === firstBldg);
@@ -602,7 +652,34 @@ const HostelProvision = () => {
         setSelectedRoom('');
     };
 
-    const handleOpenBulkModal = (universityName = null) => {
+    const handleSingleBuildingChange = (newBuilding) => {
+        setSelectedBuilding(newBuilding);
+        const bldgObj = dbBlocks.find(b => b.name === newBuilding);
+        const firstFl = bldgObj?.floors?.length > 0 ? bldgObj.floors[0].floorName : '';
+        setSelectedFloor(firstFl);
+        setSelectedRoom('');
+    };
+
+    // Ensure floor is always valid when building changes
+    useEffect(() => {
+        if (selectedBuilding && availableFloors.length > 0) {
+            if (!selectedFloor || !availableFloors.includes(selectedFloor)) {
+                setSelectedFloor(availableFloors[0]);
+                setSelectedRoom('');
+            }
+        }
+    }, [selectedBuilding, availableFloors, selectedFloor]);
+
+    useEffect(() => {
+        if (bulkBuilding && bulkAvailableFloors.length > 0) {
+            if (!bulkFloor || !bulkAvailableFloors.includes(bulkFloor)) {
+                setBulkFloor(bulkAvailableFloors[0]);
+                setBulkRoom('');
+            }
+        }
+    }, [bulkBuilding, bulkAvailableFloors, bulkFloor]);
+
+    const handleOpenBulkModal = async (universityName = null) => {
         if (document.activeElement instanceof HTMLElement) {
             document.activeElement.blur();
         }
@@ -620,14 +697,22 @@ const HostelProvision = () => {
         setBulkSelectedMemberIds([]);
         setModalActiveTab(activeTab === 'Coaches / Managers' ? 'Coaches / Managers' : 'Players');
 
-        const hostels = Array.from(new Set(dbBlocks.map(b => b.block).filter(Boolean)));
-        const defaultHostel = hostels.length > 0 ? hostels[0] : '';
+        const fresh = await fetchBlocksAndCategories();
+        const currentBlocks = fresh.blocks && fresh.blocks.length > 0 ? fresh.blocks : dbBlocks;
+        const currentCategories = fresh.categories && fresh.categories.length > 0 ? fresh.categories : dbCategories;
+
+        const hostels = Array.from(new Set([
+            ...currentCategories.map(c => c.name?.trim()),
+            ...currentBlocks.map(b => b.block?.trim())
+        ].filter(Boolean)));
+        const allHostels = hostels.length > 0 ? hostels : ['Boys Hostel', 'Girls Hostel', 'Staff Hostel', 'Guest House'];
+        const defaultHostel = allHostels.length > 0 ? allHostels[0] : '';
         setBulkHostel(defaultHostel);
 
-        const buildingsInDefaultHostel = dbBlocks.filter(b => b.block === defaultHostel);
-        const defaultBuilding = buildingsInDefaultHostel.length > 0 ? buildingsInDefaultHostel[0].name : (dbBlocks.length > 0 ? dbBlocks[0].name : '');
+        const buildingsInDefaultHostel = currentBlocks.filter(b => b.block?.trim().toLowerCase() === defaultHostel.trim().toLowerCase());
+        const defaultBuilding = buildingsInDefaultHostel.length > 0 ? buildingsInDefaultHostel[0].name : '';
         setBulkBuilding(defaultBuilding);
-        const defaultBuildingObj = dbBlocks.find(b => b.name === defaultBuilding);
+        const defaultBuildingObj = currentBlocks.find(b => b.name === defaultBuilding);
         const defaultFloor = defaultBuildingObj?.floors?.length > 0 ? defaultBuildingObj.floors[0].floorName : '';
         setBulkFloor(defaultFloor);
         setBulkRoom('');
@@ -987,194 +1072,199 @@ const HostelProvision = () => {
         <Box sx={{ width: '100%' }}>
             {/* Page Header */}
             <Box sx={{ mb: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
-                    <HotelIcon sx={{ color: '#0b5299', fontSize: { xs: 28, md: 34 } }} />
-                    <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', fontSize: { xs: '1.25rem', md: '1.75rem' } }}>
-                        Accommodation Allocation
+                <AnimatedText direction="down" duration={0.45}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
+                        <HotelIcon sx={{ color: '#0b5299', fontSize: { xs: 28, md: 34 } }} />
+                        <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', fontSize: { xs: '1.25rem', md: '1.75rem' } }}>
+                            Accommodation Allocation
+                        </Typography>
+                    </Box>
+                </AnimatedText>
+                <AnimatedText delay={0.08} duration={0.4}>
+                    <Typography sx={{ color: 'text.secondary', fontSize: '0.95rem' }}>
+                        Search participants by name or university to assign hostel rooms, manage capacities, and review allocations.
                     </Typography>
-                </Box>
-                <Typography sx={{ color: 'text.secondary', fontSize: '0.95rem' }}>
-                    Search participants by name or university to assign hostel rooms, manage capacities, and review allocations.
-                </Typography>
+                </AnimatedText>
             </Box>
 
             {/* Quick Stats Banner */}
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 2, mb: 3, width: '100%' }}>
+            <Box key={activeTab} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 2, mb: 3, width: '100%' }}>
                 {[
-                    {
-                        title: `Total ${activeTab}`,
-                        count: stats.total,
-                        subtitle: 'Total Enrolled',
-                        badge: 'Total',
-                        icon: <GroupsIcon sx={{ fontSize: 26, color: '#ffffff' }} />,
-                        bgIcon: <GroupsIcon sx={{ fontSize: 90, color: '#0b5299' }} />,
-                        gradient: 'linear-gradient(135deg, #0b5299 0%, #1e40af 100%)',
-                        shadow: 'rgba(11, 82, 153, 0.22)',
-                        bgGradient: 'linear-gradient(145deg, #ffffff 0%, #f0f7ff 100%)',
-                        borderColor: '#e2e8f0',
-                        hoverBorder: '#93c5fd',
-                        badgeBg: '#eff6ff',
-                        badgeColor: '#1d4ed8'
-                    },
-                    {
-                        title: 'Accommodation (Yes)',
-                        count: stats.requestedAcc,
-                        subtitle: 'Rooms Requested',
-                        badge: 'Requested',
-                        icon: <HotelIcon sx={{ fontSize: 26, color: '#ffffff' }} />,
-                        bgIcon: <HotelIcon sx={{ fontSize: 90, color: '#059669' }} />,
-                        gradient: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
-                        shadow: 'rgba(5, 150, 105, 0.22)',
-                        bgGradient: 'linear-gradient(145deg, #ffffff 0%, #f6fdf9 100%)',
-                        borderColor: '#e2e8f0',
-                        hoverBorder: '#a7f3d0',
-                        badgeBg: '#ecfdf5',
-                        badgeColor: '#047857'
-                    },
-                    {
-                        title: 'Rooms Mapped',
-                        count: stats.mappedCount,
-                        subtitle: 'Allocated Rooms',
-                        badge: 'Allocated',
-                        icon: <HowToRegIcon sx={{ fontSize: 26, color: '#ffffff' }} />,
-                        bgIcon: <HowToRegIcon sx={{ fontSize: 90, color: '#2563eb' }} />,
-                        gradient: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
-                        shadow: 'rgba(37, 99, 235, 0.22)',
-                        bgGradient: 'linear-gradient(145deg, #ffffff 0%, #eff6ff 100%)',
-                        borderColor: '#e2e8f0',
-                        hoverBorder: '#bfdbfe',
-                        badgeBg: '#eff6ff',
-                        badgeColor: '#1d4ed8'
-                    },
-                    {
-                        title: 'Pending Allocation',
-                        count: stats.pendingCount,
-                        subtitle: 'Yet To Be Allocated',
-                        badge: 'Pending',
-                        icon: <MeetingRoomIcon sx={{ fontSize: 26, color: '#ffffff' }} />,
-                        bgIcon: <MeetingRoomIcon sx={{ fontSize: 90, color: '#d97706' }} />,
-                        gradient: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)',
-                        shadow: 'rgba(217, 119, 6, 0.22)',
-                        bgGradient: 'linear-gradient(145deg, #ffffff 0%, #fffbeb 100%)',
-                        borderColor: '#e2e8f0',
-                        hoverBorder: '#fde68a',
-                        badgeBg: '#fffbeb',
-                        badgeColor: '#b45309'
-                    }
-                ].map((stat, index) => (
-                    <Card
-                        key={index}
-                        sx={{
-                            position: 'relative',
-                            overflow: 'hidden',
-                            borderRadius: '16px',
-                            background: stat.bgGradient,
-                            border: `1px solid ${stat.borderColor}`,
-                            boxShadow: '0 2px 12px rgba(15, 23, 42, 0.04)',
-                            transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                            height: '100%',
-                            '&:hover': {
-                                transform: 'translateY(-3px)',
-                                boxShadow: '0 10px 24px rgba(15, 23, 42, 0.08)',
-                                borderColor: stat.hoverBorder
-                            }
-                        }}
-                    >
-                        {/* Corner Category Badge (Pinned to top-right corner) */}
-                        <Chip
-                            label={stat.badge}
-                            size="small"
-                            sx={{
-                                position: 'absolute',
-                                top: 12,
-                                right: 12,
-                                bgcolor: stat.badgeBg,
-                                color: stat.badgeColor,
-                                fontWeight: 600,
-                                fontSize: '0.72rem',
-                                height: '22px',
-                                borderRadius: '6px',
-                                zIndex: 1
-                            }}
-                        />
+                        {
+                            title: `Total ${activeTab}`,
+                            count: stats.total,
+                            subtitle: 'Total Enrolled',
+                            badge: 'Total',
+                            icon: <GroupsIcon sx={{ fontSize: 26, color: '#ffffff' }} />,
+                            bgIcon: <GroupsIcon sx={{ fontSize: 90, color: '#0b5299' }} />,
+                            gradient: 'linear-gradient(135deg, #0b5299 0%, #1e40af 100%)',
+                            shadow: 'rgba(11, 82, 153, 0.22)',
+                            bgGradient: 'linear-gradient(145deg, #ffffff 0%, #f0f7ff 100%)',
+                            borderColor: '#e2e8f0',
+                            hoverBorder: '#93c5fd',
+                            badgeBg: '#eff6ff',
+                            badgeColor: '#1d4ed8'
+                        },
+                        {
+                            title: 'Accommodation (Yes)',
+                            count: stats.requestedAcc,
+                            subtitle: 'Rooms Requested',
+                            badge: 'Requested',
+                            icon: <HotelIcon sx={{ fontSize: 26, color: '#ffffff' }} />,
+                            bgIcon: <HotelIcon sx={{ fontSize: 90, color: '#059669' }} />,
+                            gradient: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                            shadow: 'rgba(5, 150, 105, 0.22)',
+                            bgGradient: 'linear-gradient(145deg, #ffffff 0%, #f6fdf9 100%)',
+                            borderColor: '#e2e8f0',
+                            hoverBorder: '#a7f3d0',
+                            badgeBg: '#ecfdf5',
+                            badgeColor: '#047857'
+                        },
+                        {
+                            title: 'Rooms Mapped',
+                            count: stats.mappedCount,
+                            subtitle: 'Allocated Rooms',
+                            badge: 'Allocated',
+                            icon: <HowToRegIcon sx={{ fontSize: 26, color: '#ffffff' }} />,
+                            bgIcon: <HowToRegIcon sx={{ fontSize: 90, color: '#2563eb' }} />,
+                            gradient: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
+                            shadow: 'rgba(37, 99, 235, 0.22)',
+                            bgGradient: 'linear-gradient(145deg, #ffffff 0%, #eff6ff 100%)',
+                            borderColor: '#e2e8f0',
+                            hoverBorder: '#bfdbfe',
+                            badgeBg: '#eff6ff',
+                            badgeColor: '#1d4ed8'
+                        },
+                        {
+                            title: 'Pending Allocation',
+                            count: stats.pendingCount,
+                            subtitle: 'Yet To Be Allocated',
+                            badge: 'Pending',
+                            icon: <MeetingRoomIcon sx={{ fontSize: 26, color: '#ffffff' }} />,
+                            bgIcon: <MeetingRoomIcon sx={{ fontSize: 90, color: '#d97706' }} />,
+                            gradient: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)',
+                            shadow: 'rgba(217, 119, 6, 0.22)',
+                            bgGradient: 'linear-gradient(145deg, #ffffff 0%, #fffbeb 100%)',
+                            borderColor: '#e2e8f0',
+                            hoverBorder: '#fde68a',
+                            badgeBg: '#fffbeb',
+                            badgeColor: '#b45309'
+                        }
+                    ].map((stat, index) => (
+                        <AnimatedCard key={index} delay={index * 0.07} style={{ height: '100%', width: '100%' }}>
+                            <Card
+                                sx={{
+                                    position: 'relative',
+                                    overflow: 'hidden',
+                                    borderRadius: '16px',
+                                    background: stat.bgGradient,
+                                    border: `1px solid ${stat.borderColor}`,
+                                    boxShadow: '0 2px 12px rgba(15, 23, 42, 0.04)',
+                                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    height: '100%',
+                                    '&:hover': {
+                                        transform: 'translateY(-3px)',
+                                        boxShadow: '0 10px 24px rgba(15, 23, 42, 0.08)',
+                                        borderColor: stat.hoverBorder
+                                    }
+                                }}
+                            >
+                                {/* Corner Category Badge (Pinned to top-right corner) */}
+                                <Chip
+                                    label={stat.badge}
+                                    size="small"
+                                    sx={{
+                                        position: 'absolute',
+                                        top: 12,
+                                        right: 12,
+                                        bgcolor: stat.badgeBg,
+                                        color: stat.badgeColor,
+                                        fontWeight: 600,
+                                        fontSize: '0.72rem',
+                                        height: '22px',
+                                        borderRadius: '6px',
+                                        zIndex: 1
+                                    }}
+                                />
 
-                        {/* Subtle decorative watermark icon in bottom-right corner */}
-                        <Box sx={{
-                            position: 'absolute',
-                            right: -8,
-                            bottom: -8,
-                            opacity: 0.04,
-                            pointerEvents: 'none',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                        }}>
-                            {stat.bgIcon}
-                        </Box>
-
-                        <CardContent sx={{ py: 2, pr: 2, pl: 1.25, '&:last-child': { pb: 2 } }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5, mb: 1.5 }}>
-                                {/* Icon badge */}
+                                {/* Subtle decorative watermark icon in bottom-right corner */}
                                 <Box sx={{
-                                    width: 52,
-                                    height: 52,
-                                    borderRadius: '12px',
-                                    background: stat.gradient,
-                                    boxShadow: `0 4px 12px ${stat.shadow}`,
+                                    position: 'absolute',
+                                    right: -8,
+                                    bottom: -8,
+                                    opacity: 0.04,
+                                    pointerEvents: 'none',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    justifyContent: 'center',
-                                    flexShrink: 0,
-                                    transition: 'transform 0.2s',
-                                    '&:hover': { transform: 'scale(1.05)' }
+                                    justifyContent: 'center'
                                 }}>
-                                    {stat.icon}
+                                    {stat.bgIcon}
                                 </Box>
 
-                                <Box>
+                                <CardContent sx={{ py: 2, pr: 2, pl: 1.25, '&:last-child': { pb: 2 } }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5, mb: 1.5 }}>
+                                        {/* Icon badge */}
+                                        <Box sx={{
+                                            width: 52,
+                                            height: 52,
+                                            borderRadius: '12px',
+                                            background: stat.gradient,
+                                            boxShadow: `0 4px 12px ${stat.shadow}`,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            flexShrink: 0,
+                                            transition: 'transform 0.2s',
+                                            '&:hover': { transform: 'scale(1.05)' }
+                                        }}>
+                                            {stat.icon}
+                                        </Box>
+
+                                        <Box>
+                                            <Typography
+                                                variant="caption"
+                                                sx={{
+                                                    color: '#64748b',
+                                                    fontWeight: 600,
+                                                    fontSize: '0.75rem',
+                                                    letterSpacing: '0.5px',
+                                                    textTransform: 'uppercase',
+                                                    display: 'block',
+                                                    mb: 0.5
+                                                }}
+                                            >
+                                                {stat.title}
+                                            </Typography>
+                                            <Typography
+                                                sx={{
+                                                    fontWeight: 800,
+                                                    color: '#0f172a',
+                                                    fontSize: { xs: '2rem', md: '2.2rem' },
+                                                    lineHeight: 1
+                                                }}
+                                            >
+                                                {stat.count}
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+
+                                    {/* Subtitle */}
                                     <Typography
                                         variant="caption"
                                         sx={{
-                                            color: '#64748b',
-                                            fontWeight: 600,
-                                            fontSize: '0.75rem',
-                                            letterSpacing: '0.5px',
-                                            textTransform: 'uppercase',
-                                            display: 'block',
-                                            mb: 0.5
+                                            color: '#94a3b8',
+                                            fontSize: '0.8rem',
+                                            fontWeight: 500,
+                                            display: 'block'
                                         }}
                                     >
-                                        {stat.title}
+                                        {stat.subtitle}
                                     </Typography>
-                                    <Typography
-                                        sx={{
-                                            fontWeight: 800,
-                                            color: '#0f172a',
-                                            fontSize: { xs: '2rem', md: '2.2rem' },
-                                            lineHeight: 1
-                                        }}
-                                    >
-                                        {stat.count}
-                                    </Typography>
-                                </Box>
-                            </Box>
-
-                            {/* Subtitle */}
-                            <Typography
-                                variant="caption"
-                                sx={{
-                                    color: '#94a3b8',
-                                    fontSize: '0.8rem',
-                                    fontWeight: 500,
-                                    display: 'block'
-                                }}
-                            >
-                                {stat.subtitle}
-                            </Typography>
-                        </CardContent>
-                    </Card>
-                ))}
-            </Box>
+                                </CardContent>
+                            </Card>
+                        </AnimatedCard>
+                    ))}
+                </Box>
 
             {/* Custom Tabs */}
             <Box sx={{ mb: 3 }}>
@@ -2248,10 +2338,7 @@ const HostelProvision = () => {
                                     labelId="building-select-label"
                                     value={selectedBuilding}
                                     label="Building / Block"
-                                    onChange={(e) => {
-                                        setSelectedBuilding(e.target.value);
-                                        setSelectedRoom(''); // Reset room on building change
-                                    }}
+                                    onChange={(e) => handleSingleBuildingChange(e.target.value)}
                                     startAdornment={
                                         <InputAdornment position="start">
                                             <ApartmentIcon sx={{ color: '#0b5299', fontSize: 20 }} />
@@ -2263,6 +2350,11 @@ const HostelProvision = () => {
                                             {bldg.name} {bldg.capacityPerRoom ? `(${bldg.capacityPerRoom} beds/room)` : ''}
                                         </MenuItem>
                                     ))}
+                                    {filteredBuildingsForSingle.length === 0 && (
+                                        <MenuItem disabled value="">
+                                            No buildings found in this category
+                                        </MenuItem>
+                                    )}
                                 </Select>
                             </FormControl>
 
@@ -2288,6 +2380,11 @@ const HostelProvision = () => {
                                             {fl}
                                         </MenuItem>
                                     ))}
+                                    {availableFloors.length === 0 && (
+                                        <MenuItem disabled value="">
+                                            No floors available
+                                        </MenuItem>
+                                    )}
                                 </Select>
                             </FormControl>
 
@@ -2333,13 +2430,24 @@ const HostelProvision = () => {
                                             </Box>
                                         </MenuItem>
                                     ))}
+                                    {availableRooms.length === 0 && (
+                                        <MenuItem disabled value="">
+                                            No rooms available on this floor
+                                        </MenuItem>
+                                    )}
                                 </Select>
                             </FormControl>
 
-                            {/* Notice if all rooms on this floor are full */}
+                            {/* Notice if no rooms available */}
                             {availableRooms.length === 0 && (
-                                <Alert severity="error" sx={{ borderRadius: 2 }}>
-                                    All rooms on <b>{selectedFloor}</b> of <b>{selectedBuilding}</b> are currently at maximum capacity. Please select another floor or building block.
+                                <Alert severity="warning" sx={{ borderRadius: 2 }}>
+                                    {!selectedBuilding ? (
+                                        'Please select a building block to view available rooms.'
+                                    ) : !selectedFloor ? (
+                                        'Please select a floor to view available rooms.'
+                                    ) : (
+                                        <>No vacant rooms available on <b>{selectedFloor}</b> of <b>{selectedBuilding}</b>. Rooms may be at full capacity or not configured in Manage Blocks.</>
+                                    )}
                                 </Alert>
                             )}
 
@@ -2650,6 +2758,11 @@ const HostelProvision = () => {
                                                 {bldg.name} {bldg.capacityPerRoom ? `(${bldg.capacityPerRoom} beds/room)` : ''}
                                             </MenuItem>
                                         ))}
+                                        {filteredBuildingsForHostel.length === 0 && (
+                                            <MenuItem disabled value="">
+                                                No buildings found in this category
+                                            </MenuItem>
+                                        )}
                                     </Select>
                                 </FormControl>
 
@@ -2666,6 +2779,11 @@ const HostelProvision = () => {
                                         {bulkAvailableFloors.map(fl => (
                                             <MenuItem key={fl} value={fl}>{fl}</MenuItem>
                                         ))}
+                                        {bulkAvailableFloors.length === 0 && (
+                                            <MenuItem disabled value="">
+                                                No floors available
+                                            </MenuItem>
+                                        )}
                                     </Select>
                                 </FormControl>
 
@@ -2699,6 +2817,11 @@ const HostelProvision = () => {
                                                 </Box>
                                             </MenuItem>
                                         ))}
+                                        {bulkAvailableRooms.length === 0 && (
+                                            <MenuItem disabled value="">
+                                                No rooms available on this floor
+                                            </MenuItem>
+                                        )}
                                     </Select>
                                 </FormControl>
 
@@ -2912,9 +3035,11 @@ const HostelProvision = () => {
                                             onChange={(e) => setCautionDepositAmount(e.target.value)}
                                             placeholder="2000"
                                             sx={{ '& .MuiOutlinedInput-root': { height: 40, bgcolor: '#ffffff' } }}
-                                            InputProps={{
-                                                startAdornment: <InputAdornment position="start">₹</InputAdornment>,
-                                                sx: { fontWeight: 700, color: '#0f172a' }
+                                            slotProps={{
+                                                input: {
+                                                    startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                                                    sx: { fontWeight: 700, color: '#0f172a' }
+                                                }
                                             }}
                                         />
 
@@ -3175,9 +3300,11 @@ const HostelProvision = () => {
                                                             placeholder="2000"
                                                             value={coachCautionAmounts[coach._id] !== undefined ? coachCautionAmounts[coach._id] : '2000'}
                                                             onChange={(e) => setCoachCautionAmounts(prev => ({ ...prev, [coach._id]: e.target.value }))}
-                                                            InputProps={{
-                                                                startAdornment: <InputAdornment position="start">₹</InputAdornment>,
-                                                                sx: { height: 32, fontSize: '12px', width: 100, bgcolor: '#ffffff' }
+                                                            slotProps={{
+                                                                input: {
+                                                                    startAdornment: <InputAdornment position="start">₹</InputAdornment>,
+                                                                    sx: { height: 32, fontSize: '12px', width: 100, bgcolor: '#ffffff' }
+                                                                }
                                                             }}
                                                         />
                                                         <Button

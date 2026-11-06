@@ -6,6 +6,7 @@ import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../../utils/api';
 import { saveAuthSession } from '../../utils/auth';
+import { getMenusByRole } from './common/RolesNav';
 import ForgotPasswordWorkflow from '../Common/ForgotPasswordWorkflow';
 
 const Authentication = ({ open, onClose, initialUsername = '', initialPassword = '' }) => {
@@ -32,6 +33,9 @@ const Authentication = ({ open, onClose, initialUsername = '', initialPassword =
     }, [open, initialUsername, initialPassword]);
 
     const handleClose = () => {
+        if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+        }
         if (onClose) onClose();
         setTimeout(() => {
             setIsForgotPassword(false);
@@ -59,13 +63,18 @@ const Authentication = ({ open, onClose, initialUsername = '', initialPassword =
             const data = await response.json();
 
             if (response.ok) {
+                if (document.activeElement instanceof HTMLElement) {
+                    document.activeElement.blur();
+                }
                 // Save user data + JWT token with inactivity tracking
                 saveAuthSession({ ...data.user, token: data.token });
                 if (onClose) onClose();
                 if (data.user.role === 'player' || data.user.role === 'coach') {
                     navigate('/user/dashboard');
                 } else {
-                    navigate('/admin/dashboard');
+                    const userMenus = getMenusByRole(data.user.role, data.user.allowedModules);
+                    const defaultPath = userMenus.length > 0 ? userMenus[0].path : '/admin/dashboard';
+                    navigate(defaultPath);
                 }
             } else {
                 setError(data.message || 'Invalid username or password');
@@ -83,6 +92,8 @@ const Authentication = ({ open, onClose, initialUsername = '', initialPassword =
             onClose={handleClose}
             maxWidth="sm"
             fullWidth
+            disableRestoreFocus
+            transitionDuration={{ enter: 225, exit: 0 }}
             slotProps={{ paper: { sx: { borderRadius: 2, m: 2, maxWidth: 460 } } }}
         >
             <Box sx={{ width: '100%', bgcolor: 'white', p: { xs: 3.5, sm: 4.5 }, position: 'relative' }}>

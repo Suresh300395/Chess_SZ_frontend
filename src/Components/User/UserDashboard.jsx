@@ -28,6 +28,8 @@ import FoodTokenDetails from './FoodTokenDetails';
 import { getCurrentUser, updateUserSession } from '../../utils/auth';
 import { formatDateDDMMYYYY } from '../../utils/dateUtils';
 import { isMealTokenExpired } from '../../config/foodTokenConfig';
+import PublicBottomBar from '../Common/PublicBottomBar';
+import { AnimatedCard, AnimatedText } from '../animations';
 
 const UserDashboard = () => {
     const user = getCurrentUser();
@@ -189,13 +191,15 @@ const UserDashboard = () => {
     };
 
     return (
-        <Box sx={{ minHeight: '100vh', pt: { xs: 1.5, sm: 2, md: 8 }, px: { xs: 1.5, sm: 2, md: '96px' }, pb: 4, backgroundColor: '#faf6f3' }}>
+        <Box sx={{ minHeight: '100vh', pt: { xs: 1.5, sm: 2, md: 8 }, px: { xs: 1.5, sm: 2, md: '96px' }, pb: { xs: 10, md: 4 }, backgroundColor: '#faf6f3' }}>
             <Card sx={{ width: '100%', borderRadius: { xs: 3, md: 4 }, boxShadow: 'none !important', border: '1px solid #eaedf1', p: { xs: 2, sm: 2.5, md: 4 } }}>
 
                 {/* Page Title */}
-                <Typography variant="h4" fontWeight="bold" color="#0b5299" sx={{ mb: { xs: 2, md: 3 }, fontSize: { xs: '1.35rem', sm: '1.6rem', md: '1.85rem' } }}>
-                    Welcome {dashData?.name || user?.name || user?.username || 'User'}..!
-                </Typography>
+                <AnimatedText direction="down" delay={0.03}>
+                    <Typography variant="h4" fontWeight="bold" color="#0b5299" sx={{ mb: { xs: 2, md: 3 }, fontSize: { xs: '1.35rem', sm: '1.6rem', md: '1.85rem' } }}>
+                        Welcome {dashData?.name || user?.name || user?.username || 'User'}..!
+                    </Typography>
+                </AnimatedText>
 
                 {/* Loading */}
                 {loading && (
@@ -207,444 +211,454 @@ const UserDashboard = () => {
                 {/* Content */}
                 {!loading && (
                     <>
-                        <Card sx={{
-                            width: '100%',
-                            borderRadius: 3,
-                            mb: 3,
-                            backgroundColor: 'var(--color-navy)',
-                            boxShadow: 'none !important',
-                            color: '#fff',
-                            overflow: 'hidden',
-                            position: 'relative'
-                        }}>
-                            {/* Desktop Sun Background */}
-                            <Box sx={{
-                                display: { xs: 'none', sm: 'block' },
-                                position: 'absolute',
-                                top: '50%',
-                                right: 0,
-                                height: '130%',
-                                aspectRatio: '1/1',
-                                transform: 'translate(50%, -50%)',
-                                backgroundImage: 'url("/Circle _Gold.svg")',
-                                backgroundRepeat: 'no-repeat',
-                                backgroundPosition: 'center',
-                                backgroundSize: 'contain',
-                                zIndex: 0,
-                                opacity: 0.8
-                            }} />
+                        <AnimatedCard delay={0.06} style={{ width: '100%' }}>
+                            <Card sx={{
+                                width: '100%',
+                                borderRadius: 3,
+                                mb: 3,
+                                backgroundColor: 'var(--color-navy)',
+                                boxShadow: 'none !important',
+                                color: '#fff',
+                                overflow: 'hidden',
+                                position: 'relative'
+                            }}>
+                                {/* Desktop Sun Background */}
+                                <Box sx={{
+                                    display: { xs: 'none', sm: 'block' },
+                                    position: 'absolute',
+                                    top: '50%',
+                                    right: 0,
+                                    height: '130%',
+                                    aspectRatio: '1/1',
+                                    transform: 'translate(50%, -50%)',
+                                    backgroundImage: 'url("/Circle _Gold.svg")',
+                                    backgroundRepeat: 'no-repeat',
+                                    backgroundPosition: 'center',
+                                    backgroundSize: 'contain',
+                                    zIndex: 0,
+                                    opacity: 0.8
+                                }} />
 
-                            {/* Mobile Sun Background */}
-                            <Box sx={{
-                                display: { xs: 'block', sm: 'none' },
-                                position: 'absolute',
-                                bottom: 0,
-                                left: '50%',
-                                width: '120%',
-                                aspectRatio: '1/1',
-                                transform: 'translate(-50%, 50%)',
-                                backgroundImage: 'url("/Circle _Gold.svg")',
-                                backgroundRepeat: 'no-repeat',
-                                backgroundPosition: 'center',
-                                backgroundSize: 'contain',
-                                zIndex: 0,
-                                opacity: 0.8
-                            }} />
-                            <CardContent sx={{ p: 2, position: 'relative', zIndex: 1 }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
-                                    {/* Hoverable Avatar with Edit Icon */}
-                                    <Box sx={{ position: 'relative', display: 'inline-block' }}>
-                                        <Box
-                                            onClick={handleOpenModal}
-                                            sx={{
-                                                position: 'relative',
-                                                width: 90,
-                                                height: 90,
-                                                borderRadius: '50%',
-                                                cursor: 'pointer',
-                                                overflow: 'hidden',
-                                                border: '3px solid rgba(255,255,255,0.7)',
-                                                boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
-                                                bgcolor: 'rgba(255,255,255,0.25)',
-                                                '&:hover .photo-edit-overlay': {
-                                                    opacity: 1,
-                                                },
-                                            }}
-                                        >
-                                            <Avatar
-                                                src={resolvePhotoUrl(dashData?.photo || user?.photo)}
-                                                alt={dashData?.name || user?.name || 'Player'}
+                                {/* Mobile Sun Background */}
+                                <Box sx={{
+                                    display: { xs: 'block', sm: 'none' },
+                                    position: 'absolute',
+                                    bottom: 0,
+                                    left: '50%',
+                                    width: '120%',
+                                    aspectRatio: '1/1',
+                                    transform: 'translate(-50%, 50%)',
+                                    backgroundImage: 'url("/Circle _Gold.svg")',
+                                    backgroundRepeat: 'no-repeat',
+                                    backgroundPosition: 'center',
+                                    backgroundSize: 'contain',
+                                    zIndex: 0,
+                                    opacity: 0.8
+                                }} />
+                                <CardContent sx={{ p: 2, position: 'relative', zIndex: 1 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>
+                                        {/* Hoverable Avatar with Edit Icon */}
+                                        <Box sx={{ position: 'relative', display: 'inline-block' }}>
+                                            <Box
+                                                onClick={handleOpenModal}
                                                 sx={{
-                                                    width: '100%',
-                                                    height: '100%',
-                                                    bgcolor: 'transparent',
-                                                    fontSize: 36,
+                                                    position: 'relative',
+                                                    width: 90,
+                                                    height: 90,
+                                                    borderRadius: '50%',
+                                                    cursor: 'pointer',
+                                                    overflow: 'hidden',
+                                                    border: '3px solid rgba(255,255,255,0.7)',
+                                                    boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
+                                                    bgcolor: 'rgba(255,255,255,0.25)',
+                                                    '&:hover .photo-edit-overlay': {
+                                                        opacity: 1,
+                                                    },
                                                 }}
                                             >
-                                                <PersonIcon sx={{ fontSize: 48, color: '#fff' }} />
-                                            </Avatar>
+                                                <Avatar
+                                                    src={resolvePhotoUrl(dashData?.photo || user?.photo)}
+                                                    alt={dashData?.name || user?.name || 'Player'}
+                                                    sx={{
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        bgcolor: 'transparent',
+                                                        fontSize: 36,
+                                                    }}
+                                                >
+                                                    <PersonIcon sx={{ fontSize: 48, color: '#fff' }} />
+                                                </Avatar>
 
-                                            {/* Hover Overlay with Edit Icon */}
+                                                {/* Hover Overlay with Edit Icon */}
+                                                <Box
+                                                    className="photo-edit-overlay"
+                                                    sx={{
+                                                        position: 'absolute',
+                                                        top: 0,
+                                                        left: 0,
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        bgcolor: 'rgba(0, 0, 0, 0.58)',
+                                                        backdropFilter: 'blur(1px)',
+                                                        display: 'flex',
+                                                        flexDirection: 'column',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        opacity: 0,
+                                                        transition: 'opacity 0.25s ease',
+                                                        color: '#fff',
+                                                    }}
+                                                >
+                                                    <CameraAltIcon sx={{ fontSize: 24, mb: 0.3 }} />
+                                                    <Typography sx={{ fontSize: '10px', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                                                        Edit
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+
+                                            {/* Corner Edit Badge */}
                                             <Box
-                                                className="photo-edit-overlay"
+                                                onClick={handleOpenModal}
                                                 sx={{
                                                     position: 'absolute',
-                                                    top: 0,
-                                                    left: 0,
-                                                    width: '100%',
-                                                    height: '100%',
-                                                    bgcolor: 'rgba(0, 0, 0, 0.58)',
-                                                    backdropFilter: 'blur(1px)',
+                                                    bottom: -2,
+                                                    right: -2,
+                                                    width: 28,
+                                                    height: 28,
+                                                    borderRadius: '50%',
+                                                    bgcolor: '#0b5299',
+                                                    color: '#fff',
+                                                    border: '2px solid #fff',
                                                     display: 'flex',
-                                                    flexDirection: 'column',
                                                     alignItems: 'center',
                                                     justifyContent: 'center',
-                                                    opacity: 0,
-                                                    transition: 'opacity 0.25s ease',
-                                                    color: '#fff',
+                                                    cursor: 'pointer',
+                                                    boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                                                    transition: 'transform 0.2s ease, background-color 0.2s ease',
+                                                    zIndex: 3,
+                                                    '&:hover': {
+                                                        transform: 'scale(1.1)',
+                                                        bgcolor: '#083d73',
+                                                    }
                                                 }}
+                                                title="Change photo"
                                             >
-                                                <CameraAltIcon sx={{ fontSize: 24, mb: 0.3 }} />
-                                                <Typography sx={{ fontSize: '10px', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' }}>
-                                                    Edit
-                                                </Typography>
+                                                <EditIcon sx={{ fontSize: 15 }} />
                                             </Box>
                                         </Box>
-
-                                        {/* Corner Edit Badge */}
-                                        <Box
-                                            onClick={handleOpenModal}
-                                            sx={{
-                                                position: 'absolute',
-                                                bottom: -2,
-                                                right: -2,
-                                                width: 28,
-                                                height: 28,
-                                                borderRadius: '50%',
-                                                bgcolor: '#0b5299',
-                                                color: '#fff',
-                                                border: '2px solid #fff',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                cursor: 'pointer',
-                                                boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
-                                                transition: 'transform 0.2s ease, background-color 0.2s ease',
-                                                zIndex: 3,
-                                                '&:hover': {
-                                                    transform: 'scale(1.1)',
-                                                    bgcolor: '#083d73',
-                                                }
-                                            }}
-                                            title="Change photo"
-                                        >
-                                            <EditIcon sx={{ fontSize: 15 }} />
+                                        <Box sx={{ flex: 1 }}>
+                                            <Typography variant="h4" fontWeight="bold" sx={{ mb: 0.5 }}>
+                                                {dashData?.name || user?.name || 'Player Name'}
+                                            </Typography>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                                                <Chip
+                                                    label={dashData?.role ? dashData.role.charAt(0).toUpperCase() + dashData.role.slice(1) : (user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Player')}
+                                                    size="small"
+                                                    sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: '#fff', fontWeight: 600, border: '1px solid rgba(255,255,255,0.4)' }}
+                                                />
+                                            </Box>
+                                            <Typography variant="body2" sx={{ opacity: 0.85, mt: 0.5 }}>
+                                                Mobile: {dashData?.email || user?.email || user?.username || 'player@university.edu'}
+                                            </Typography>
                                         </Box>
                                     </Box>
-                                    <Box sx={{ flex: 1 }}>
-                                        <Typography variant="h4" fontWeight="bold" sx={{ mb: 0.5 }}>
-                                            {dashData?.name || user?.name || 'Player Name'}
-                                        </Typography>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                                            <Chip
-                                                label={dashData?.role ? dashData.role.charAt(0).toUpperCase() + dashData.role.slice(1) : (user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Player')}
-                                                size="small"
-                                                sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: '#fff', fontWeight: 600, border: '1px solid rgba(255,255,255,0.4)' }}
-                                            />
-                                        </Box>
-                                        <Typography variant="body2" sx={{ opacity: 0.85, mt: 0.5 }}>
-                                            Mobile: {dashData?.email || user?.email || user?.username || 'player@university.edu'}
-                                        </Typography>
-                                    </Box>
-                                </Box>
 
-                                {/* Additional Player Details */}
-                                {playerDetails && (
-                                    <>
-                                        <Divider sx={{ my: 3, borderColor: 'rgba(255,255,255,0.2)' }} />
-                                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(3, 1fr)', md: 'repeat(6, 1fr)' }, gap: 3 }}>
-                                            <Box>
-                                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: 1 }}>University</Typography>
-                                                <Typography variant="body2" fontWeight="600">{playerDetails.universityName || '—'}</Typography>
+                                    {/* Additional Player Details */}
+                                    {playerDetails && (
+                                        <>
+                                            <Divider sx={{ my: 3, borderColor: 'rgba(255,255,255,0.2)' }} />
+                                            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(3, 1fr)', md: 'repeat(6, 1fr)' }, gap: 3 }}>
+                                                <Box>
+                                                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: 1 }}>University</Typography>
+                                                    <Typography variant="body2" fontWeight="600">{playerDetails.universityName || '—'}</Typography>
+                                                </Box>
+                                                <Box>
+                                                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: 1 }}>Gender</Typography>
+                                                    <Typography variant="body2" fontWeight="600">{playerDetails.gender || '—'}</Typography>
+                                                </Box>
+                                                <Box>
+                                                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: 1 }}>DOB</Typography>
+                                                    <Typography variant="body2" fontWeight="600">{formatDate(playerDetails.dob)}</Typography>
+                                                </Box>
+                                                <Box>
+                                                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: 1 }}>Transport</Typography>
+                                                    <Typography variant="body2" fontWeight="600">{playerDetails.transportMode || '—'} {playerDetails.transportNumber ? `(${playerDetails.transportNumber})` : ''}</Typography>
+                                                </Box>
+                                                <Box>
+                                                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: 1 }}>Arrival</Typography>
+                                                    <Typography variant="body2" fontWeight="600">{formatDate(playerDetails.arrivalDate)} {playerDetails.arrivalTime || ''}</Typography>
+                                                </Box>
+                                                <Box>
+                                                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: 1 }}>Departure</Typography>
+                                                    <Typography variant="body2" fontWeight="600">{formatDate(playerDetails.departureDate)} {playerDetails.departureTime || ''}</Typography>
+                                                </Box>
                                             </Box>
-                                            <Box>
-                                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: 1 }}>Gender</Typography>
-                                                <Typography variant="body2" fontWeight="600">{playerDetails.gender || '—'}</Typography>
-                                            </Box>
-                                            <Box>
-                                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: 1 }}>DOB</Typography>
-                                                <Typography variant="body2" fontWeight="600">{formatDate(playerDetails.dob)}</Typography>
-                                            </Box>
-                                            <Box>
-                                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: 1 }}>Transport</Typography>
-                                                <Typography variant="body2" fontWeight="600">{playerDetails.transportMode || '—'} {playerDetails.transportNumber ? `(${playerDetails.transportNumber})` : ''}</Typography>
-                                            </Box>
-                                            <Box>
-                                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: 1 }}>Arrival</Typography>
-                                                <Typography variant="body2" fontWeight="600">{formatDate(playerDetails.arrivalDate)} {playerDetails.arrivalTime || ''}</Typography>
-                                            </Box>
-                                            <Box>
-                                                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: 1 }}>Departure</Typography>
-                                                <Typography variant="body2" fontWeight="600">{formatDate(playerDetails.departureDate)} {playerDetails.departureTime || ''}</Typography>
-                                            </Box>
-                                        </Box>
-                                    </>
-                                )}
-                            </CardContent>
-                        </Card>
+                                        </>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </AnimatedCard>
 
                         {/* Dynamic Section */}
                         {activeView === 'accommodation_details' ? (
-                            <Box sx={{ width: '100%' }}>
+                            <AnimatedCard key="accommodation_details" style={{ width: '100%' }}>
                                 <AccommodationDetails onBack={() => setActiveView('dashboard')} />
-                            </Box>
+                            </AnimatedCard>
                         ) : activeView === 'food_tokens' ? (
-                            <Box sx={{ width: '100%' }}>
+                            <AnimatedCard key="food_tokens" style={{ width: '100%' }}>
                                 <FoodTokenDetails onBack={() => setActiveView('dashboard')} />
-                            </Box>
+                            </AnimatedCard>
                         ) : (
                             <Box sx={{ width: '100%' }}>
-                                <Typography variant="h6" fontWeight="bold" color="#1a202c" sx={{ mb: 2 }}>
-                                    My Facilities &amp; Payments
-                                </Typography>
+                                <AnimatedText delay={0.08}>
+                                    <Typography variant="h6" fontWeight="bold" color="#1a202c" sx={{ mb: 2 }}>
+                                        My Facilities &amp; Payments
+                                    </Typography>
+                                </AnimatedText>
                                 <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 3 }}>
 
                                     {/* Accommodation Card */}
-                                    <Box sx={{ p: 2.5, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#f8fafc', display: 'flex', flexDirection: 'column', height: '100%' }}>
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
-                                            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                                                <Avatar sx={{ bgcolor: '#3b82f6', width: 48, height: 48, borderRadius: 2 }}>
-                                                    <HotelIcon />
-                                                </Avatar>
-                                                <Typography variant="h6" fontWeight="bold" color="#1e293b">Accommodation</Typography>
+                                    <AnimatedCard delay={0.05} style={{ height: '100%', width: '100%' }}>
+                                        <Box sx={{ p: 2.5, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#f8fafc', display: 'flex', flexDirection: 'column', height: '100%' }}>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
+                                                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                                                    <Avatar sx={{ bgcolor: '#3b82f6', width: 48, height: 48, borderRadius: 2 }}>
+                                                        <HotelIcon />
+                                                    </Avatar>
+                                                    <Typography variant="h6" fontWeight="bold" color="#1e293b">Accommodation</Typography>
+                                                </Box>
+                                                <Chip
+                                                    icon={<CheckCircleIcon sx={{ fontSize: '16px !important' }} />}
+                                                    label={acc.status || 'Not Allocated'}
+                                                    size="small"
+                                                    sx={{
+                                                        bgcolor: acc.status === 'Allocated' ? '#dcfce7' : '#f1f5f9',
+                                                        color: acc.status === 'Allocated' ? '#166534' : '#64748b',
+                                                        fontWeight: 600,
+                                                        '& .MuiChip-icon': { color: acc.status === 'Allocated' ? '#166534' : '#64748b' }
+                                                    }}
+                                                />
                                             </Box>
-                                            <Chip
-                                                icon={<CheckCircleIcon sx={{ fontSize: '16px !important' }} />}
-                                                label={acc.status || 'Not Allocated'}
-                                                size="small"
-                                                sx={{
-                                                    bgcolor: acc.status === 'Allocated' ? '#dcfce7' : '#f1f5f9',
-                                                    color: acc.status === 'Allocated' ? '#166534' : '#64748b',
-                                                    fontWeight: 600,
-                                                    '& .MuiChip-icon': { color: acc.status === 'Allocated' ? '#166534' : '#64748b' }
-                                                }}
-                                            />
+                                            <Box sx={{ flexGrow: 1 }}>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
+                                                    <BusinessIcon sx={{ color: '#64748b', fontSize: 20, mr: { xs: 1, sm: 2 }, flexShrink: 0 }} />
+                                                    <Box sx={{ width: { xs: '110px', sm: '135px' }, display: 'flex', justifyContent: 'space-between', pr: 1.5, flexShrink: 0 }}>
+                                                        <Typography variant="body2" color="#64748b" fontWeight="600">Block</Typography>
+                                                        <Typography variant="body2" color="#64748b" fontWeight="600">-</Typography>
+                                                    </Box>
+                                                    <Typography variant="body2" fontWeight="600" color="#1e293b" sx={{ wordBreak: 'break-word' }}>{acc.block || '—'}</Typography>
+                                                </Box>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
+                                                    <MeetingRoomIcon sx={{ color: '#64748b', fontSize: 20, mr: { xs: 1, sm: 2 }, flexShrink: 0 }} />
+                                                    <Box sx={{ width: { xs: '110px', sm: '135px' }, display: 'flex', justifyContent: 'space-between', pr: 1.5, flexShrink: 0 }}>
+                                                        <Typography variant="body2" color="#64748b" fontWeight="600">Room Number</Typography>
+                                                        <Typography variant="body2" color="#64748b" fontWeight="600">-</Typography>
+                                                    </Box>
+                                                    <Typography variant="body2" fontWeight="600" color="#1e293b" sx={{ wordBreak: 'break-word' }}>{acc.roomNumber || '—'}</Typography>
+                                                </Box>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                                                    <GroupIcon sx={{ color: '#64748b', fontSize: 20, mr: { xs: 1, sm: 2 }, flexShrink: 0 }} />
+                                                    <Box sx={{ width: { xs: '110px', sm: '135px' }, display: 'flex', justifyContent: 'space-between', pr: 1.5, flexShrink: 0 }}>
+                                                        <Typography variant="body2" color="#64748b" fontWeight="600">Room Type</Typography>
+                                                        <Typography variant="body2" color="#64748b" fontWeight="600">-</Typography>
+                                                    </Box>
+                                                    <Typography variant="body2" fontWeight="600" color="#1e293b" sx={{ wordBreak: 'break-word' }}>{acc.roomType || '—'}</Typography>
+                                                </Box>
+                                            </Box>
+                                            <Button
+                                                variant="contained"
+                                                disableElevation
+                                                onClick={() => setActiveView('accommodation_details')}
+                                                sx={{ bgcolor: '#0b5299', textTransform: 'none', borderRadius: 1, fontWeight: 600, py: 1, width: 'fit-content', alignSelf: 'flex-end' }}
+                                            >
+                                                View Details <span style={{ marginLeft: '8px' }}>›</span>
+                                            </Button>
                                         </Box>
-                                        <Box sx={{ flexGrow: 1 }}>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
-                                                <BusinessIcon sx={{ color: '#64748b', fontSize: 20, mr: { xs: 1, sm: 2 }, flexShrink: 0 }} />
-                                                <Box sx={{ width: { xs: '110px', sm: '135px' }, display: 'flex', justifyContent: 'space-between', pr: 1.5, flexShrink: 0 }}>
-                                                    <Typography variant="body2" color="#64748b" fontWeight="600">Block</Typography>
-                                                    <Typography variant="body2" color="#64748b" fontWeight="600">-</Typography>
-                                                </Box>
-                                                <Typography variant="body2" fontWeight="600" color="#1e293b" sx={{ wordBreak: 'break-word' }}>{acc.block || '—'}</Typography>
-                                            </Box>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
-                                                <MeetingRoomIcon sx={{ color: '#64748b', fontSize: 20, mr: { xs: 1, sm: 2 }, flexShrink: 0 }} />
-                                                <Box sx={{ width: { xs: '110px', sm: '135px' }, display: 'flex', justifyContent: 'space-between', pr: 1.5, flexShrink: 0 }}>
-                                                    <Typography variant="body2" color="#64748b" fontWeight="600">Room Number</Typography>
-                                                    <Typography variant="body2" color="#64748b" fontWeight="600">-</Typography>
-                                                </Box>
-                                                <Typography variant="body2" fontWeight="600" color="#1e293b" sx={{ wordBreak: 'break-word' }}>{acc.roomNumber || '—'}</Typography>
-                                            </Box>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                                                <GroupIcon sx={{ color: '#64748b', fontSize: 20, mr: { xs: 1, sm: 2 }, flexShrink: 0 }} />
-                                                <Box sx={{ width: { xs: '110px', sm: '135px' }, display: 'flex', justifyContent: 'space-between', pr: 1.5, flexShrink: 0 }}>
-                                                    <Typography variant="body2" color="#64748b" fontWeight="600">Room Type</Typography>
-                                                    <Typography variant="body2" color="#64748b" fontWeight="600">-</Typography>
-                                                </Box>
-                                                <Typography variant="body2" fontWeight="600" color="#1e293b" sx={{ wordBreak: 'break-word' }}>{acc.roomType || '—'}</Typography>
-                                            </Box>
-                                        </Box>
-                                        <Button
-                                            variant="contained"
-                                            disableElevation
-                                            onClick={() => setActiveView('accommodation_details')}
-                                            sx={{ bgcolor: '#0b5299', textTransform: 'none', borderRadius: 1, fontWeight: 600, py: 1, width: 'fit-content', alignSelf: 'flex-end' }}
-                                        >
-                                            View Details <span style={{ marginLeft: '8px' }}>›</span>
-                                        </Button>
-                                    </Box>
+                                    </AnimatedCard>
 
                                     {/* Food Tokens Card */}
-                                    <Box sx={{ p: 2.5, borderRadius: 3, border: '1px solid #fee2e2', bgcolor: '#fff5f5', display: 'flex', flexDirection: 'column', height: '100%' }}>
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
-                                            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                                                <Avatar sx={{ bgcolor: '#f97316', width: 48, height: 48, borderRadius: 2 }}>
-                                                    <RestaurantIcon />
-                                                </Avatar>
-                                                <Typography variant="h6" fontWeight="bold" color="#1e293b">Food Tokens</Typography>
+                                    <AnimatedCard delay={0.12} style={{ height: '100%', width: '100%' }}>
+                                        <Box sx={{ p: 2.5, borderRadius: 3, border: '1px solid #fee2e2', bgcolor: '#fff5f5', display: 'flex', flexDirection: 'column', height: '100%' }}>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
+                                                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                                                    <Avatar sx={{ bgcolor: '#f97316', width: 48, height: 48, borderRadius: 2 }}>
+                                                        <RestaurantIcon />
+                                                    </Avatar>
+                                                    <Typography variant="h6" fontWeight="bold" color="#1e293b">Food Tokens</Typography>
+                                                </Box>
+                                                <Chip
+                                                    icon={<CheckCircleIcon sx={{ fontSize: '16px !important' }} />}
+                                                    label={availableFtCount > 0 ? 'Active' : (ft.used > 0 ? 'Used' : 'Inactive')}
+                                                    size="small"
+                                                    sx={{
+                                                        bgcolor: availableFtCount > 0 ? '#dcfce7' : '#f1f5f9',
+                                                        color: availableFtCount > 0 ? '#166534' : '#64748b',
+                                                        fontWeight: 600,
+                                                        '& .MuiChip-icon': { color: availableFtCount > 0 ? '#166534' : '#64748b' }
+                                                    }}
+                                                />
                                             </Box>
-                                            <Chip
-                                                icon={<CheckCircleIcon sx={{ fontSize: '16px !important' }} />}
-                                                label={availableFtCount > 0 ? 'Active' : (ft.used > 0 ? 'Used' : 'Inactive')}
-                                                size="small"
-                                                sx={{
-                                                    bgcolor: availableFtCount > 0 ? '#dcfce7' : '#f1f5f9',
-                                                    color: availableFtCount > 0 ? '#166534' : '#64748b',
-                                                    fontWeight: 600,
-                                                    '& .MuiChip-icon': { color: availableFtCount > 0 ? '#166534' : '#64748b' }
-                                                }}
-                                            />
-                                        </Box>
-                                        <Box sx={{ flexGrow: 1 }}>
-                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                                                <Box>
-                                                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 0.5 }}>
-                                                        <Typography variant="h3" fontWeight="bold" color="#f97316">{availableFtCount}</Typography>
-                                                        <Typography variant="subtitle1" fontWeight="600" color="#64748b">Available</Typography>
+                                            <Box sx={{ flexGrow: 1 }}>
+                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                                    <Box>
+                                                        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 0.5 }}>
+                                                            <Typography variant="h3" fontWeight="bold" color="#f97316">{availableFtCount}</Typography>
+                                                            <Typography variant="subtitle1" fontWeight="600" color="#64748b">Available</Typography>
+                                                        </Box>
+                                                        <Typography variant="body2" color="#64748b">{ft.used || 0} Used of {totalActiveFt || 0}</Typography>
                                                     </Box>
-                                                    <Typography variant="body2" color="#64748b">{ft.used || 0} Used of {totalActiveFt || 0}</Typography>
+                                                    <Box sx={{ width: 50, height: 50, borderRadius: '50%', bgcolor: '#e0f2fe', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', flexShrink: 0, ml: 1.5 }}>
+                                                        <Typography variant="caption" fontWeight="bold" color="#0369a1" sx={{ lineHeight: 1 }}>{usedPercent}%</Typography>
+                                                        <Typography sx={{ fontSize: '10px', color: '#0369a1', lineHeight: 1, mt: 0.5 }}>Used</Typography>
+                                                    </Box>
                                                 </Box>
-                                                <Box sx={{ width: 50, height: 50, borderRadius: '50%', bgcolor: '#e0f2fe', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', flexShrink: 0, ml: 1.5 }}>
-                                                    <Typography variant="caption" fontWeight="bold" color="#0369a1" sx={{ lineHeight: 1 }}>{usedPercent}%</Typography>
-                                                    <Typography sx={{ fontSize: '10px', color: '#0369a1', lineHeight: 1, mt: 0.5 }}>Used</Typography>
-                                                </Box>
+                                                <LinearProgress variant="determinate" value={usedPercent} sx={{ height: 8, borderRadius: 4, bgcolor: '#e2e8f0', '& .MuiLinearProgress-bar': { bgcolor: '#f97316', borderRadius: 4 } }} />
                                             </Box>
-                                            <LinearProgress variant="determinate" value={usedPercent} sx={{ height: 8, borderRadius: 4, bgcolor: '#e2e8f0', '& .MuiLinearProgress-bar': { bgcolor: '#f97316', borderRadius: 4 } }} />
+                                            <Button
+                                                variant="contained"
+                                                disableElevation
+                                                onClick={() => setActiveView('food_tokens')}
+                                                sx={{ bgcolor: '#f97316', textTransform: 'none', borderRadius: 1, fontWeight: 600, py: 1, width: 'fit-content', mt: 3, '&:hover': { bgcolor: '#ea580c' }, alignSelf: 'flex-end' }}
+                                            >
+                                                View Tokens <span style={{ marginLeft: '8px' }}>›</span>
+                                            </Button>
                                         </Box>
-                                        <Button
-                                            variant="contained"
-                                            disableElevation
-                                            onClick={() => setActiveView('food_tokens')}
-                                            sx={{ bgcolor: '#f97316', textTransform: 'none', borderRadius: 1, fontWeight: 600, py: 1, width: 'fit-content', mt: 3, '&:hover': { bgcolor: '#ea580c' }, alignSelf: 'flex-end' }}
-                                        >
-                                            View Tokens <span style={{ marginLeft: '8px' }}>›</span>
-                                        </Button>
-                                    </Box>
+                                    </AnimatedCard>
 
                                     {/* Caution Deposit Card */}
-                                    <Box sx={{
-                                        p: 2.5,
-                                        borderRadius: 3,
-                                        border: (cd.paid && cd.amount > 0) ? '1px solid #dcfce7' : '1px solid #e2e8f0',
-                                        bgcolor: (cd.paid && cd.amount > 0) ? '#f0fdf4' : '#ffffff',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        height: '100%',
-                                        transition: 'all 0.3s ease'
-                                    }}>
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
-                                            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                                                <Avatar sx={{
-                                                    bgcolor: (cd.paid && cd.amount > 0) ? '#22c55e' : '#94a3b8',
-                                                    width: 48,
-                                                    height: 48,
-                                                    borderRadius: 2,
-                                                    transition: 'background-color 0.3s ease'
-                                                }}>
-                                                    <AccountBalanceWalletIcon />
-                                                </Avatar>
-                                                <Box>
-                                                    <Typography variant="h6" fontWeight="bold" color="#1e293b" sx={{ lineHeight: 1.2 }}>
-                                                        {(dashData?.userType === 'coach' || user?.role === 'coach') ? 'Coach Caution Deposit' : 'Caution Deposit'}
-                                                    </Typography>
-                                                    <Typography variant="caption" sx={{ color: '#64748b' }}>
-                                                        Refundable Security Deposit
-                                                    </Typography>
+                                    <AnimatedCard delay={0.19} style={{ height: '100%', width: '100%' }}>
+                                        <Box sx={{
+                                            p: 2.5,
+                                            borderRadius: 3,
+                                            border: (cd.paid && cd.amount > 0) ? '1px solid #dcfce7' : '1px solid #e2e8f0',
+                                            bgcolor: (cd.paid && cd.amount > 0) ? '#f0fdf4' : '#ffffff',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            height: '100%',
+                                            transition: 'all 0.3s ease'
+                                        }}>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
+                                                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                                                    <Avatar sx={{
+                                                        bgcolor: (cd.paid && cd.amount > 0) ? '#22c55e' : '#94a3b8',
+                                                        width: 48,
+                                                        height: 48,
+                                                        borderRadius: 2,
+                                                        transition: 'background-color 0.3s ease'
+                                                    }}>
+                                                        <AccountBalanceWalletIcon />
+                                                    </Avatar>
+                                                    <Box>
+                                                        <Typography variant="h6" fontWeight="bold" color="#1e293b" sx={{ lineHeight: 1.2 }}>
+                                                            {(dashData?.userType === 'coach' || user?.role === 'coach') ? 'Coach Caution Deposit' : 'Caution Deposit'}
+                                                        </Typography>
+                                                        <Typography variant="caption" sx={{ color: '#64748b' }}>
+                                                            Refundable Security Deposit
+                                                        </Typography>
+                                                    </Box>
                                                 </Box>
-                                            </Box>
-                                            <Chip
-                                                icon={
-                                                    (cd.refundStatus === 'Refunded' || cd.refundStatus === 'Refund Completed') ? (
-                                                        <CheckCircleIcon sx={{ fontSize: '16px !important', color: '#166534 !important' }} />
-                                                    ) : (cd.paid && cd.amount > 0) ? (
-                                                        <CheckCircleIcon sx={{ fontSize: '16px !important', color: '#166534 !important' }} />
-                                                    ) : (
-                                                        <AccessTimeIcon sx={{ fontSize: '16px !important', color: '#64748b !important' }} />
-                                                    )
-                                                }
-                                                label={
-                                                    (cd.refundStatus === 'Refunded' || cd.refundStatus === 'Refund Completed')
-                                                        ? 'Refund Completed'
-                                                        : ((cd.paid && cd.amount > 0) ? 'Paid' : 'Unpaid')
-                                                }
-                                                size="small"
-                                                sx={{
-                                                    bgcolor: (cd.refundStatus === 'Refunded' || cd.refundStatus === 'Refund Completed') ? '#dcfce7' : ((cd.paid && cd.amount > 0) ? '#dcfce7' : '#f1f5f9'),
-                                                    color: (cd.refundStatus === 'Refunded' || cd.refundStatus === 'Refund Completed') ? '#166534' : ((cd.paid && cd.amount > 0) ? '#166534' : '#64748b'),
-                                                    fontWeight: 600,
-                                                    border: (cd.refundStatus === 'Refunded' || cd.refundStatus === 'Refund Completed') ? '1px solid #86efac' : ((cd.paid && cd.amount > 0) ? '1px solid #86efac' : '1px solid #cbd5e1'),
-                                                    '& .MuiChip-icon': {
-                                                        color: (cd.refundStatus === 'Refunded' || cd.refundStatus === 'Refund Completed') ? '#166534' : ((cd.paid && cd.amount > 0) ? '#166534' : '#64748b')
-                                                    }
-                                                }}
-                                            />
-                                        </Box>
-                                        <Box sx={{ flexGrow: 1 }}>
-                                            <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5, mb: 1 }}>
-                                                {(cd.paid && cd.amount > 0) ? (
-                                                    <>
-                                                        <Typography variant="h3" fontWeight="bold" color="#16a34a">
-                                                            ₹{Number(cd.amount).toLocaleString('en-IN')}
-                                                        </Typography>
-                                                        <Typography variant="subtitle1" fontWeight="600" color={(cd.refundStatus === 'Refunded' || cd.refundStatus === 'Refund Completed') ? '#0b5299' : '#16a34a'}>
-                                                            {(cd.refundStatus === 'Refunded' || cd.refundStatus === 'Refund Completed') ? 'Refund Completed' : 'Paid'}
-                                                        </Typography>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Typography variant="h3" fontWeight="bold" color="#94a3b8">
-                                                            --
-                                                        </Typography>
-                                                        <Typography variant="subtitle1" fontWeight="700" color="#dc2626">
-                                                            Unpaid
-                                                        </Typography>
-                                                    </>
-                                                )}
-                                            </Box>
-                                            {cd.paid && cd.paidBy && (
-                                                <Typography variant="body2" color="#64748b" sx={{ mb: 0.5 }}>
-                                                    Paid by <span style={{ fontWeight: 600, color: '#1e293b', marginLeft: '4px' }}>{cd.paidBy}</span>
-                                                </Typography>
-                                            )}
-                                            {cd.paid && cd.receiptNo && (
-                                                <Typography variant="caption" color="#64748b" sx={{ display: 'block', mb: 1 }}>
-                                                    Receipt No: <span style={{ fontWeight: 600, color: '#0b5299' }}>{cd.receiptNo}</span>
-                                                </Typography>
-                                            )}
-                                            <Typography variant="body2" color="#64748b" sx={{ mb: 2 }}>
-                                                Total Deposit <span style={{ fontWeight: 600, color: (cd.paid && cd.amount > 0) ? '#1e293b' : '#64748b', marginLeft: '4px' }}>
-                                                    {(cd.paid && cd.amount > 0) ? `₹${Number(cd.amount).toLocaleString('en-IN')}` : 'Not Paid'}
-                                                </span>
-                                            </Typography>
-                                            <Divider sx={{ my: 2 }} />
-
-                                            {/* Refund Information below the line */}
-                                            <Box sx={{
-                                                bgcolor: (cd.paid && cd.amount > 0) ? '#ffffff' : '#f8fafc',
-                                                p: 1.75,
-                                                borderRadius: 2,
-                                                border: (cd.paid && cd.amount > 0) ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
-                                                boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-                                                display: 'flex',
-                                                alignItems: 'flex-start',
-                                                gap: 1.25
-                                            }}>
-                                                <InfoIcon sx={{ fontSize: 20, color: (cd.paid && cd.amount > 0) ? '#16a34a' : '#64748b', mt: 0.2, flexShrink: 0 }} />
-                                                <Box>
-                                                    <Typography variant="subtitle2" fontWeight="700" color={(cd.paid && cd.amount > 0) ? '#166534' : '#475569'} sx={{ mb: 0.5 }}>
-                                                        Refund Information
-                                                    </Typography>
-                                                    <Typography variant="body2" color="#334155" sx={{ fontSize: '0.84rem', lineHeight: 1.55 }}>
-                                                        {(cd.refundStatus === 'Refunded' || cd.refundStatus === 'Refund Completed') ? (
-                                                            <>
-                                                                Caution deposit of <strong>₹{Number(cd.amount || 0).toLocaleString('en-IN')}</strong> has been <strong>successfully refunded</strong>{(dashData?.userType === 'coach' || user?.role === 'coach') ? ' to Coach.' : ' to your university representative.'}
-                                                            </>
+                                                <Chip
+                                                    icon={
+                                                        (cd.refundStatus === 'Refunded' || cd.refundStatus === 'Refund Completed') ? (
+                                                            <CheckCircleIcon sx={{ fontSize: '16px !important', color: '#166534 !important' }} />
                                                         ) : (cd.paid && cd.amount > 0) ? (
-                                                            <>
-                                                                Caution deposit of <strong>₹{Number(cd.amount).toLocaleString('en-IN')}</strong> is <strong>100% refundable</strong>. Money will be refunded at the time of <strong>vacating the hostel room and returning keys</strong>, subject to room clearance and no property damage.
-                                                            </>
+                                                            <CheckCircleIcon sx={{ fontSize: '16px !important', color: '#166534 !important' }} />
                                                         ) : (
-                                                            <>
-                                                                This {(dashData?.userType === 'coach' || user?.role === 'coach') ? 'coach ' : ''}caution deposit is <strong>100% refundable</strong>. Once paid, the money will be refunded at the time of <strong>vacating the hostel room and returning keys</strong>, subject to room clearance and no property damage.
-                                                            </>
-                                                        )}
+                                                            <AccessTimeIcon sx={{ fontSize: '16px !important', color: '#64748b !important' }} />
+                                                        )
+                                                    }
+                                                    label={
+                                                        (cd.refundStatus === 'Refunded' || cd.refundStatus === 'Refund Completed')
+                                                            ? 'Refund Completed'
+                                                            : ((cd.paid && cd.amount > 0) ? 'Paid' : 'Unpaid')
+                                                    }
+                                                    size="small"
+                                                    sx={{
+                                                        bgcolor: (cd.refundStatus === 'Refunded' || cd.refundStatus === 'Refund Completed') ? '#dcfce7' : ((cd.paid && cd.amount > 0) ? '#dcfce7' : '#f1f5f9'),
+                                                        color: (cd.refundStatus === 'Refunded' || cd.refundStatus === 'Refund Completed') ? '#166534' : ((cd.paid && cd.amount > 0) ? '#166534' : '#64748b'),
+                                                        fontWeight: 600,
+                                                        border: (cd.refundStatus === 'Refunded' || cd.refundStatus === 'Refund Completed') ? '1px solid #86efac' : ((cd.paid && cd.amount > 0) ? '1px solid #86efac' : '1px solid #cbd5e1'),
+                                                        '& .MuiChip-icon': {
+                                                            color: (cd.refundStatus === 'Refunded' || cd.refundStatus === 'Refund Completed') ? '#166534' : ((cd.paid && cd.amount > 0) ? '#166534' : '#64748b')
+                                                        }
+                                                    }}
+                                                />
+                                            </Box>
+                                            <Box sx={{ flexGrow: 1 }}>
+                                                <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5, mb: 1 }}>
+                                                    {(cd.paid && cd.amount > 0) ? (
+                                                        <>
+                                                            <Typography variant="h3" fontWeight="bold" color="#16a34a">
+                                                                ₹{Number(cd.amount).toLocaleString('en-IN')}
+                                                            </Typography>
+                                                            <Typography variant="subtitle1" fontWeight="600" color={(cd.refundStatus === 'Refunded' || cd.refundStatus === 'Refund Completed') ? '#0b5299' : '#16a34a'}>
+                                                                {(cd.refundStatus === 'Refunded' || cd.refundStatus === 'Refund Completed') ? 'Refund Completed' : 'Paid'}
+                                                            </Typography>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Typography variant="h3" fontWeight="bold" color="#94a3b8">
+                                                                --
+                                                            </Typography>
+                                                            <Typography variant="subtitle1" fontWeight="700" color="#dc2626">
+                                                                Unpaid
+                                                            </Typography>
+                                                        </>
+                                                    )}
+                                                </Box>
+                                                {cd.paid && cd.paidBy && (
+                                                    <Typography variant="body2" color="#64748b" sx={{ mb: 0.5 }}>
+                                                        Paid by <span style={{ fontWeight: 600, color: '#1e293b', marginLeft: '4px' }}>{cd.paidBy}</span>
                                                     </Typography>
+                                                )}
+                                                {cd.paid && cd.receiptNo && (
+                                                    <Typography variant="caption" color="#64748b" sx={{ display: 'block', mb: 1 }}>
+                                                        Receipt No: <span style={{ fontWeight: 600, color: '#0b5299' }}>{cd.receiptNo}</span>
+                                                    </Typography>
+                                                )}
+                                                <Typography variant="body2" color="#64748b" sx={{ mb: 2 }}>
+                                                    Total Deposit <span style={{ fontWeight: 600, color: (cd.paid && cd.amount > 0) ? '#1e293b' : '#64748b', marginLeft: '4px' }}>
+                                                        {(cd.paid && cd.amount > 0) ? `₹${Number(cd.amount).toLocaleString('en-IN')}` : 'Not Paid'}
+                                                    </span>
+                                                </Typography>
+                                                <Divider sx={{ my: 2 }} />
+
+                                                {/* Refund Information below the line */}
+                                                <Box sx={{
+                                                    bgcolor: (cd.paid && cd.amount > 0) ? '#ffffff' : '#f8fafc',
+                                                    p: 1.75,
+                                                    borderRadius: 2,
+                                                    border: (cd.paid && cd.amount > 0) ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+                                                    boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                                                    display: 'flex',
+                                                    alignItems: 'flex-start',
+                                                    gap: 1.25
+                                                }}>
+                                                    <InfoIcon sx={{ fontSize: 20, color: (cd.paid && cd.amount > 0) ? '#16a34a' : '#64748b', mt: 0.2, flexShrink: 0 }} />
+                                                    <Box>
+                                                        <Typography variant="subtitle2" fontWeight="700" color={(cd.paid && cd.amount > 0) ? '#166534' : '#475569'} sx={{ mb: 0.5 }}>
+                                                            Refund Information
+                                                        </Typography>
+                                                        <Typography variant="body2" color="#334155" sx={{ fontSize: '0.84rem', lineHeight: 1.55 }}>
+                                                            {(cd.refundStatus === 'Refunded' || cd.refundStatus === 'Refund Completed') ? (
+                                                                <>
+                                                                    Caution deposit of <strong>₹{Number(cd.amount || 0).toLocaleString('en-IN')}</strong> has been <strong>successfully refunded</strong>{(dashData?.userType === 'coach' || user?.role === 'coach') ? ' to Coach.' : ' to your university representative.'}
+                                                                </>
+                                                            ) : (cd.paid && cd.amount > 0) ? (
+                                                                <>
+                                                                    Caution deposit of <strong>₹{Number(cd.amount).toLocaleString('en-IN')}</strong> is <strong>100% refundable</strong>. Money will be refunded at the time of <strong>vacating the hostel room and returning keys</strong>, subject to room clearance and no property damage.
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    This {(dashData?.userType === 'coach' || user?.role === 'coach') ? 'coach ' : ''}caution deposit is <strong>100% refundable</strong>. Once paid, the money will be refunded at the time of <strong>vacating the hostel room and returning keys</strong>, subject to room clearance and no property damage.
+                                                                </>
+                                                            )}
+                                                        </Typography>
+                                                    </Box>
                                                 </Box>
                                             </Box>
                                         </Box>
-                                    </Box>
+                                    </AnimatedCard>
                                 </Box>
                             </Box>
                         )}
@@ -819,6 +833,8 @@ const UserDashboard = () => {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            <PublicBottomBar />
         </Box>
     );
 };

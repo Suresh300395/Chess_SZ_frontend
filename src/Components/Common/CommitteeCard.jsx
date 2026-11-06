@@ -4,10 +4,12 @@ import PermIdentityRoundedIcon from '@mui/icons-material/PermIdentityRounded';
 import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined';
 import LocalPhoneOutlinedIcon from '@mui/icons-material/LocalPhoneOutlined';
 import WebOutlinedIcon from '@mui/icons-material/WebOutlined';
+import { AnimatedCard } from '../animations';
 
-const CommitteeCard = ({ member }) => {
+const CommitteeCard = ({ member, index = 0 }) => {
     return (
-        <Box
+        <AnimatedCard delay={Math.min(index * 0.05, 0.35)} style={{ width: '100%', height: '100%' }}>
+            <Box
             sx={{
                 position: 'relative',
                 display: 'flex',
@@ -352,7 +354,8 @@ const CommitteeCard = ({ member }) => {
                 )}
             </Box>
         </Box>
-    );
+    </AnimatedCard>
+);
 };
 
 export default CommitteeCard;

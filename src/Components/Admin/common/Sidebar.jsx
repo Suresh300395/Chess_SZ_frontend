@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Typography } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getMenusByRole } from './RolesNav';
@@ -8,8 +8,17 @@ const Sidebar = ({ onNavigate }) => {
     const navigate = useNavigate();
     const location = useLocation();
 
-    const user = getCurrentUser() || { role: 'admin' };
-    const menus = getMenusByRole(user.role);
+    const [user, setUser] = useState(getCurrentUser() || { role: 'admin' });
+
+    useEffect(() => {
+        const handleAuthChange = () => {
+            setUser(getCurrentUser() || { role: 'admin' });
+        };
+        window.addEventListener('authChange', handleAuthChange);
+        return () => window.removeEventListener('authChange', handleAuthChange);
+    }, []);
+
+    const menus = getMenusByRole(user.role, user.allowedModules);
 
     const handleItemClick = (path) => {
         navigate(path);

@@ -59,6 +59,8 @@ export const authAPI = {
             body: JSON.stringify({ username, password }),
         }),
 
+    getMe: () => apiFetch('/auth/me', {}, true),
+
     registerAdmin: (data) =>
         apiFetch('/auth/register-admin', {
             method: 'POST',
@@ -266,6 +268,9 @@ export const blocksAPI = {
     create: (data) => apiFetch('/blocks', { method: 'POST', body: JSON.stringify(data) }, true),
     update: (id, data) => apiFetch(`/blocks/${id}`, { method: 'PUT', body: JSON.stringify(data) }, true),
     delete: (id) => apiFetch(`/blocks/${id}`, { method: 'DELETE' }, true),
+    getCategories: () => apiFetch('/blocks/categories'),
+    createCategory: (data) => apiFetch('/blocks/categories', { method: 'POST', body: JSON.stringify(data) }, true),
+    deleteCategory: (id) => apiFetch(`/blocks/categories/${id}`, { method: 'DELETE' }, true),
     getGuidelines: () => apiFetch('/blocks/guidelines'),
     updateGuidelines: (points) => apiFetch('/blocks/guidelines', { method: 'PUT', body: JSON.stringify({ points }) }, true),
 };

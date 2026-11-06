@@ -13,6 +13,7 @@ import TableRowsRoundedIcon from '@mui/icons-material/TableRowsRounded';
 import io from 'socket.io-client';
 import { toast } from 'sonner';
 import { committeeAPI, SOCKET_URL } from '../../utils/api';
+import { AnimatedCard, AnimatedText } from '../animations';
 
 const OrganizingCommitee = () => {
     const [viewMode, setViewMode] = useState('table');
@@ -250,98 +251,104 @@ const OrganizingCommitee = () => {
 
     return (
         <Box sx={{ width: '100%' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
-                <GroupsIcon sx={{ color: '#0b5299', fontSize: { xs: 28, md: 34 } }} />
-                <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', fontSize: { xs: '1.25rem', md: '2rem' } }}>
-                    Organizing Committee
+            <AnimatedText direction="down" delay={0.03}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                    <GroupsIcon sx={{ color: '#0b5299', fontSize: { xs: 28, md: 34 } }} />
+                    <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', fontSize: { xs: '1.25rem', md: '2rem' } }}>
+                        Organizing Committee
+                    </Typography>
+                </Box>
+            </AnimatedText>
+            <AnimatedText delay={0.06}>
+                <Typography sx={{ color: 'text.secondary', mb: 4 }}>
+                    Manage organizing committee details here.
                 </Typography>
-            </Box>
-            <Typography sx={{ color: 'text.secondary', mb: 4 }}>
-                Manage organizing committee details here.
-            </Typography>
+            </AnimatedText>
 
-            <Paper sx={{ p: { xs: 2, sm: 3 }, width: '100%', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', borderRadius: 2, mb: 4 }}>
-                <form onSubmit={handleSubmit}>
-                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }, gap: 3, alignItems: 'center' }}>
-                        <Box>
-                            <TextField
-                                fullWidth
-                                label="Member Name*"
-                                name="memberName"
-                                value={formData.memberName}
-                                onChange={handleChange}
-                                required
-                            />
-                        </Box>
-                        <Box>
-                            <TextField
-                                fullWidth
-                                label="Designation (Role)*"
-                                name="designation"
-                                value={formData.designation}
-                                onChange={handleChange}
-                                required
-                            />
-                        </Box>
-                        <Box>
-                            <TextField
-                                fullWidth
-                                label="Position in Committee*"
-                                name="position"
-                                value={formData.position}
-                                onChange={handleChange}
-                                required
-                            />
-                        </Box>
-
-                        <Box>
-                            <TextField
-                                fullWidth
-                                label="Display Order*"
-                                name="order"
-                                type="number"
-                                value={formData.order}
-                                onChange={handleChange}
-                                required
-                            />
-                        </Box>
-                    </Box>
-
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, mt: 4 }}>
-                        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, width: { xs: '100%', sm: 'auto' } }}>
-                            <Button
-                                component="label"
-                                variant="outlined"
-                                startIcon={<CloudUploadIcon />}
-                                sx={{ width: { xs: '100%', sm: 'auto' } }}
-                            >
-                                UPLOAD PHOTO
-                                <input
-                                    type="file"
-                                    hidden
-                                    accept="image/webp"
-                                    onChange={(e) => handleFileChange(e, false)}
+            <AnimatedCard delay={0.08} style={{ width: '100%' }}>
+                <Paper sx={{ p: { xs: 2, sm: 3 }, width: '100%', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', borderRadius: 2, mb: 4 }}>
+                    <form onSubmit={handleSubmit}>
+                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }, gap: 3, alignItems: 'center' }}>
+                            <Box>
+                                <TextField
+                                    fullWidth
+                                    label="Member Name*"
+                                    name="memberName"
+                                    value={formData.memberName}
+                                    onChange={handleChange}
+                                    required
                                 />
-                            </Button>
-                            <Button
-                                type="submit"
-                                variant="contained"
-                                sx={{ bgcolor: '#0b5299', '&:hover': { bgcolor: '#09407a' }, width: { xs: '100%', sm: 'auto' } }}
-                            >
-                                ADD MEMBER
-                            </Button>
+                            </Box>
+                            <Box>
+                                <TextField
+                                    fullWidth
+                                    label="Designation (Role)*"
+                                    name="designation"
+                                    value={formData.designation}
+                                    onChange={handleChange}
+                                    required
+                                />
+                            </Box>
+                            <Box>
+                                <TextField
+                                    fullWidth
+                                    label="Position in Committee*"
+                                    name="position"
+                                    value={formData.position}
+                                    onChange={handleChange}
+                                    required
+                                />
+                            </Box>
+
+                            <Box>
+                                <TextField
+                                    fullWidth
+                                    label="Display Order*"
+                                    name="order"
+                                    type="number"
+                                    value={formData.order}
+                                    onChange={handleChange}
+                                    required
+                                />
+                            </Box>
                         </Box>
-                        <Typography variant="caption" sx={{ color: 'text.secondary', fontStyle: 'italic', textAlign: 'center' }}>
-                            * Photo rules: Only WEBP format, Max 100KB, 1:1 Aspect Ratio (Square).
-                        </Typography>
-                        {formData.photo && (
-                            <Typography variant="caption" sx={{ color: 'green', fontWeight: 500 }}>
-                                Selected: {formData.photo.name}
+
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, mt: 4 }}>
+                            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, width: { xs: '100%', sm: 'auto' } }}>
+                                <Button
+                                    component="label"
+                                    variant="outlined"
+                                    startIcon={<CloudUploadIcon />}
+                                    sx={{ width: { xs: '100%', sm: 'auto' } }}
+                                >
+                                    UPLOAD PHOTO
+                                    <input
+                                        type="file"
+                                        hidden
+                                        accept="image/webp"
+                                        onChange={(e) => handleFileChange(e, false)}
+                                    />
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    variant="contained"
+                                    sx={{ bgcolor: '#0b5299', '&:hover': { bgcolor: '#09407a' }, width: { xs: '100%', sm: 'auto' } }}
+                                >
+                                    ADD MEMBER
+                                </Button>
+                            </Box>
+                            <Typography variant="caption" sx={{ color: 'text.secondary', fontStyle: 'italic', textAlign: 'center' }}>
+                                * Photo rules: Only WEBP format, Max 100KB, 1:1 Aspect Ratio (Square).
                             </Typography>
-                        )}
-                    </Box>
-                </form>
-            </Paper>
+                            {formData.photo && (
+                                <Typography variant="caption" sx={{ color: 'green', fontWeight: 500 }}>
+                                    Selected: {formData.photo.name}
+                                </Typography>
+                            )}
+                        </Box>
+                    </form>
+                </Paper>
+            </AnimatedCard>
 
             {members.length > 0 && (
                 <Box sx={{ mt: 4 }}>
@@ -394,71 +401,72 @@ const OrganizingCommitee = () => {
                     {viewMode === 'cards' ? (
                         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 2 }}>
                             {members.map((member, index) => (
-                                <Paper
-                                    key={member._id}
-                                    variant="outlined"
-                                    sx={{
-                                        p: 2,
-                                        borderRadius: 2.5,
-                                        bgcolor: '#ffffff',
-                                        borderColor: '#e2e8f0',
-                                        boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        justifyContent: 'space-between',
-                                        gap: 1.5,
-                                        transition: 'all 0.2s ease-in-out',
-                                        '&:hover': {
-                                            borderColor: '#cbd5e1',
-                                            boxShadow: '0 6px 16px rgba(11,82,153,0.08)'
-                                        }
-                                    }}
-                                >
-                                    <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
-                                        <Avatar src={member.photo} alt={member.memberName} sx={{ width: 56, height: 56, border: '2px solid #e2e8f0' }} />
-                                        <Box sx={{ minWidth: 0, flex: 1 }}>
-                                            <Typography sx={{ fontWeight: 700, color: '#0f172a', fontSize: '1rem', wordBreak: 'break-word' }}>
-                                                {member.memberName}
-                                            </Typography>
-                                            <Typography variant="body2" sx={{ color: '#0b5299', fontWeight: 600, fontSize: '13px' }}>
-                                                {member.position}
-                                            </Typography>
-                                            <Typography variant="caption" sx={{ color: '#64748b' }}>
-                                                {member.designation}
-                                            </Typography>
+                                <AnimatedCard key={member._id} delay={Math.min(index * 0.04, 0.25)} style={{ height: '100%', width: '100%' }}>
+                                    <Paper
+                                        variant="outlined"
+                                        sx={{
+                                            p: 2,
+                                            borderRadius: 2.5,
+                                            bgcolor: '#ffffff',
+                                            borderColor: '#e2e8f0',
+                                            boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            justifyContent: 'space-between',
+                                            gap: 1.5,
+                                            transition: 'all 0.2s ease-in-out',
+                                            '&:hover': {
+                                                borderColor: '#cbd5e1',
+                                                boxShadow: '0 6px 16px rgba(11,82,153,0.08)'
+                                            }
+                                        }}
+                                    >
+                                        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                                            <Avatar src={member.photo} alt={member.memberName} sx={{ width: 56, height: 56, border: '2px solid #e2e8f0' }} />
+                                            <Box sx={{ minWidth: 0, flex: 1 }}>
+                                                <Typography sx={{ fontWeight: 700, color: '#0f172a', fontSize: '1rem', wordBreak: 'break-word' }}>
+                                                    {member.memberName}
+                                                </Typography>
+                                                <Typography variant="body2" sx={{ color: '#0b5299', fontWeight: 600, fontSize: '13px' }}>
+                                                    {member.position}
+                                                </Typography>
+                                                <Typography variant="caption" sx={{ color: '#64748b' }}>
+                                                    {member.designation}
+                                                </Typography>
+                                            </Box>
                                         </Box>
-                                    </Box>
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pt: 1, borderTop: '1px solid #f1f5f9' }}>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
-                                                Order:
-                                            </Typography>
-                                            <TextField
-                                                type="number"
-                                                size="small"
-                                                defaultValue={member.order}
-                                                onBlur={(e) => {
-                                                    if (e.target.value !== String(member.order)) {
-                                                        handleOrderUpdate(member._id, e.target.value);
-                                                    }
-                                                }}
-                                                sx={{ width: '65px', '& input': { py: 0.4, fontSize: '12px' } }}
-                                            />
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pt: 1, borderTop: '1px solid #f1f5f9' }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
+                                                    Order:
+                                                </Typography>
+                                                <TextField
+                                                    type="number"
+                                                    size="small"
+                                                    defaultValue={member.order}
+                                                    onBlur={(e) => {
+                                                        if (e.target.value !== String(member.order)) {
+                                                            handleOrderUpdate(member._id, e.target.value);
+                                                        }
+                                                    }}
+                                                    sx={{ width: '65px', '& input': { py: 0.4, fontSize: '12px' } }}
+                                                />
+                                            </Box>
+                                            <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                                <Tooltip title="Edit Member">
+                                                    <IconButton size="small" onClick={() => handleOpenEdit(member)} sx={{ color: '#0b5299', bgcolor: '#eff6ff' }}>
+                                                        <EditIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                                <Tooltip title="Delete Member">
+                                                    <IconButton size="small" onClick={() => handleDelete(member._id)} sx={{ color: '#dc2626', bgcolor: '#fef2f2' }}>
+                                                        <DeleteIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            </Box>
                                         </Box>
-                                        <Box sx={{ display: 'flex', gap: 0.5 }}>
-                                            <Tooltip title="Edit Member">
-                                                <IconButton size="small" onClick={() => handleOpenEdit(member)} sx={{ color: '#0b5299', bgcolor: '#eff6ff' }}>
-                                                    <EditIcon fontSize="small" />
-                                                </IconButton>
-                                            </Tooltip>
-                                            <Tooltip title="Delete Member">
-                                                <IconButton size="small" onClick={() => handleDelete(member._id)} sx={{ color: '#dc2626', bgcolor: '#fef2f2' }}>
-                                                    <DeleteIcon fontSize="small" />
-                                                </IconButton>
-                                            </Tooltip>
-                                        </Box>
-                                    </Box>
-                                </Paper>
+                                    </Paper>
+                                </AnimatedCard>
                             ))}
                         </Box>
                     ) : (

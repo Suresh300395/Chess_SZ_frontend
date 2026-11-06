@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
     Box, Typography, Chip, Button, Paper, Avatar,
     Dialog, DialogContent, IconButton, Tooltip
@@ -15,8 +16,10 @@ import DownloadIcon from '@mui/icons-material/Download';
 import Tabs from './Common/Tabs';
 import CommitteeCard from './Common/CommitteeCard';
 import PublicBottomBar from './Common/PublicBottomBar';
+import { AnimatedCard, AnimatedText } from './animations';
 import io from 'socket.io-client';
 import { committeeAPI, routeMapAPI, liveBoardAPI, SOCKET_URL } from '../utils/api';
+import { scrollToTabContainer } from '../utils/scrollUtils';
 
 const getMatchDetails = (m, currentRound) => {
     const rawRes = (m.result || '*').trim();
@@ -67,13 +70,31 @@ const getMatchDetails = (m, currentRound) => {
 };
 
 const Home = () => {
-    const [activeTab, setActiveTab] = useState('Live Board');
+    const location = useLocation();
+    const [activeTab, setActiveTab] = useState(location.state?.targetTab || 'About');
     const [committeeMembers, setCommitteeMembers] = useState([]);
     const [liveBoard, setLiveBoard] = useState(null);
     const [routeMap, setRouteMap] = useState(null);
     const [isMapModalOpen, setIsMapModalOpen] = useState(false);
     const [selectedMapIndex, setSelectedMapIndex] = useState(0);
-    const tabs = ['Live Board', 'Route Map', 'Organizing Committee'];
+    const tabs = ['About', 'Live Board', 'Route Map', 'Organizing Committee'];
+
+    const isFirstMount = useRef(true);
+
+    useEffect(() => {
+        if (location.state?.targetTab) {
+            setActiveTab(location.state.targetTab);
+            scrollToTabContainer();
+        }
+    }, [location.state?.targetTab]);
+
+    useEffect(() => {
+        if (isFirstMount.current) {
+            isFirstMount.current = false;
+            return;
+        }
+        scrollToTabContainer();
+    }, [activeTab]);
 
     const resolveImgUrl = (path) => {
         if (!path) return '';
@@ -193,10 +214,13 @@ const Home = () => {
                 <Box component="section" className="hero-section">
                     <Box component="img" src="/hero.png" alt="South Zone Chess Tournament" className="hero-banner-img" />
                     <Box className="hero-content page-container">
-                        <Box component="h1" className="hero-title">
-                            <Box component="span" className="text-navy">SOUTH ZONE</Box><br />
-                            <Box component="span" className="text-orange">CHESS</Box> <Box component="span" className="text-navy">TOURNAMENT</Box>
-                        </Box>
+                        <AnimatedText direction="down" delay={0.05}>
+                            <Box component="h1" className="hero-title">
+                                <Box component="span" className="text-navy">SOUTH ZONE</Box><br />
+                                <Box component="span" className="text-navy">INTER UNIVERSITY</Box><br />
+                                <Box component="span" className="text-orange">CHESS (MEN)</Box> <Box component="span" className="text-navy">TOURNAMENT</Box>
+                            </Box>
+                        </AnimatedText>
                     </Box>
                 </Box>
 
@@ -216,11 +240,14 @@ const Home = () => {
                         boxSizing: 'border-box'
                     }}
                 >
-                    <Tabs tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} />
+                    <AnimatedCard delay={0.06} whileInView={true} style={{ width: 'auto' }}>
+                        <Tabs tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} />
+                    </AnimatedCard>
                 </Box>
 
-                <Box component="section" className="tab-content-section" sx={{ mt: { xs: 2.5, sm: 3.5, md: 0 }, px: { xs: 1.5, sm: 2, md: '96px' }, pb: { xs: 4, md: 8 } }}>
-                    <Box className="tab-content-card" sx={{ p: { xs: 2, sm: 3, md: 5 }, bgcolor: 'white', borderRadius: 4, boxShadow: '0px 4px 20px rgba(0,0,0,0.05)', height: 'auto', minHeight: 'auto' }}>
+                <Box component="section" className="tab-content-section" sx={{ mt: { xs: 2.5, sm: 3.5, md: 0 }, px: { xs: 1.5, sm: 2, md: '96px' }, pb: { xs: 2.5, sm: 3.5, md: 8 } }}>
+                    <AnimatedCard key={activeTab} whileInView={true} style={{ width: '100%' }}>
+                        <Box className="tab-content-card" sx={{ p: { xs: 2, sm: 3, md: 5 }, bgcolor: 'white', borderRadius: 4, boxShadow: '0px 4px 20px rgba(0,0,0,0.05)', height: 'auto', minHeight: 'auto' }}>
                         <Box
                             component="h2"
                             className="tab-card-title"
@@ -234,6 +261,185 @@ const Home = () => {
                         >
                             {activeTab}
                         </Box>
+
+                        {/* ABOUT TAB */}
+                        {activeTab === 'About' && (
+                            <Box sx={{ width: '100%', mt: 0 }}>
+                                <AnimatedCard whileInView={true} delay={0.04} style={{ width: '100%', marginBottom: '28px' }}>
+                                    <Box
+                                        sx={{
+                                            background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                                            borderRadius: 3,
+                                            p: { xs: 2.5, sm: 3.5, md: 4 },
+                                            border: '1px solid #e2e8f0',
+                                        }}
+                                    >
+                                        <Typography
+                                            variant="h5"
+                                            sx={{
+                                                color: '#0b5299',
+                                                fontWeight: 700,
+                                                fontSize: { xs: '1.25rem', sm: '1.45rem', md: '1.65rem' },
+                                                mb: 1.5,
+                                            }}
+                                        >
+                                            South Zone Inter University Chess (Men) Tournament 2026
+                                        </Typography>
+                                        <Typography
+                                            variant="body1"
+                                            sx={{
+                                                color: '#334155',
+                                                lineHeight: 1.75,
+                                                fontSize: { xs: '14px', sm: '15px', md: '16px' },
+                                            }}
+                                        >
+                                            Welcome to the prestigious South Zone Inter University Chess (Men) Tournament, proudly organized and hosted by <strong>Aditya University</strong>, Surampalem, under the esteemed auspices of the <strong>Association of Indian Universities (AIU)</strong>, New Delhi. This grand championship brings together top collegiate chess players and university teams from across the southern zone to compete in strategic mastery, intellectual discipline, and true sportsmanship.
+                                        </Typography>
+                                    </Box>
+                                </AnimatedCard>
+
+                                <Box
+                                    sx={{
+                                        display: 'grid',
+                                        gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
+                                        gap: 2.5,
+                                        mb: 3.5,
+                                    }}
+                                >
+                                    <AnimatedCard whileInView={true} delay={0.05} style={{ height: '100%', width: '100%' }}>
+                                        <Box
+                                            sx={{
+                                                p: 2.5,
+                                                bgcolor: '#ffffff',
+                                                borderRadius: 3,
+                                                border: '1px solid #e2e8f0',
+                                                boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+                                                height: '100%',
+                                                boxSizing: 'border-box',
+                                                transition: 'transform 0.2s, box-shadow 0.2s',
+                                                '&:hover': { transform: 'translateY(-3px)', boxShadow: '0 6px 16px rgba(11, 82, 153, 0.08)' },
+                                            }}
+                                        >
+                                            <Typography sx={{ fontSize: '24px', mb: 1 }}>🏛️</Typography>
+                                            <Typography variant="subtitle2" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px' }}>
+                                                Host Institution
+                                            </Typography>
+                                            <Typography variant="body1" sx={{ color: '#0b5299', fontWeight: 700, mt: 0.5 }}>
+                                                Aditya University
+                                            </Typography>
+                                            <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.5 }}>
+                                                Surampalem, Kakinada Dist., A.P.
+                                            </Typography>
+                                        </Box>
+                                    </AnimatedCard>
+
+                                    <AnimatedCard whileInView={true} delay={0.1} style={{ height: '100%', width: '100%' }}>
+                                        <Box
+                                            sx={{
+                                                p: 2.5,
+                                                bgcolor: '#ffffff',
+                                                borderRadius: 3,
+                                                border: '1px solid #e2e8f0',
+                                                boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+                                                height: '100%',
+                                                boxSizing: 'border-box',
+                                                transition: 'transform 0.2s, box-shadow 0.2s',
+                                                '&:hover': { transform: 'translateY(-3px)', boxShadow: '0 6px 16px rgba(11, 82, 153, 0.08)' },
+                                            }}
+                                        >
+                                            <Typography sx={{ fontSize: '24px', mb: 1 }}>🏆</Typography>
+                                            <Typography variant="subtitle2" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px' }}>
+                                                Governing Body
+                                            </Typography>
+                                            <Typography variant="body1" sx={{ color: '#0b5299', fontWeight: 700, mt: 0.5 }}>
+                                                AIU, New Delhi
+                                            </Typography>
+                                            <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.5 }}>
+                                                Association of Indian Universities
+                                            </Typography>
+                                        </Box>
+                                    </AnimatedCard>
+
+                                    <AnimatedCard whileInView={true} delay={0.15} style={{ height: '100%', width: '100%' }}>
+                                        <Box
+                                            sx={{
+                                                p: 2.5,
+                                                bgcolor: '#ffffff',
+                                                borderRadius: 3,
+                                                border: '1px solid #e2e8f0',
+                                                boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+                                                height: '100%',
+                                                boxSizing: 'border-box',
+                                                transition: 'transform 0.2s, box-shadow 0.2s',
+                                                '&:hover': { transform: 'translateY(-3px)', boxShadow: '0 6px 16px rgba(11, 82, 153, 0.08)' },
+                                            }}
+                                        >
+                                            <Typography sx={{ fontSize: '24px', mb: 1 }}>♟️</Typography>
+                                            <Typography variant="subtitle2" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px' }}>
+                                                Event Discipline
+                                            </Typography>
+                                            <Typography variant="body1" sx={{ color: '#0b5299', fontWeight: 700, mt: 0.5 }}>
+                                                Chess (Men)
+                                            </Typography>
+                                            <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.5 }}>
+                                                South Zone Universities Championship
+                                            </Typography>
+                                        </Box>
+                                    </AnimatedCard>
+
+                                    <AnimatedCard whileInView={true} delay={0.2} style={{ height: '100%', width: '100%' }}>
+                                        <Box
+                                            sx={{
+                                                p: 2.5,
+                                                bgcolor: '#ffffff',
+                                                borderRadius: 3,
+                                                border: '1px solid #e2e8f0',
+                                                boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+                                                height: '100%',
+                                                boxSizing: 'border-box',
+                                                transition: 'transform 0.2s, box-shadow 0.2s',
+                                                '&:hover': { transform: 'translateY(-3px)', boxShadow: '0 6px 16px rgba(11, 82, 153, 0.08)' },
+                                            }}
+                                        >
+                                            <Typography sx={{ fontSize: '24px', mb: 1 }}>📍</Typography>
+                                            <Typography variant="subtitle2" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px' }}>
+                                                Tournament Venue
+                                            </Typography>
+                                            <Typography variant="body1" sx={{ color: '#0b5299', fontWeight: 700, mt: 0.5 }}>
+                                                Aditya Campus
+                                            </Typography>
+                                            <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.5 }}>
+                                                Indoor Sports Complex & Halls
+                                            </Typography>
+                                        </Box>
+                                    </AnimatedCard>
+                                </Box>
+
+                                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
+                                    <AnimatedCard whileInView={true} delay={0.08} style={{ height: '100%', width: '100%' }}>
+                                        <Box sx={{ p: { xs: 2.5, sm: 3 }, bgcolor: '#ffffff', borderRadius: 3, border: '1px solid #e2e8f0', height: '100%', boxSizing: 'border-box' }}>
+                                            <Typography variant="h6" sx={{ color: '#0b5299', fontWeight: 700, mb: 1.5, fontSize: { xs: '1.05rem', sm: '1.15rem' } }}>
+                                                About Aditya University
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ color: '#475569', lineHeight: 1.7, fontSize: '14px' }}>
+                                                Aditya University stands as a premier higher education institution dedicated to academic brilliance and athletic prowess. The campus features world-class indoor sports facilities, fully furnished accommodations, and experienced organizers committed to conducting zonal tournaments of the highest caliber.
+                                            </Typography>
+                                        </Box>
+                                    </AnimatedCard>
+
+                                    <AnimatedCard whileInView={true} delay={0.14} style={{ height: '100%', width: '100%' }}>
+                                        <Box sx={{ p: { xs: 2.5, sm: 3 }, bgcolor: '#ffffff', borderRadius: 3, border: '1px solid #e2e8f0', height: '100%', boxSizing: 'border-box' }}>
+                                            <Typography variant="h6" sx={{ color: '#0b5299', fontWeight: 700, mb: 1.5, fontSize: { xs: '1.05rem', sm: '1.15rem' } }}>
+                                                Tournament Format & Fair Play
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ color: '#475569', lineHeight: 1.7, fontSize: '14px' }}>
+                                                The tournament is conducted in strict compliance with official FIDE Laws of Chess and AIU sports guidelines. Featuring live digital broadcast scoreboards, computerized pairing systems, and certified arbiters, the championship ensures complete transparency and high-level competition.
+                                            </Typography>
+                                        </Box>
+                                    </AnimatedCard>
+                                </Box>
+                            </Box>
+                        )}
 
                         {/* LIVE BOARD TAB */}
                         {activeTab === 'Live Board' && (
@@ -264,7 +470,7 @@ const Home = () => {
 
                                 {/* Embed Video / Live Board */}
                                 {liveBoard?.embedUrl && (
-                                    <Box sx={{ mb: 4 }}>
+                                    <AnimatedCard whileInView={true} delay={0.05} style={{ width: '100%', marginBottom: '32px' }}>
                                         <Box sx={{ width: '100%', height: { xs: '320px', md: '520px' }, borderRadius: 3, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', bgcolor: '#000' }}>
                                             <iframe
                                                 src={liveBoard.embedUrl}
@@ -275,7 +481,7 @@ const Home = () => {
                                                 allowFullScreen
                                             />
                                         </Box>
-                                    </Box>
+                                    </AnimatedCard>
                                 )}
 
                                 {/* Top Matches Table / Cards */}
@@ -286,18 +492,23 @@ const Home = () => {
                                         </Typography>
 
                                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                                {liveBoard.matches.map((m, idx) => {
-                                                    const details = getMatchDetails(m, liveBoard?.currentRound);
-                                                    const isCompleted = details.status === 'COMPLETED';
-                                                    const isLive = details.status === 'LIVE';
+                                            {liveBoard.matches.map((m, idx) => {
+                                                const details = getMatchDetails(m, liveBoard?.currentRound);
+                                                const isCompleted = details.status === 'COMPLETED';
+                                                const isLive = details.status === 'LIVE';
 
-                                                    const borderColor = isCompleted ? '#86efac' : isLive ? '#fca5a5' : '#93c5fd';
-                                                    const cardBg = isCompleted ? '#f6fdf9' : isLive ? '#fffbfb' : '#ffffff';
-                                                    const badgeBg = isCompleted ? '#1e293b' : isLive ? '#dc2626' : '#3b82f6';
+                                                const borderColor = isCompleted ? '#86efac' : isLive ? '#fca5a5' : '#93c5fd';
+                                                const cardBg = isCompleted ? '#f6fdf9' : isLive ? '#fffbfb' : '#ffffff';
+                                                const badgeBg = isCompleted ? '#1e293b' : isLive ? '#dc2626' : '#3b82f6';
 
-                                                    return (
+                                                return (
+                                                    <AnimatedCard
+                                                        key={idx}
+                                                        whileInView={true}
+                                                        delay={Math.min(idx * 0.05, 0.25)}
+                                                        style={{ width: '100%' }}
+                                                    >
                                                         <Paper
-                                                            key={idx}
                                                             elevation={0}
                                                             sx={{
                                                                 borderRadius: '16px',
@@ -315,445 +526,446 @@ const Home = () => {
                                                                 }
                                                             }}
                                                         >
-                                                            {/* MOBILE HEADER BAR (xs only) */}
-                                                            <Box
-                                                                sx={{
-                                                                    display: { xs: 'flex', sm: 'none' },
-                                                                    alignItems: 'center',
-                                                                    justifyContent: 'space-between',
-                                                                    bgcolor: badgeBg,
-                                                                    px: 2,
-                                                                    py: 1,
-                                                                    color: '#ffffff'
-                                                                }}
-                                                            >
-                                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                                                                    <Typography sx={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.5px', opacity: 0.85, textTransform: 'uppercase' }}>
-                                                                        Board
-                                                                    </Typography>
-                                                                    <Typography sx={{ fontSize: '1.05rem', fontWeight: 800 }}>
-                                                                        #{m.boardNumber || idx + 1}
-                                                                    </Typography>
-                                                                </Box>
-
-                                                                {isCompleted ? (
-                                                                    <Chip
-                                                                        label="Completed"
-                                                                        size="small"
-                                                                        sx={{
-                                                                            bgcolor: '#dcfce7',
-                                                                            color: '#15803d',
-                                                                            fontWeight: 700,
-                                                                            fontSize: '11px',
-                                                                            height: 22,
-                                                                            borderRadius: '6px'
-                                                                        }}
-                                                                    />
-                                                                ) : isLive ? (
-                                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, bgcolor: 'rgba(255,255,255,0.2)', px: 1, py: 0.3, borderRadius: '6px' }}>
-                                                                        <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#ffffff' }} />
-                                                                        <Typography sx={{ fontSize: '11px', fontWeight: 700, color: '#ffffff' }}>LIVE</Typography>
-                                                                    </Box>
-                                                                ) : (
-                                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, bgcolor: 'rgba(255,255,255,0.18)', px: 1, py: 0.3, borderRadius: '6px' }}>
-                                                                        <AccessTimeIcon sx={{ fontSize: 13, color: '#ffffff' }} />
-                                                                        <Typography sx={{ fontSize: '11px', fontWeight: 600, color: '#ffffff' }}>
-                                                                            Upcoming • {details.roundText}
-                                                                        </Typography>
-                                                                    </Box>
-                                                                )}
-                                                            </Box>
-
-                                                            {/* MOBILE MATCH BODY (xs only) */}
-                                                            <Box sx={{ display: { xs: 'flex', sm: 'none' }, flexDirection: 'column', p: 1.75, gap: 1 }}>
-                                                                {/* Player 1 Row */}
-                                                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5 }}>
-                                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0, flex: 1 }}>
-                                                                        <Box sx={{ position: 'relative', flexShrink: 0, display: 'inline-flex' }}>
-                                                                            <Avatar
-                                                                                src={m.whitePhoto ? resolveImgUrl(m.whitePhoto) : `https://ui-avatars.com/api/?name=${encodeURIComponent(m.whitePlayer || 'White')}&background=0b5299&color=fff&bold=true`}
-                                                                                alt={m.whitePlayer || 'Player 1'}
-                                                                                sx={{ width: 42, height: 42, border: '2px solid #ffffff', boxShadow: '0 2px 6px rgba(0,0,0,0.08)' }}
-                                                                            />
-                                                                        </Box>
-                                                                        <Box sx={{ minWidth: 0, flex: 1 }}>
-                                                                            <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a', lineHeight: 1.25 }}>
-                                                                                {m.whitePlayer || 'TBD'}
-                                                                            </Typography>
-                                                                            <Typography sx={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500, mt: 0.25 }}>
-                                                                                {m.whiteUniversity || 'University'}
-                                                                            </Typography>
-                                                                        </Box>
-                                                                    </Box>
-
-                                                                    {isCompleted && (
-                                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 0.5 }}>
-                                                                            {details.p1Won && (
-                                                                                <Box
-                                                                                    component="img"
-                                                                                    src="/Trophyy.webp"
-                                                                                    alt="Winner Trophy"
-                                                                                    sx={{ width: 22, height: 22, objectFit: 'contain' }}
-                                                                                />
-                                                                            )}
-                                                                            <Typography sx={{ fontSize: '1.3rem', fontWeight: 800, color: details.p1Won ? '#16a34a' : details.isDraw ? '#2563eb' : '#dc2626' }}>
-                                                                                {details.score1}
-                                                                            </Typography>
-                                                                        </Box>
-                                                                    )}
-                                                                </Box>
-
-                                                                <Box sx={{ height: '1px', bgcolor: '#f1f5f9', my: 0.25 }} />
-
-                                                                {/* Player 2 Row */}
-                                                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5 }}>
-                                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0, flex: 1 }}>
-                                                                        <Box sx={{ position: 'relative', flexShrink: 0, display: 'inline-flex' }}>
-                                                                            <Avatar
-                                                                                src={m.blackPhoto ? resolveImgUrl(m.blackPhoto) : `https://ui-avatars.com/api/?name=${encodeURIComponent(m.blackPlayer || 'Black')}&background=0b5299&color=fff&bold=true`}
-                                                                                alt={m.blackPlayer || 'Player 2'}
-                                                                                sx={{ width: 42, height: 42, border: '2px solid #ffffff', boxShadow: '0 2px 6px rgba(0,0,0,0.08)' }}
-                                                                            />
-                                                                        </Box>
-                                                                        <Box sx={{ minWidth: 0, flex: 1 }}>
-                                                                            <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a', lineHeight: 1.25 }}>
-                                                                                {m.blackPlayer || 'TBD'}
-                                                                            </Typography>
-                                                                            <Typography sx={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500, mt: 0.25 }}>
-                                                                                {m.blackUniversity || 'University'}
-                                                                            </Typography>
-                                                                        </Box>
-                                                                    </Box>
-
-                                                                    {isCompleted && (
-                                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 0.5 }}>
-                                                                            {details.p2Won && (
-                                                                                <Box
-                                                                                    component="img"
-                                                                                    src="/Trophyy.webp"
-                                                                                    alt="Winner Trophy"
-                                                                                    sx={{ width: 22, height: 22, objectFit: 'contain' }}
-                                                                                />
-                                                                            )}
-                                                                            <Typography sx={{ fontSize: '1.3rem', fontWeight: 800, color: details.p2Won ? '#16a34a' : details.isDraw ? '#2563eb' : '#dc2626' }}>
-                                                                                {details.score2}
-                                                                            </Typography>
-                                                                        </Box>
-                                                                    )}
-                                                                </Box>
-                                                            </Box>
-
-                                                            {/* DESKTOP LEFT BADGE (sm and above) */}
-                                                            <Box
-                                                                sx={{
-                                                                    display: { xs: 'none', sm: 'flex' },
-                                                                    bgcolor: badgeBg,
-                                                                    width: { sm: 84 },
-                                                                    minWidth: { sm: 84 },
-                                                                    flexDirection: 'column',
-                                                                    alignItems: 'center',
-                                                                    justifyContent: 'center',
-                                                                    px: 1.5,
-                                                                    py: 2,
-                                                                    gap: 0.25,
-                                                                    flexShrink: 0
-                                                                }}
-                                                            >
-                                                                <Typography
-                                                                    sx={{
-                                                                        color: '#ffffff',
-                                                                        fontSize: '11px',
-                                                                        fontWeight: 600,
-                                                                        letterSpacing: '0.5px',
-                                                                        opacity: 0.9,
-                                                                        textTransform: 'uppercase'
-                                                                    }}
-                                                                >
+                                                        {/* MOBILE HEADER BAR (xs only) */}
+                                                        <Box
+                                                            sx={{
+                                                                display: { xs: 'flex', sm: 'none' },
+                                                                alignItems: 'center',
+                                                                justifyContent: 'space-between',
+                                                                bgcolor: badgeBg,
+                                                                px: 2,
+                                                                py: 1,
+                                                                color: '#ffffff'
+                                                            }}
+                                                        >
+                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                                                                <Typography sx={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.5px', opacity: 0.85, textTransform: 'uppercase' }}>
                                                                     Board
                                                                 </Typography>
-                                                                <Typography
-                                                                    sx={{
-                                                                        color: '#ffffff',
-                                                                        fontSize: { sm: '1.45rem' },
-                                                                        fontWeight: 800,
-                                                                        lineHeight: 1.1
-                                                                    }}
-                                                                >
+                                                                <Typography sx={{ fontSize: '1.05rem', fontWeight: 800 }}>
                                                                     #{m.boardNumber || idx + 1}
                                                                 </Typography>
                                                             </Box>
 
-                                                            {/* DESKTOP MATCH CONTENT (sm and above) */}
-                                                            <Box
-                                                                sx={{
-                                                                    display: { xs: 'none', sm: 'flex' },
-                                                                    flex: 1,
-                                                                    alignItems: 'center',
-                                                                    justifyContent: 'space-between',
-                                                                    p: { sm: 2, md: 2.5 },
-                                                                    gap: 2,
-                                                                    minWidth: 0
-                                                                }}
-                                                            >
-                                                                {/* Left Player: White */}
-                                                                <Box
+                                                            {isCompleted ? (
+                                                                <Chip
+                                                                    label="Completed"
+                                                                    size="small"
                                                                     sx={{
-                                                                        display: 'flex',
-                                                                        alignItems: 'center',
-                                                                        gap: 2,
-                                                                        flex: 1,
-                                                                        minWidth: 0
+                                                                        bgcolor: '#dcfce7',
+                                                                        color: '#15803d',
+                                                                        fontWeight: 700,
+                                                                        fontSize: '11px',
+                                                                        height: 22,
+                                                                        borderRadius: '6px'
                                                                     }}
-                                                                >
+                                                                />
+                                                            ) : isLive ? (
+                                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, bgcolor: 'rgba(255,255,255,0.2)', px: 1, py: 0.3, borderRadius: '6px' }}>
+                                                                    <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#ffffff' }} />
+                                                                    <Typography sx={{ fontSize: '11px', fontWeight: 700, color: '#ffffff' }}>LIVE</Typography>
+                                                                </Box>
+                                                            ) : (
+                                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, bgcolor: 'rgba(255,255,255,0.18)', px: 1, py: 0.3, borderRadius: '6px' }}>
+                                                                    <AccessTimeIcon sx={{ fontSize: 13, color: '#ffffff' }} />
+                                                                    <Typography sx={{ fontSize: '11px', fontWeight: 600, color: '#ffffff' }}>
+                                                                        Upcoming • {details.roundText}
+                                                                    </Typography>
+                                                                </Box>
+                                                            )}
+                                                        </Box>
+
+                                                        {/* MOBILE MATCH BODY (xs only) */}
+                                                        <Box sx={{ display: { xs: 'flex', sm: 'none' }, flexDirection: 'column', p: 1.75, gap: 1 }}>
+                                                            {/* Player 1 Row */}
+                                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5 }}>
+                                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0, flex: 1 }}>
                                                                     <Box sx={{ position: 'relative', flexShrink: 0, display: 'inline-flex' }}>
                                                                         <Avatar
                                                                             src={m.whitePhoto ? resolveImgUrl(m.whitePhoto) : `https://ui-avatars.com/api/?name=${encodeURIComponent(m.whitePlayer || 'White')}&background=0b5299&color=fff&bold=true`}
                                                                             alt={m.whitePlayer || 'Player 1'}
-                                                                            sx={{
-                                                                                width: 52,
-                                                                                height: 52,
-                                                                                border: '2px solid #ffffff',
-                                                                                boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-                                                                            }}
+                                                                            sx={{ width: 42, height: 42, border: '2px solid #ffffff', boxShadow: '0 2px 6px rgba(0,0,0,0.08)' }}
                                                                         />
                                                                     </Box>
                                                                     <Box sx={{ minWidth: 0, flex: 1 }}>
-                                                                        <Typography
-                                                                            sx={{
-                                                                                fontWeight: 700,
-                                                                                fontSize: '1.1rem',
-                                                                                color: '#0f172a',
-                                                                                lineHeight: 1.25,
-                                                                                overflow: 'hidden',
-                                                                                textOverflow: 'ellipsis',
-                                                                                whiteSpace: 'nowrap'
-                                                                            }}
-                                                                        >
+                                                                        <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a', lineHeight: 1.25 }}>
                                                                             {m.whitePlayer || 'TBD'}
                                                                         </Typography>
-                                                                        <Typography
-                                                                            sx={{
-                                                                                fontSize: '0.88rem',
-                                                                                color: '#64748b',
-                                                                                fontWeight: 500,
-                                                                                mt: 0.25,
-                                                                                overflow: 'hidden',
-                                                                                textOverflow: 'ellipsis',
-                                                                                whiteSpace: 'nowrap'
-                                                                            }}
-                                                                        >
+                                                                        <Typography sx={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500, mt: 0.25 }}>
                                                                             {m.whiteUniversity || 'University'}
                                                                         </Typography>
                                                                     </Box>
                                                                 </Box>
 
-                                                                {/* Center Section: Score or Status */}
-                                                                <Box
-                                                                    sx={{
-                                                                        display: 'flex',
-                                                                        flexDirection: 'column',
-                                                                        alignItems: 'center',
-                                                                        justifyContent: 'center',
-                                                                        minWidth: 130,
-                                                                        flexShrink: 0,
-                                                                        px: 1
-                                                                    }}
-                                                                >
-                                                                    {isCompleted ? (
-                                                                        <>
+                                                                {isCompleted && (
+                                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 0.5 }}>
+                                                                        {details.p1Won && (
                                                                             <Box
-                                                                                sx={{
-                                                                                    display: 'flex',
-                                                                                    alignItems: 'center',
-                                                                                    gap: 1.5,
-                                                                                    bgcolor: '#f8fafc',
-                                                                                    border: '1px solid #e2e8f0',
-                                                                                    px: 2.2,
-                                                                                    py: 0.4,
-                                                                                    borderRadius: '12px',
-                                                                                    boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
-                                                                                }}
-                                                                            >
-                                                                                <Typography
-                                                                                    sx={{
-                                                                                        fontSize: '1.4rem',
-                                                                                        fontWeight: 800,
-                                                                                        color: details.p1Won ? '#16a34a' : details.isDraw ? '#2563eb' : '#dc2626'
-                                                                                    }}
-                                                                                >
-                                                                                    {details.score1}
-                                                                                </Typography>
-                                                                                <Typography
-                                                                                    sx={{
-                                                                                        fontSize: '1rem',
-                                                                                        fontWeight: 700,
-                                                                                        color: '#64748b'
-                                                                                    }}
-                                                                                >
-                                                                                    -
-                                                                                </Typography>
-                                                                                <Typography
-                                                                                    sx={{
-                                                                                        fontSize: '1.4rem',
-                                                                                        fontWeight: 800,
-                                                                                        color: details.p2Won ? '#16a34a' : details.isDraw ? '#2563eb' : '#dc2626'
-                                                                                    }}
-                                                                                >
-                                                                                    {details.score2}
-                                                                                </Typography>
-                                                                            </Box>
-                                                                            <Chip
-                                                                                label="Completed"
-                                                                                size="small"
-                                                                                sx={{
-                                                                                    bgcolor: '#dcfce7',
-                                                                                    color: '#15803d',
-                                                                                    fontWeight: 700,
-                                                                                    fontSize: '11px',
-                                                                                    height: 22,
-                                                                                    borderRadius: '6px',
-                                                                                    mt: 0.6
-                                                                                }}
+                                                                                component="img"
+                                                                                src="/Trophyy.webp"
+                                                                                alt="Winner Trophy"
+                                                                                sx={{ width: 22, height: 22, objectFit: 'contain' }}
                                                                             />
-                                                                        </>
-                                                                    ) : isLive ? (
-                                                                        <Box
-                                                                            sx={{
-                                                                                display: 'flex',
-                                                                                flexDirection: 'column',
-                                                                                alignItems: 'center',
-                                                                                bgcolor: '#fef2f2',
-                                                                                border: '1px solid #fecaca',
-                                                                                px: 2.5,
-                                                                                py: 0.8,
-                                                                                borderRadius: '14px',
-                                                                                textAlign: 'center'
-                                                                            }}
-                                                                        >
-                                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>
-                                                                                <Box
-                                                                                    sx={{
-                                                                                        width: 8,
-                                                                                        height: 8,
-                                                                                        borderRadius: '50%',
-                                                                                        bgcolor: '#ef4444'
-                                                                                    }}
-                                                                                />
-                                                                                <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#dc2626' }}>
-                                                                                    LIVE
-                                                                                </Typography>
-                                                                            </Box>
-                                                                            <Typography sx={{ fontSize: '11px', color: '#64748b', fontWeight: 500, mt: 0.2 }}>
-                                                                                {details.roundText}
-                                                                            </Typography>
-                                                                        </Box>
-                                                                    ) : (
-                                                                        <Box
-                                                                            sx={{
-                                                                                display: 'flex',
-                                                                                flexDirection: 'column',
-                                                                                alignItems: 'center',
-                                                                                bgcolor: '#f0f7ff',
-                                                                                border: '1px solid #dbeafe',
-                                                                                px: 2.5,
-                                                                                py: 0.8,
-                                                                                borderRadius: '14px',
-                                                                                textAlign: 'center'
-                                                                            }}
-                                                                        >
-                                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                                                <AccessTimeIcon sx={{ fontSize: 16, color: '#0284c7' }} />
-                                                                                <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#0369a1' }}>
-                                                                                    Upcoming
-                                                                                </Typography>
-                                                                            </Box>
-                                                                            <Typography sx={{ fontSize: '11px', color: '#64748b', fontWeight: 500, mt: 0.2 }}>
-                                                                                {details.roundText}
-                                                                            </Typography>
-                                                                        </Box>
-                                                                    )}
-                                                                </Box>
+                                                                        )}
+                                                                        <Typography sx={{ fontSize: '1.3rem', fontWeight: 800, color: details.p1Won ? '#16a34a' : details.isDraw ? '#2563eb' : '#dc2626' }}>
+                                                                            {details.score1}
+                                                                        </Typography>
+                                                                    </Box>
+                                                                )}
+                                                            </Box>
 
-                                                                {/* Right Player: Black */}
-                                                                <Box
-                                                                    sx={{
-                                                                        display: 'flex',
-                                                                        alignItems: 'center',
-                                                                        gap: 2,
-                                                                        flex: 1,
-                                                                        minWidth: 0
-                                                                    }}
-                                                                >
+                                                            <Box sx={{ height: '1px', bgcolor: '#f1f5f9', my: 0.25 }} />
+
+                                                            {/* Player 2 Row */}
+                                                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5 }}>
+                                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0, flex: 1 }}>
                                                                     <Box sx={{ position: 'relative', flexShrink: 0, display: 'inline-flex' }}>
                                                                         <Avatar
                                                                             src={m.blackPhoto ? resolveImgUrl(m.blackPhoto) : `https://ui-avatars.com/api/?name=${encodeURIComponent(m.blackPlayer || 'Black')}&background=0b5299&color=fff&bold=true`}
                                                                             alt={m.blackPlayer || 'Player 2'}
-                                                                            sx={{
-                                                                                width: 52,
-                                                                                height: 52,
-                                                                                border: '2px solid #ffffff',
-                                                                                boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-                                                                            }}
+                                                                            sx={{ width: 42, height: 42, border: '2px solid #ffffff', boxShadow: '0 2px 6px rgba(0,0,0,0.08)' }}
                                                                         />
                                                                     </Box>
                                                                     <Box sx={{ minWidth: 0, flex: 1 }}>
-                                                                        <Typography
-                                                                            sx={{
-                                                                                fontWeight: 700,
-                                                                                fontSize: '1.1rem',
-                                                                                color: '#0f172a',
-                                                                                lineHeight: 1.25,
-                                                                                overflow: 'hidden',
-                                                                                textOverflow: 'ellipsis',
-                                                                                whiteSpace: 'nowrap'
-                                                                            }}
-                                                                        >
+                                                                        <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', color: '#0f172a', lineHeight: 1.25 }}>
                                                                             {m.blackPlayer || 'TBD'}
                                                                         </Typography>
-                                                                        <Typography
-                                                                            sx={{
-                                                                                fontSize: '0.88rem',
-                                                                                color: '#64748b',
-                                                                                fontWeight: 500,
-                                                                                mt: 0.25,
-                                                                                overflow: 'hidden',
-                                                                                textOverflow: 'ellipsis',
-                                                                                whiteSpace: 'nowrap'
-                                                                            }}
-                                                                        >
+                                                                        <Typography sx={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 500, mt: 0.25 }}>
                                                                             {m.blackUniversity || 'University'}
                                                                         </Typography>
                                                                     </Box>
                                                                 </Box>
 
-                                                                {/* Desktop Winner Trophy at Card Ending */}
-                                                                {isCompleted && (details.p1Won || details.p2Won) && (
-                                                                    <Tooltip title={`Winner: ${details.p1Won ? m.whitePlayer : m.blackPlayer}`} arrow>
-                                                                        <Box
-                                                                            component="img"
-                                                                            src="/Trophyy.webp"
-                                                                            alt="Winner Trophy"
-                                                                            sx={{
-                                                                                width: { sm: 38, md: 44 },
-                                                                                height: { sm: 38, md: 44 },
-                                                                                objectFit: 'contain',
-                                                                                filter: 'drop-shadow(0 3px 6px rgba(0,0,0,0.16))',
-                                                                                flexShrink: 0,
-                                                                                ml: 1.5,
-                                                                                cursor: 'pointer',
-                                                                                transition: 'transform 0.2s ease',
-                                                                                '&:hover': {
-                                                                                    transform: 'scale(1.15)'
-                                                                                }
-                                                                            }}
-                                                                        />
-                                                                    </Tooltip>
+                                                                {isCompleted && (
+                                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 0.5 }}>
+                                                                        {details.p2Won && (
+                                                                            <Box
+                                                                                component="img"
+                                                                                src="/Trophyy.webp"
+                                                                                alt="Winner Trophy"
+                                                                                sx={{ width: 22, height: 22, objectFit: 'contain' }}
+                                                                            />
+                                                                        )}
+                                                                        <Typography sx={{ fontSize: '1.3rem', fontWeight: 800, color: details.p2Won ? '#16a34a' : details.isDraw ? '#2563eb' : '#dc2626' }}>
+                                                                            {details.score2}
+                                                                        </Typography>
+                                                                    </Box>
                                                                 )}
                                                             </Box>
-                                                        </Paper>
-                                                    );
-                                                })}
-                                            </Box>
+                                                        </Box>
+
+                                                        {/* DESKTOP LEFT BADGE (sm and above) */}
+                                                        <Box
+                                                            sx={{
+                                                                display: { xs: 'none', sm: 'flex' },
+                                                                bgcolor: badgeBg,
+                                                                width: { sm: 84 },
+                                                                minWidth: { sm: 84 },
+                                                                flexDirection: 'column',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                px: 1.5,
+                                                                py: 2,
+                                                                gap: 0.25,
+                                                                flexShrink: 0
+                                                            }}
+                                                        >
+                                                            <Typography
+                                                                sx={{
+                                                                    color: '#ffffff',
+                                                                    fontSize: '11px',
+                                                                    fontWeight: 600,
+                                                                    letterSpacing: '0.5px',
+                                                                    opacity: 0.9,
+                                                                    textTransform: 'uppercase'
+                                                                }}
+                                                            >
+                                                                Board
+                                                            </Typography>
+                                                            <Typography
+                                                                sx={{
+                                                                    color: '#ffffff',
+                                                                    fontSize: { sm: '1.45rem' },
+                                                                    fontWeight: 800,
+                                                                    lineHeight: 1.1
+                                                                }}
+                                                            >
+                                                                #{m.boardNumber || idx + 1}
+                                                            </Typography>
+                                                        </Box>
+
+                                                        {/* DESKTOP MATCH CONTENT (sm and above) */}
+                                                        <Box
+                                                            sx={{
+                                                                display: { xs: 'none', sm: 'flex' },
+                                                                flex: 1,
+                                                                alignItems: 'center',
+                                                                justifyContent: 'space-between',
+                                                                p: { sm: 2, md: 2.5 },
+                                                                gap: 2,
+                                                                minWidth: 0
+                                                            }}
+                                                        >
+                                                            {/* Left Player: White */}
+                                                            <Box
+                                                                sx={{
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: 2,
+                                                                    flex: 1,
+                                                                    minWidth: 0
+                                                                }}
+                                                            >
+                                                                <Box sx={{ position: 'relative', flexShrink: 0, display: 'inline-flex' }}>
+                                                                    <Avatar
+                                                                        src={m.whitePhoto ? resolveImgUrl(m.whitePhoto) : `https://ui-avatars.com/api/?name=${encodeURIComponent(m.whitePlayer || 'White')}&background=0b5299&color=fff&bold=true`}
+                                                                        alt={m.whitePlayer || 'Player 1'}
+                                                                        sx={{
+                                                                            width: 52,
+                                                                            height: 52,
+                                                                            border: '2px solid #ffffff',
+                                                                            boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                                                                        }}
+                                                                    />
+                                                                </Box>
+                                                                <Box sx={{ minWidth: 0, flex: 1 }}>
+                                                                    <Typography
+                                                                        sx={{
+                                                                            fontWeight: 700,
+                                                                            fontSize: '1.1rem',
+                                                                            color: '#0f172a',
+                                                                            lineHeight: 1.25,
+                                                                            overflow: 'hidden',
+                                                                            textOverflow: 'ellipsis',
+                                                                            whiteSpace: 'nowrap'
+                                                                        }}
+                                                                    >
+                                                                        {m.whitePlayer || 'TBD'}
+                                                                    </Typography>
+                                                                    <Typography
+                                                                        sx={{
+                                                                            fontSize: '0.88rem',
+                                                                            color: '#64748b',
+                                                                            fontWeight: 500,
+                                                                            mt: 0.25,
+                                                                            overflow: 'hidden',
+                                                                            textOverflow: 'ellipsis',
+                                                                            whiteSpace: 'nowrap'
+                                                                        }}
+                                                                    >
+                                                                        {m.whiteUniversity || 'University'}
+                                                                    </Typography>
+                                                                </Box>
+                                                            </Box>
+
+                                                            {/* Center Section: Score or Status */}
+                                                            <Box
+                                                                sx={{
+                                                                    display: 'flex',
+                                                                    flexDirection: 'column',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                    minWidth: 130,
+                                                                    flexShrink: 0,
+                                                                    px: 1
+                                                                }}
+                                                            >
+                                                                {isCompleted ? (
+                                                                    <>
+                                                                        <Box
+                                                                            sx={{
+                                                                                display: 'flex',
+                                                                                alignItems: 'center',
+                                                                                gap: 1.5,
+                                                                                bgcolor: '#f8fafc',
+                                                                                border: '1px solid #e2e8f0',
+                                                                                px: 2.2,
+                                                                                py: 0.4,
+                                                                                borderRadius: '12px',
+                                                                                boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
+                                                                            }}
+                                                                        >
+                                                                            <Typography
+                                                                                sx={{
+                                                                                    fontSize: '1.4rem',
+                                                                                    fontWeight: 800,
+                                                                                    color: details.p1Won ? '#16a34a' : details.isDraw ? '#2563eb' : '#dc2626'
+                                                                                }}
+                                                                            >
+                                                                                {details.score1}
+                                                                            </Typography>
+                                                                            <Typography
+                                                                                sx={{
+                                                                                    fontSize: '1rem',
+                                                                                    fontWeight: 700,
+                                                                                    color: '#64748b'
+                                                                                }}
+                                                                            >
+                                                                                -
+                                                                            </Typography>
+                                                                            <Typography
+                                                                                sx={{
+                                                                                    fontSize: '1.4rem',
+                                                                                    fontWeight: 800,
+                                                                                    color: details.p2Won ? '#16a34a' : details.isDraw ? '#2563eb' : '#dc2626'
+                                                                                }}
+                                                                            >
+                                                                                {details.score2}
+                                                                            </Typography>
+                                                                        </Box>
+                                                                        <Chip
+                                                                            label="Completed"
+                                                                            size="small"
+                                                                            sx={{
+                                                                                bgcolor: '#dcfce7',
+                                                                                color: '#15803d',
+                                                                                fontWeight: 700,
+                                                                                fontSize: '11px',
+                                                                                height: 22,
+                                                                                borderRadius: '6px',
+                                                                                mt: 0.6
+                                                                            }}
+                                                                        />
+                                                                    </>
+                                                                ) : isLive ? (
+                                                                    <Box
+                                                                        sx={{
+                                                                            display: 'flex',
+                                                                            flexDirection: 'column',
+                                                                            alignItems: 'center',
+                                                                            bgcolor: '#fef2f2',
+                                                                            border: '1px solid #fecaca',
+                                                                            px: 2.5,
+                                                                            py: 0.8,
+                                                                            borderRadius: '14px',
+                                                                            textAlign: 'center'
+                                                                        }}
+                                                                    >
+                                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>
+                                                                            <Box
+                                                                                sx={{
+                                                                                    width: 8,
+                                                                                    height: 8,
+                                                                                    borderRadius: '50%',
+                                                                                    bgcolor: '#ef4444'
+                                                                                }}
+                                                                            />
+                                                                            <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#dc2626' }}>
+                                                                                LIVE
+                                                                            </Typography>
+                                                                        </Box>
+                                                                        <Typography sx={{ fontSize: '11px', color: '#64748b', fontWeight: 500, mt: 0.2 }}>
+                                                                            {details.roundText}
+                                                                        </Typography>
+                                                                    </Box>
+                                                                ) : (
+                                                                    <Box
+                                                                        sx={{
+                                                                            display: 'flex',
+                                                                            flexDirection: 'column',
+                                                                            alignItems: 'center',
+                                                                            bgcolor: '#f0f7ff',
+                                                                            border: '1px solid #dbeafe',
+                                                                            px: 2.5,
+                                                                            py: 0.8,
+                                                                            borderRadius: '14px',
+                                                                            textAlign: 'center'
+                                                                        }}
+                                                                    >
+                                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                                            <AccessTimeIcon sx={{ fontSize: 16, color: '#0284c7' }} />
+                                                                            <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#0369a1' }}>
+                                                                                Upcoming
+                                                                            </Typography>
+                                                                        </Box>
+                                                                        <Typography sx={{ fontSize: '11px', color: '#64748b', fontWeight: 500, mt: 0.2 }}>
+                                                                            {details.roundText}
+                                                                        </Typography>
+                                                                    </Box>
+                                                                )}
+                                                            </Box>
+
+                                                            {/* Right Player: Black */}
+                                                            <Box
+                                                                sx={{
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    gap: 2,
+                                                                    flex: 1,
+                                                                    minWidth: 0
+                                                                }}
+                                                            >
+                                                                <Box sx={{ position: 'relative', flexShrink: 0, display: 'inline-flex' }}>
+                                                                    <Avatar
+                                                                        src={m.blackPhoto ? resolveImgUrl(m.blackPhoto) : `https://ui-avatars.com/api/?name=${encodeURIComponent(m.blackPlayer || 'Black')}&background=0b5299&color=fff&bold=true`}
+                                                                        alt={m.blackPlayer || 'Player 2'}
+                                                                        sx={{
+                                                                            width: 52,
+                                                                            height: 52,
+                                                                            border: '2px solid #ffffff',
+                                                                            boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+                                                                        }}
+                                                                    />
+                                                                </Box>
+                                                                <Box sx={{ minWidth: 0, flex: 1 }}>
+                                                                    <Typography
+                                                                        sx={{
+                                                                            fontWeight: 700,
+                                                                            fontSize: '1.1rem',
+                                                                            color: '#0f172a',
+                                                                            lineHeight: 1.25,
+                                                                            overflow: 'hidden',
+                                                                            textOverflow: 'ellipsis',
+                                                                            whiteSpace: 'nowrap'
+                                                                        }}
+                                                                    >
+                                                                        {m.blackPlayer || 'TBD'}
+                                                                    </Typography>
+                                                                    <Typography
+                                                                        sx={{
+                                                                            fontSize: '0.88rem',
+                                                                            color: '#64748b',
+                                                                            fontWeight: 500,
+                                                                            mt: 0.25,
+                                                                            overflow: 'hidden',
+                                                                            textOverflow: 'ellipsis',
+                                                                            whiteSpace: 'nowrap'
+                                                                        }}
+                                                                    >
+                                                                        {m.blackUniversity || 'University'}
+                                                                    </Typography>
+                                                                </Box>
+                                                            </Box>
+
+                                                            {/* Desktop Winner Trophy at Card Ending */}
+                                                            {isCompleted && (details.p1Won || details.p2Won) && (
+                                                                <Tooltip title={`Winner: ${details.p1Won ? m.whitePlayer : m.blackPlayer}`} arrow>
+                                                                    <Box
+                                                                        component="img"
+                                                                        src="/Trophyy.webp"
+                                                                        alt="Winner Trophy"
+                                                                        sx={{
+                                                                            width: { sm: 38, md: 44 },
+                                                                            height: { sm: 38, md: 44 },
+                                                                            objectFit: 'contain',
+                                                                            filter: 'drop-shadow(0 3px 6px rgba(0,0,0,0.16))',
+                                                                            flexShrink: 0,
+                                                                            ml: 1.5,
+                                                                            cursor: 'pointer',
+                                                                            transition: 'transform 0.2s ease',
+                                                                            '&:hover': {
+                                                                                transform: 'scale(1.15)'
+                                                                            }
+                                                                        }}
+                                                                    />
+                                                                </Tooltip>
+                                                            )}
+                                                        </Box>
+                                                    </Paper>
+                                                    </AnimatedCard>
+                                                );
+                                            })}
+                                        </Box>
                                     </Box>
                                 )}
 
@@ -819,136 +1031,142 @@ const Home = () => {
                                                 }}
                                             >
                                                 {mapImagesList.map((img, idx) => (
-                                                    <Box
+                                                    <AnimatedCard
                                                         key={idx}
-                                                        onClick={() => {
-                                                            setSelectedMapIndex(idx);
-                                                            setIsMapModalOpen(true);
-                                                        }}
-                                                        sx={{
-                                                            position: 'relative',
-                                                            borderRadius: 3,
-                                                            overflow: 'hidden',
-                                                            bgcolor: '#f8fafc',
-                                                            border: '1.5px solid #e2e8f0',
-                                                            boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
-                                                            cursor: 'pointer',
-                                                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                                            height: { xs: 260, sm: 300, md: mapImagesList.length === 1 ? 460 : 320 },
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            p: 1.5,
-                                                            '&:hover': {
-                                                                transform: 'translateY(-4px)',
-                                                                boxShadow: '0 12px 28px rgba(11,82,153,0.18)',
-                                                                borderColor: '#0b5299',
-                                                                '& .gallery-hover-overlay': { opacity: 1 },
-                                                                '& .gallery-image': { transform: 'scale(1.025)' }
-                                                            }
-                                                        }}
+                                                        delay={idx * 0.08}
+                                                        whileInView={true}
+                                                        style={{ width: '100%', height: '100%' }}
                                                     >
-                                                        {/* Top-Left Corner: Download Button */}
-                                                        <Tooltip title="Download Map">
-                                                            <IconButton
-                                                                size="small"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleDownloadMap(img, `campus-route-map-${idx + 1}`);
-                                                                }}
-                                                                sx={{
-                                                                    position: 'absolute',
-                                                                    left: 12,
-                                                                    top: 12,
-                                                                    zIndex: 4,
-                                                                    bgcolor: 'rgba(255, 255, 255, 0.95)',
-                                                                    backdropFilter: 'blur(6px)',
-                                                                    color: '#0b5299',
-                                                                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                                                                    transition: 'all 0.2s ease',
-                                                                    '&:hover': {
-                                                                        bgcolor: '#0b5299',
-                                                                        color: '#ffffff',
-                                                                        transform: 'scale(1.1)'
-                                                                    }
-                                                                }}
-                                                            >
-                                                                <DownloadIcon sx={{ fontSize: 20 }} />
-                                                            </IconButton>
-                                                        </Tooltip>
-
-                                                        {/* Top-Right Corner: Map Badge */}
-                                                        {mapImagesList.length > 1 && (
-                                                            <Chip
-                                                                label={`Map ${idx + 1}`}
-                                                                size="small"
-                                                                sx={{
-                                                                    position: 'absolute',
-                                                                    right: 12,
-                                                                    top: 12,
-                                                                    zIndex: 4,
-                                                                    bgcolor: 'rgba(15, 23, 42, 0.78)',
-                                                                    backdropFilter: 'blur(4px)',
-                                                                    color: '#ffffff',
-                                                                    fontWeight: 700,
-                                                                    fontSize: 11,
-                                                                    height: 24
-                                                                }}
-                                                            />
-                                                        )}
-
-                                                        {/* Gallery Image */}
                                                         <Box
-                                                            component="img"
-                                                            src={resolveImgUrl(img)}
-                                                            alt={`Campus Route Map ${idx + 1}`}
-                                                            className="gallery-image"
-                                                            sx={{
-                                                                maxWidth: '100%',
-                                                                maxHeight: '100%',
-                                                                width: 'auto',
-                                                                height: 'auto',
-                                                                objectFit: 'contain',
-                                                                borderRadius: 1.5,
-                                                                transition: 'transform 0.3s ease'
+                                                            onClick={() => {
+                                                                setSelectedMapIndex(idx);
+                                                                setIsMapModalOpen(true);
                                                             }}
-                                                        />
-
-                                                        {/* Hover Overlay Hint */}
-                                                        <Box
-                                                            className="gallery-hover-overlay"
                                                             sx={{
-                                                                position: 'absolute',
-                                                                inset: 0,
-                                                                bgcolor: 'rgba(11, 82, 153, 0.08)',
+                                                                position: 'relative',
+                                                                borderRadius: 3,
+                                                                overflow: 'hidden',
+                                                                bgcolor: '#f8fafc',
+                                                                border: '1.5px solid #e2e8f0',
+                                                                boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+                                                                cursor: 'pointer',
+                                                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                                height: { xs: 260, sm: 300, md: mapImagesList.length === 1 ? 460 : 320 },
                                                                 display: 'flex',
                                                                 alignItems: 'center',
                                                                 justifyContent: 'center',
-                                                                opacity: 0,
-                                                                transition: 'opacity 0.2s ease',
-                                                                pointerEvents: 'none'
+                                                                p: 1.5,
+                                                                '&:hover': {
+                                                                    transform: 'translateY(-4px)',
+                                                                    boxShadow: '0 12px 28px rgba(11,82,153,0.18)',
+                                                                    borderColor: '#0b5299',
+                                                                    '& .gallery-hover-overlay': { opacity: 1 },
+                                                                    '& .gallery-image': { transform: 'scale(1.025)' }
+                                                                }
                                                             }}
                                                         >
+                                                            {/* Top-Left Corner: Download Button */}
+                                                            <Tooltip title="Download Map">
+                                                                <IconButton
+                                                                    size="small"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleDownloadMap(img, `campus-route-map-${idx + 1}`);
+                                                                    }}
+                                                                    sx={{
+                                                                        position: 'absolute',
+                                                                        left: 12,
+                                                                        top: 12,
+                                                                        zIndex: 4,
+                                                                        bgcolor: 'rgba(255, 255, 255, 0.95)',
+                                                                        backdropFilter: 'blur(6px)',
+                                                                        color: '#0b5299',
+                                                                        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                                                                        transition: 'all 0.2s ease',
+                                                                        '&:hover': {
+                                                                            bgcolor: '#0b5299',
+                                                                            color: '#ffffff',
+                                                                            transform: 'scale(1.1)'
+                                                                        }
+                                                                    }}
+                                                                >
+                                                                    <DownloadIcon sx={{ fontSize: 20 }} />
+                                                                </IconButton>
+                                                            </Tooltip>
+
+                                                            {/* Top-Right Corner: Map Badge */}
+                                                            {mapImagesList.length > 1 && (
+                                                                <Chip
+                                                                    label={`Map ${idx + 1}`}
+                                                                    size="small"
+                                                                    sx={{
+                                                                        position: 'absolute',
+                                                                        right: 12,
+                                                                        top: 12,
+                                                                        zIndex: 4,
+                                                                        bgcolor: 'rgba(15, 23, 42, 0.78)',
+                                                                        backdropFilter: 'blur(4px)',
+                                                                        color: '#ffffff',
+                                                                        fontWeight: 700,
+                                                                        fontSize: 11,
+                                                                        height: 24
+                                                                    }}
+                                                                />
+                                                            )}
+
+                                                            {/* Gallery Image */}
                                                             <Box
+                                                                component="img"
+                                                                src={resolveImgUrl(img)}
+                                                                alt={`Campus Route Map ${idx + 1}`}
+                                                                className="gallery-image"
                                                                 sx={{
-                                                                    bgcolor: 'rgba(255, 255, 255, 0.95)',
-                                                                    color: '#0b5299',
-                                                                    px: 2,
-                                                                    py: 0.8,
-                                                                    borderRadius: 2,
-                                                                    fontWeight: 700,
-                                                                    fontSize: '13px',
+                                                                    maxWidth: '100%',
+                                                                    maxHeight: '100%',
+                                                                    width: 'auto',
+                                                                    height: 'auto',
+                                                                    objectFit: 'contain',
+                                                                    borderRadius: 1.5,
+                                                                    transition: 'transform 0.3s ease'
+                                                                }}
+                                                            />
+
+                                                            {/* Hover Overlay Hint */}
+                                                            <Box
+                                                                className="gallery-hover-overlay"
+                                                                sx={{
+                                                                    position: 'absolute',
+                                                                    inset: 0,
+                                                                    bgcolor: 'rgba(11, 82, 153, 0.08)',
                                                                     display: 'flex',
                                                                     alignItems: 'center',
-                                                                    gap: 0.8,
-                                                                    boxShadow: '0 4px 14px rgba(0,0,0,0.15)'
+                                                                    justifyContent: 'center',
+                                                                    opacity: 0,
+                                                                    transition: 'opacity 0.2s ease',
+                                                                    pointerEvents: 'none'
                                                                 }}
                                                             >
-                                                                <ZoomInIcon sx={{ fontSize: 18 }} />
-                                                                Click to Enlarge
+                                                                <Box
+                                                                    sx={{
+                                                                        bgcolor: 'rgba(255, 255, 255, 0.95)',
+                                                                        color: '#0b5299',
+                                                                        px: 2,
+                                                                        py: 0.8,
+                                                                        borderRadius: 2,
+                                                                        fontWeight: 700,
+                                                                        fontSize: '13px',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        gap: 0.8,
+                                                                        boxShadow: '0 4px 14px rgba(0,0,0,0.15)'
+                                                                    }}
+                                                                >
+                                                                    <ZoomInIcon sx={{ fontSize: 18 }} />
+                                                                    Click to Enlarge
+                                                                </Box>
                                                             </Box>
                                                         </Box>
-                                                    </Box>
+                                                    </AnimatedCard>
                                                 ))}
                                             </Box>
                                         </Box>
@@ -956,14 +1174,16 @@ const Home = () => {
                                 })()}
 
                                 {routeMap?.directions && (
-                                    <Paper sx={{ p: 3, borderRadius: 3, bgcolor: '#f8fafc', border: '1px solid #e2e8f0' }}>
-                                        <Typography variant="subtitle1" fontWeight="bold" sx={{ color: '#0f172a', mb: 1.5 }}>
-                                            Transit & Travel Directions
-                                        </Typography>
-                                        <Typography variant="body2" sx={{ color: '#334155', whiteSpace: 'pre-line', lineHeight: 1.8 }}>
-                                            {routeMap.directions}
-                                        </Typography>
-                                    </Paper>
+                                    <AnimatedCard whileInView={true} delay={0.12} style={{ width: '100%', marginTop: '24px' }}>
+                                        <Paper sx={{ p: 3, borderRadius: 3, bgcolor: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                                            <Typography variant="subtitle1" fontWeight="bold" sx={{ color: '#0f172a', mb: 1.5 }}>
+                                                Transit & Travel Directions
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ color: '#334155', whiteSpace: 'pre-line', lineHeight: 1.8 }}>
+                                                {routeMap.directions}
+                                            </Typography>
+                                        </Paper>
+                                    </AnimatedCard>
                                 )}
                             </Box>
                         )}
@@ -980,14 +1200,15 @@ const Home = () => {
                                             md: committeeMembers.length <= 2 ? (committeeMembers.length === 1 ? '1fr' : 'repeat(2, 1fr)') : 'repeat(3, 1fr)',
                                             lg: committeeMembers.length === 1 ? '1fr'
                                                 : committeeMembers.length === 2 ? 'repeat(2, 1fr)'
-                                                : committeeMembers.length === 3 ? 'repeat(3, 1fr)'
-                                                : 'repeat(4, 1fr)'
+                                                    : committeeMembers.length === 3 ? 'repeat(3, 1fr)'
+                                                        : 'repeat(4, 1fr)'
                                         },
                                         gap: { xs: 2, sm: 2.5, md: 3 }
                                     }}>
-                                        {committeeMembers.map((member) => (
+                                        {committeeMembers.map((member, index) => (
                                             <CommitteeCard
                                                 key={member._id}
+                                                index={index}
                                                 member={{
                                                     name: member.memberName,
                                                     role: member.designation,
@@ -1007,6 +1228,7 @@ const Home = () => {
                             </Box>
                         )}
                     </Box>
+                </AnimatedCard>
                 </Box>
             </Box>
 
@@ -1150,9 +1372,6 @@ const Home = () => {
                     );
                 })()}
             </Dialog>
-
-            {/* Bottom Spacing on Mobile so nav bar does not cover content */}
-            <Box sx={{ height: { xs: '80px', md: '0px' } }} />
 
             {/* Mobile Bottom Navigation Bar */}
             <PublicBottomBar activeTab={activeTab} setActiveTab={setActiveTab} />

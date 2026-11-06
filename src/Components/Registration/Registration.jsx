@@ -11,6 +11,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import Authentication from '../Admin/Authentication';
 import { registrationAPI } from '../../utils/api';
+import { AnimatedCard, AnimatedText } from '../animations';
 
 const createInitialPlayer = () => ({
     playerName: '',
@@ -518,15 +519,8 @@ const Registration = () => {
                 playerErrors.arrivalTime = 'Arrival time is required';
                 isValid = false;
             }
-            if (!player.departureDate) {
-                playerErrors.departureDate = 'Departure date is required';
-                isValid = false;
-            } else if (player.departureDate.split('-')[0]?.length > 4 || Number(player.departureDate.split('-')[0]) > 9999) {
+            if (player.departureDate && (player.departureDate.split('-')[0]?.length > 4 || Number(player.departureDate.split('-')[0]) > 9999)) {
                 playerErrors.departureDate = 'Year cannot exceed 4 digits';
-                isValid = false;
-            }
-            if (!player.departureTime) {
-                playerErrors.departureTime = 'Departure time is required';
                 isValid = false;
             }
             newErrors.players[index] = playerErrors;
@@ -737,8 +731,11 @@ const Registration = () => {
     return (
         <Box className="registration-container">
             <Box className="registration-form-wrapper">
-                <Box component="h1" className="registration-title">Registration</Box>
+                <AnimatedText direction="down" delay={0.03}>
+                    <Box component="h1" className="registration-title">Registration</Box>
+                </AnimatedText>
 
+                <AnimatedCard delay={0.08} style={{ width: '100%' }}>
                 <Box component="form" onSubmit={handleSubmit} noValidate>
                     {/* University Details Section */}
                     <Box component="fieldset" className="section-fieldset">
@@ -1055,7 +1052,7 @@ const Registration = () => {
                                     <Box sx={{ mt: 1 }}>
                                         <TextField
                                             fullWidth
-                                            label="Date of Departure*"
+                                            label="Date of Departure"
                                             name="departureDate"
                                             type="date"
                                             slotProps={{
@@ -1075,7 +1072,7 @@ const Registration = () => {
                                     <Box sx={{ mt: 1 }}>
                                         <TextField
                                             fullWidth
-                                            label="Time of Departure*"
+                                            label="Time of Departure"
                                             name="departureTime"
                                             type="time"
                                             slotProps={{
@@ -1288,6 +1285,7 @@ const Registration = () => {
                         {submitting ? 'Submitting...' : (isExistingUniversity ? 'Submit New Participants' : 'Submit Registration')}
                     </Box>
                 </Box>
+                </AnimatedCard>
             </Box>
 
             {/* Registration Success Popup Modal */}

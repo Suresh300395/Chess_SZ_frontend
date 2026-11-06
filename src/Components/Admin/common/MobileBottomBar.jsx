@@ -16,8 +16,17 @@ import { getMenusByRole } from './RolesNav';
 const MobileBottomBar = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const user = getCurrentUser() || { username: 'Admin', role: 'admin' };
-    const menus = getMenusByRole(user.role);
+    const [user, setUser] = useState(getCurrentUser() || { username: 'Admin', role: 'admin' });
+
+    React.useEffect(() => {
+        const handleAuthChange = () => {
+            setUser(getCurrentUser() || { username: 'Admin', role: 'admin' });
+        };
+        window.addEventListener('authChange', handleAuthChange);
+        return () => window.removeEventListener('authChange', handleAuthChange);
+    }, []);
+
+    const menus = getMenusByRole(user.role, user.allowedModules);
 
     // Filter out the modules already placed on the bottom bar (Accommodation, Food Tokens, Caution Deposit, Dashboard)
     const bottomBarPaths = [
@@ -43,7 +52,7 @@ const MobileBottomBar = () => {
         navigate(path);
     };
 
-    const navItems = [
+    const allPotentialNavItems = [
         {
             id: 'accommodation',
             label: 'Accommodation',
@@ -85,6 +94,9 @@ const MobileBottomBar = () => {
             onClick: () => setModulesSheetOpen(true)
         }
     ];
+
+    // Only show items that this user has permission to access
+    const navItems = allPotentialNavItems.filter(item => !item.path || menus.some(m => m.path === item.path));
 
     return (
         <>

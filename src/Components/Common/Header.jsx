@@ -1,24 +1,12 @@
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
-import { Box, Button, Menu, MenuItem, Avatar, IconButton, Divider, Typography } from '@mui/material';
-import PersonIcon from '@mui/icons-material/Person';
-import LogoutIcon from '@mui/icons-material/Logout';
-import HomeIcon from '@mui/icons-material/Home';
-import DashboardIcon from '@mui/icons-material/Dashboard';
+import { Box, Button, Typography } from '@mui/material';
 import PersonAddAlt1OutlinedIcon from '@mui/icons-material/PersonAddAlt1Outlined';
 import EastIcon from '@mui/icons-material/East';
 import LoginIcon from '@mui/icons-material/Login';
 import Authentication from '../Admin/Authentication';
-import { getCurrentUser, clearAuthSession } from '../../utils/auth';
-import { SOCKET_URL } from '../../utils/api';
-
-const resolvePhotoUrl = (photoPath) => {
-    if (!photoPath) return null;
-    if (photoPath.startsWith('http://') || photoPath.startsWith('https://') || photoPath.startsWith('data:')) {
-        return photoPath;
-    }
-    return `${SOCKET_URL}${photoPath.startsWith('/') ? '' : '/'}${photoPath}`;
-};
+import { getCurrentUser } from '../../utils/auth';
+import ProfilePopover from './ProfilePopover';
 
 const Header = () => {
     const [scrolled, setScrolled] = useState(false);
@@ -26,27 +14,10 @@ const Header = () => {
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
     const user = getCurrentUser();
     const [currentUser, setCurrentUser] = useState(user);
-    const [anchorEl, setAnchorEl] = useState(null);
     const lastScrollY = useRef(0);
-    const navigate = useNavigate();
     const location = useLocation();
 
     const isDashboard = location.pathname.startsWith('/admin') || location.pathname.startsWith('/user') || location.pathname.includes('/dashboard');
-
-    const handleMenuOpen = (event) => setAnchorEl(event.currentTarget);
-    const handleMenuClose = () => {
-        if (document.activeElement instanceof HTMLElement) {
-            document.activeElement.blur();
-        }
-        setAnchorEl(null);
-    };
-
-    const handleLogout = () => {
-        clearAuthSession(false);
-        setCurrentUser(null);
-        handleMenuClose();
-        navigate('/');
-    };
 
     useEffect(() => {
         const handleScroll = (e) => {
@@ -109,79 +80,8 @@ const Header = () => {
 
                 <Box component="nav" className="header-nav">
                     {currentUser ? (
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: 1.5, transition: 'opacity 0.2s', '&:hover': { opacity: 0.8 } }} onClick={handleMenuOpen}>
-                                <Box sx={{ p: 0.5, bgcolor: '#e3f2fd', border: '2px solid #fff', boxShadow: '0 0 0 2px #e3f2fd', borderRadius: '50%' }}>
-                                    <Avatar sx={{ bgcolor: '#0b5299', width: 35, height: 35 }} src={resolvePhotoUrl(currentUser?.photo)}>
-                                        <PersonIcon />
-                                    </Avatar>
-                                </Box>
-                                <Box sx={{ display: { xs: 'none', sm: 'flex' }, flexDirection: 'column', alignItems: 'flex-start' }}>
-                                    <Typography sx={{ fontSize: '15px', color: '#0f172a', fontWeight: 700, lineHeight: 1.2 }}>
-                                        {currentUser.name || currentUser.username}
-                                    </Typography>
-                                    <Typography sx={{ fontSize: '13px', color: '#64748b', fontWeight: 500, lineHeight: 1.2, mt: 0.3, textTransform: 'capitalize' }}>
-                                        {currentUser.role || 'Player'}
-                                    </Typography>
-                                </Box>
-                            </Box>
-                            <Menu
-                                anchorEl={anchorEl}
-                                open={Boolean(anchorEl)}
-                                onClose={handleMenuClose}
-                                disableRestoreFocus
-                                disableAutoFocusItem
-                                autoFocus={false}
-                                slotProps={{
-                                    paper: {
-                                        elevation: 0,
-                                        sx: {
-                                            overflow: 'visible',
-                                            filter: 'drop-shadow(0px 4px 20px rgba(0,0,0,0.1))',
-                                            mt: 1.5,
-                                            borderRadius: 3,
-                                            minWidth: 300,
-                                            p: 2,
-                                            '&:before': {
-                                                content: '""',
-                                                display: 'block',
-                                                position: 'absolute',
-                                                top: 0,
-                                                right: 14,
-                                                width: 10,
-                                                height: 10,
-                                                bgcolor: 'background.paper',
-                                                transform: 'translateY(-50%) rotate(45deg)',
-                                                zIndex: 0,
-                                            },
-                                        },
-                                    }
-                                }}
-                                transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-                                anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-                            >
-                                <MenuItem onClick={() => {
-                                    handleMenuClose();
-                                    if (isDashboard) {
-                                        navigate('/');
-                                    } else {
-                                        navigate(currentUser.role === 'player' ? '/user/dashboard' : '/admin/dashboard');
-                                    }
-                                }} sx={{ borderRadius: 1, py: 1.5, mx: 2, mb: 0.5 }}>
-                                    {isDashboard ? (
-                                        <HomeIcon sx={{ mr: 2, color: '#0b5299' }} />
-                                    ) : (
-                                        <DashboardIcon sx={{ mr: 2, color: '#0b5299' }} />
-                                    )}
-                                    <Typography fontWeight="500" color="#0b5299">
-                                        {isDashboard ? 'Home' : 'Dashboard'}
-                                    </Typography>
-                                </MenuItem>
-                                <MenuItem onClick={handleLogout} sx={{ borderRadius: 1, py: 1.5, mx: 2, mb: 1, bgcolor: '#fff5f5', '&:hover': { bgcolor: '#ffebee' } }}>
-                                    <LogoutIcon sx={{ mr: 2, color: '#d32f2f' }} />
-                                    <Typography fontWeight="600" color="#d32f2f">Logout</Typography>
-                                </MenuItem>
-                            </Menu>
+                        <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center' }}>
+                            <ProfilePopover />
                         </Box>
                     ) : (
                         <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 1.5 }}>

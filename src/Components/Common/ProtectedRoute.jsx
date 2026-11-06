@@ -18,7 +18,8 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     // Role check
     if (allowedRoles && !allowedRoles.includes(user.role)) {
         // Redirect to appropriate dashboard
-        const redirectTo = user.role === 'player' ? '/user/dashboard' : '/admin/dashboard';
+        const isUserRole = ['player', 'coach', 'user'].includes(user?.role?.toLowerCase());
+        const redirectTo = isUserRole ? '/user/dashboard' : '/admin/dashboard';
         return <Navigate to={redirectTo} replace />;
     }
 

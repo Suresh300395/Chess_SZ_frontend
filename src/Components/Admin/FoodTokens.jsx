@@ -53,6 +53,7 @@ import CustomTabs from '../Common/Tabs';
 import { foodTokenAPI, SOCKET_URL } from '../../utils/api';
 import { MEAL_TYPES, EVENT_NAME, ORGANIZATION_NAME } from '../../config/foodTokenConfig';
 import { printFoodToken, printMultipleFoodTokens } from './FoodTokens/FoodTokenPrint';
+import { AnimatedCard, AnimatedText } from '../animations';
 import { formatDateDDMMYYYY } from '../../utils/dateUtils';
 
 const getTodayDateString = () => {
@@ -844,15 +845,19 @@ const FoodTokens = () => {
         <Box sx={{ width: '100%', pb: 4 }}>
             {/* Page Header */}
             <Box sx={{ mb: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
-                    <RestaurantIcon sx={{ color: '#0b5299', fontSize: { xs: 28, md: 34 } }} />
-                    <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', fontSize: '28px', lineHeight: 1.2 }}>
-                        Food Tokens
+                <AnimatedText direction="down" delay={0.03}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
+                        <RestaurantIcon sx={{ color: '#0b5299', fontSize: { xs: 28, md: 34 } }} />
+                        <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', fontSize: '28px', lineHeight: 1.2 }}>
+                            Food Tokens
+                        </Typography>
+                    </Box>
+                </AnimatedText>
+                <AnimatedText delay={0.06}>
+                    <Typography sx={{ color: 'text.secondary', fontSize: '14px', mt: 0.5 }}>
+                        Issue and thermal print food tokens for players, coaches, and managers.
                     </Typography>
-                </Box>
-                <Typography sx={{ color: 'text.secondary', fontSize: '14px', mt: 0.5 }}>
-                    Issue and thermal print food tokens for players, coaches, and managers.
-                </Typography>
+                </AnimatedText>
             </Box>
 
             {/* Sub-Navigation Tabs */}

@@ -10,6 +10,7 @@ import TableRowsRoundedIcon from '@mui/icons-material/TableRowsRounded';
 import io from 'socket.io-client';
 import { registrationAPI, SOCKET_URL } from '../../utils/api';
 import { formatDateDDMMYYYY } from '../../utils/dateUtils';
+import { AnimatedCard, AnimatedText } from '../animations';
 
 
 const Dashboard = () => {
@@ -100,7 +101,7 @@ const Dashboard = () => {
             badgeColor: '#1d4ed8'
         },
         {
-            title: 'Total Teams',
+            title: 'Total Universities',
             count: totalTeams,
             subtitle: 'Registered Universities',
             badge: 'Institutions',
@@ -133,20 +134,24 @@ const Dashboard = () => {
 
     return (
         <Box sx={{ width: '100%' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
-                <DashboardIcon sx={{ color: '#0b5299', fontSize: { xs: 28, md: 34 } }} />
-                <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', fontSize: { xs: '1.25rem', md: '2rem' } }}>
-                    Welcome to Admin Dashboard
+            <AnimatedText direction="down" delay={0.02}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                    <DashboardIcon sx={{ color: '#0b5299', fontSize: { xs: 28, md: 34 } }} />
+                    <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', fontSize: { xs: '1.25rem', md: '2rem' } }}>
+                        Welcome to Admin Dashboard
+                    </Typography>
+                </Box>
+            </AnimatedText>
+            <AnimatedText delay={0.06}>
+                <Typography sx={{ color: 'text.secondary', mb: 4 }}>
+                    Select an option from the sidebar to view details, manage registrations and organize the tournament.
                 </Typography>
-            </Box>
-            <Typography sx={{ color: 'text.secondary', mb: 4 }}>
-                Select an option from the sidebar to view details, manage registrations and organize the tournament.
-            </Typography>
+            </AnimatedText>
 
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: { xs: 2, sm: 2.5, md: 3 }, width: '100%', mb: 4 }}>
                 {stats.map((stat, index) => (
-                    <Card
-                        key={index}
+                    <AnimatedCard key={index} delay={index * 0.08} style={{ height: '100%', width: '100%' }}>
+                        <Card
                         sx={{
                             position: 'relative',
                             overflow: 'hidden',
@@ -259,13 +264,16 @@ const Dashboard = () => {
                             </Typography>
                         </CardContent>
                     </Card>
+                </AnimatedCard>
                 ))}
             </Box>
 
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 1.5 }}>
-                <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', fontSize: { xs: '1.1rem', sm: '1.4rem', md: '1.8rem' } }}>
-                    Registered Teams Overview
-                </Typography>
+                <AnimatedText direction="down" whileInView>
+                    <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', fontSize: { xs: '1.1rem', sm: '1.4rem', md: '1.8rem' } }}>
+                        Registered Teams Overview
+                    </Typography>
+                </AnimatedText>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, bgcolor: '#ffffff', p: 0.4, borderRadius: 2, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
                     <Tooltip title="Cards View">
                         <IconButton
@@ -326,7 +334,8 @@ const Dashboard = () => {
                                 {registrations
                                     .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                                     .map((reg, index) => (
-                                        <Paper
+                                        <AnimatedCard key={reg._id} delay={Math.min(index * 0.04, 0.25)} style={{ height: '100%', width: '100%' }}>
+                                            <Paper
                                             key={reg._id}
                                             variant="outlined"
                                             sx={{
@@ -415,6 +424,7 @@ const Dashboard = () => {
                                                 View Details
                                             </Button>
                                         </Paper>
+                                    </AnimatedCard>
                                     ))}
                             </Box>
                         )}

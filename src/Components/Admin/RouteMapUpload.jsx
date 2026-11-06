@@ -16,6 +16,7 @@ import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { toast } from 'sonner';
 import { routeMapAPI, SOCKET_URL } from '../../utils/api';
+import { AnimatedText, AnimatedCard } from '../animations';
 
 const RouteMapUpload = () => {
     const [loading, setLoading] = useState(true);
@@ -285,19 +286,24 @@ const RouteMapUpload = () => {
         <Box sx={{ width: '100%', maxWidth: '1100px', mx: 'auto', p: { xs: 1.5, sm: 2, md: 3 } }}>
             {/* Header */}
             <Box sx={{ mb: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
-                    <MapIcon sx={{ color: '#0b5299', fontSize: { xs: 28, md: 32 } }} />
-                    <Typography variant="h4" fontWeight="bold" sx={{ color: '#0b5299', fontSize: { xs: '1.35rem', sm: '1.75rem', md: '2rem' } }}>
-                        Route Map Upload
+                <AnimatedText direction="down" duration={0.45}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
+                        <MapIcon sx={{ color: '#0b5299', fontSize: { xs: 28, md: 32 } }} />
+                        <Typography variant="h4" fontWeight="bold" sx={{ color: '#0b5299', fontSize: { xs: '1.35rem', sm: '1.75rem', md: '2rem' } }}>
+                            Route Map Upload
+                        </Typography>
+                    </Box>
+                </AnimatedText>
+                <AnimatedText delay={0.08} duration={0.4}>
+                    <Typography variant="body2" sx={{ color: '#64748b' }}>
+                        Upload multiple campus layout plans, transit directions, and stadium venue maps. Selected images automatically upload and save immediately.
                     </Typography>
-                </Box>
-                <Typography variant="body2" sx={{ color: '#64748b' }}>
-                    Upload multiple campus layout plans, transit directions, and stadium venue maps. Selected images automatically upload and save immediately.
-                </Typography>
+                </AnimatedText>
             </Box>
 
             <form onSubmit={handleSaveInfo}>
-                <Paper sx={{ p: { xs: 2, sm: 3 }, mb: 3, borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
+                <AnimatedCard delay={0.06}>
+                    <Paper sx={{ p: { xs: 2, sm: 3 }, mb: 3, borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
                     {/* Header bar of images section */}
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5, mb: 1.5 }}>
                         <Box>
@@ -697,6 +703,7 @@ const RouteMapUpload = () => {
                         </Button>
                     </Box>
                 </Paper>
+                </AnimatedCard>
             </form>
 
             {/* Lightbox Dialog to preview any map full size */}

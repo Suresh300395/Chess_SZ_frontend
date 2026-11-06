@@ -5,12 +5,15 @@ import EditIcon from '@mui/icons-material/Edit';
 import AddIcon from '@mui/icons-material/Add';
 import DownloadIcon from '@mui/icons-material/Download';
 import HotelIcon from '@mui/icons-material/Hotel';
+import CategoryIcon from '@mui/icons-material/Category';
+import CloseIcon from '@mui/icons-material/Close';
 import GridViewRoundedIcon from '@mui/icons-material/GridViewRounded';
 import TableRowsRoundedIcon from '@mui/icons-material/TableRowsRounded';
 import { toast } from 'sonner';
 
 // Import centralized API base URL and endpoints
 import { API_BASE, blocksAPI } from '../../utils/api';
+import { AnimatedText, AnimatedCard } from '../animations';
 
 const ManageBlocks = () => {
     const [blocks, setBlocks] = useState([]);
@@ -18,6 +21,10 @@ const ManageBlocks = () => {
     const [viewMode, setViewMode] = useState('table');
     const [open, setOpen] = useState(false);
     const [editId, setEditId] = useState(null);
+    const [categories, setCategories] = useState([]);
+    const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+    const [newCategoryName, setNewCategoryName] = useState('');
+    const [savingCategory, setSavingCategory] = useState(false);
     const [formData, setFormData] = useState({
         name: '', block: 'Boys Hostel', warden: '', wardenContact: '', officeHours: '', address: '', capacityPerRoom: 4, floorCount: 1, floors: [{ floorName: 'Ground Floor', roomCount: '', roomsString: '' }]
     });
@@ -35,9 +42,68 @@ const ManageBlocks = () => {
         }
     };
 
+    const fetchCategories = async () => {
+        try {
+            const response = await blocksAPI.getCategories();
+            if (response.ok) {
+                const data = await response.json();
+                setCategories(data);
+                // If form has no block or default block not set, pick the first
+                setFormData(prev => {
+                    if (!prev.block && data.length > 0) {
+                        return { ...prev, block: data[0].name };
+                    }
+                    return prev;
+                });
+            }
+        } catch (error) {
+            console.error('Failed to load categories:', error);
+        }
+    };
+
     useEffect(() => {
         fetchBlocks();
+        fetchCategories();
     }, []);
+
+    const handleAddCategory = async (e) => {
+        if (e) e.preventDefault();
+        const trimmed = newCategoryName.trim();
+        if (!trimmed) {
+            toast.error('Please enter a category name');
+            return;
+        }
+        setSavingCategory(true);
+        try {
+            const response = await blocksAPI.createCategory({ name: trimmed });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || 'Failed to add category');
+            toast.success(`Category "${trimmed}" added successfully`);
+            setNewCategoryName('');
+            await fetchCategories();
+            setFormData(prev => ({ ...prev, block: trimmed }));
+        } catch (error) {
+            toast.error(error.message);
+        } finally {
+            setSavingCategory(false);
+        }
+    };
+
+    const handleDeleteCategory = async (cat) => {
+        if (!window.confirm(`Are you sure you want to delete category "${cat.name}"?`)) return;
+        try {
+            const response = await blocksAPI.deleteCategory(cat._id);
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || 'Failed to delete category');
+            toast.success('Category deleted successfully');
+            await fetchCategories();
+            if (formData.block === cat.name) {
+                setFormData(prev => ({ ...prev, block: categories.find(c => c._id !== cat._id)?.name || '' }));
+            }
+        } catch (error) {
+            toast.error(error.message);
+        }
+    };
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -90,6 +156,22 @@ const ManageBlocks = () => {
         }
     };
 
+    const handleOpenAdd = () => {
+        setEditId(null);
+        setFormData({
+            name: '',
+            block: categories.length > 0 ? categories[0].name : 'Boys Hostel',
+            warden: '',
+            wardenContact: '',
+            officeHours: '',
+            address: '',
+            capacityPerRoom: 4,
+            floorCount: 1,
+            floors: [{ floorName: 'Ground Floor', roomCount: '', roomsString: '' }]
+        });
+        setOpen(true);
+    };
+
     const handleEdit = (b) => {
         setEditId(b._id);
         const floorsForState = (b.floors || []).map(f => ({
@@ -100,7 +182,7 @@ const ManageBlocks = () => {
 
         setFormData({
             name: b.name,
-            block: b.block || 'Boys Hostel',
+            block: b.block || (categories.length > 0 ? categories[0].name : 'Boys Hostel'),
             warden: b.warden || '',
             wardenContact: b.wardenContact || '',
             officeHours: b.officeHours || '',
@@ -115,7 +197,17 @@ const ManageBlocks = () => {
     const handleClose = () => {
         setOpen(false);
         setEditId(null);
-        setFormData({ name: '', block: 'Boys Hostel', warden: '', wardenContact: '', officeHours: '', address: '', capacityPerRoom: 4, floorCount: 1, floors: [{ floorName: 'Ground Floor', roomCount: '', roomsString: '' }] });
+        setFormData({
+            name: '',
+            block: categories.length > 0 ? categories[0].name : 'Boys Hostel',
+            warden: '',
+            wardenContact: '',
+            officeHours: '',
+            address: '',
+            capacityPerRoom: 4,
+            floorCount: 1,
+            floors: [{ floorName: 'Ground Floor', roomCount: '', roomsString: '' }]
+        });
     };
 
     const handleDelete = async (id) => {
@@ -260,12 +352,14 @@ const ManageBlocks = () => {
         <Box sx={{ width: '100%' }}>
             <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', md: 'center' }, gap: 2, mb: 3 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: { xs: '100%', md: 'auto' }, gap: 1.5 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 1.5 } }}>
-                        <HotelIcon sx={{ color: '#0b5299', fontSize: { xs: 26, sm: 30, md: 34 } }} />
-                        <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', fontSize: { xs: '1.15rem', sm: '1.4rem', md: '1.75rem' } }}>
-                            Manage Hostel Blocks
-                        </Typography>
-                    </Box>
+                    <AnimatedText direction="down" duration={0.45}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 1.5 } }}>
+                            <HotelIcon sx={{ color: '#0b5299', fontSize: { xs: 26, sm: 30, md: 34 } }} />
+                            <Typography variant="h5" sx={{ color: '#0b5299', fontWeight: '700', fontSize: { xs: '1.15rem', sm: '1.4rem', md: '1.75rem' } }}>
+                                Manage Hostel Blocks
+                            </Typography>
+                        </Box>
+                    </AnimatedText>
 
                     {/* On mobile: View Toggle stays in the SAME ROW as heading */}
                     <Box sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center', gap: 0.5, bgcolor: '#ffffff', p: 0.4, borderRadius: 2, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', flexShrink: 0 }}>
@@ -360,7 +454,10 @@ const ManageBlocks = () => {
                         Upload CSV
                         <input type="file" hidden accept=".csv" onChange={handleFileUpload} />
                     </Button>
-                    <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setEditId(null); setOpen(true); }} sx={{ bgcolor: '#0b5299', '&:hover': { bgcolor: '#083d73' }, flex: { xs: '1 1 auto', md: 'none' } }}>
+                    <Button variant="outlined" startIcon={<CategoryIcon />} onClick={() => setCategoryModalOpen(true)} sx={{ color: '#0b5299', borderColor: '#0b5299', flex: { xs: '1 1 auto', md: 'none' } }}>
+                        Categories
+                    </Button>
+                    <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpenAdd} sx={{ bgcolor: '#0b5299', '&:hover': { bgcolor: '#083d73' }, flex: { xs: '1 1 auto', md: 'none' } }}>
                         Add Block
                     </Button>
                 </Box>
@@ -381,88 +478,90 @@ const ManageBlocks = () => {
                         </Paper>
                     ) : (
                         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 2.5 }}>
-                            {blocks.map((b) => {
+                            {blocks.map((b, index) => {
                                 const totalRooms = b.floors ? b.floors.reduce((acc, f) => acc + f.roomCount, 0) : b.totalRooms || 0;
                                 const floorCount = b.floors ? b.floors.length : 0;
                                 return (
-                                    <Card
-                                        key={b._id}
-                                        variant="outlined"
-                                        sx={{
-                                            borderRadius: 2.5,
-                                            border: '1px solid #e2e8f0',
-                                            boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-                                            transition: 'all 0.2s ease',
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            '&:hover': {
-                                                boxShadow: '0 8px 20px rgba(11,82,153,0.1)',
-                                                borderColor: '#93c5fd'
-                                            }
-                                        }}
-                                    >
-                                        <CardContent sx={{ p: 2.5, flex: 1, display: 'flex', flexDirection: 'column', gap: 1.5, '&:last-child': { pb: 2.5 } }}>
-                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
-                                                <Box>
-                                                    <Typography sx={{ fontWeight: 700, color: '#0f172a', fontSize: '1.05rem', lineHeight: 1.3 }}>
-                                                        {b.name}
-                                                    </Typography>
-                                                    <Chip
-                                                        label={b.block}
-                                                        size="small"
-                                                        sx={{
-                                                            mt: 0.8,
-                                                            fontWeight: 600,
-                                                            fontSize: '0.75rem',
-                                                            bgcolor: b.block === 'Boys Hostel' ? '#eff6ff' : b.block === 'Girls Hostel' ? '#fdf2f8' : '#f8fafc',
-                                                            color: b.block === 'Boys Hostel' ? '#1d4ed8' : b.block === 'Girls Hostel' ? '#be185d' : '#334155',
-                                                            border: '1px solid',
-                                                            borderColor: b.block === 'Boys Hostel' ? '#bfdbfe' : b.block === 'Girls Hostel' ? '#fbcfe8' : '#cbd5e1'
-                                                        }}
-                                                    />
-                                                </Box>
-                                                <Box sx={{ display: 'flex', gap: 0.5 }}>
-                                                    <IconButton size="small" color="primary" onClick={() => handleEdit(b)} sx={{ bgcolor: '#eff6ff', '&:hover': { bgcolor: '#dbeafe' } }}>
-                                                        <EditIcon sx={{ fontSize: 18 }} />
-                                                    </IconButton>
-                                                    <IconButton size="small" color="error" onClick={() => handleDelete(b._id)} sx={{ bgcolor: '#fef2f2', '&:hover': { bgcolor: '#fee2e2' } }}>
-                                                        <DeleteIcon sx={{ fontSize: 18 }} />
-                                                    </IconButton>
-                                                </Box>
-                                            </Box>
+                                    <AnimatedCard key={b._id} delay={Math.min(index * 0.05, 0.25)} style={{ height: '100%', width: '100%' }}>
+                                            <Card
+                                                variant="outlined"
+                                                sx={{
+                                                    height: '100%',
+                                                    borderRadius: 2.5,
+                                                    border: '1px solid #e2e8f0',
+                                                    boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                                                    transition: 'all 0.2s ease',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    '&:hover': {
+                                                        boxShadow: '0 8px 20px rgba(11,82,153,0.1)',
+                                                        borderColor: '#93c5fd'
+                                                    }
+                                                }}
+                                            >
+                                                <CardContent sx={{ p: 2.5, flex: 1, display: 'flex', flexDirection: 'column', gap: 1.5, '&:last-child': { pb: 2.5 } }}>
+                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
+                                                        <Box>
+                                                            <Typography sx={{ fontWeight: 700, color: '#0f172a', fontSize: '1.05rem', lineHeight: 1.3 }}>
+                                                                {b.name}
+                                                            </Typography>
+                                                            <Chip
+                                                                label={b.block}
+                                                                size="small"
+                                                                sx={{
+                                                                    mt: 0.8,
+                                                                    fontWeight: 600,
+                                                                    fontSize: '0.75rem',
+                                                                    bgcolor: b.block === 'Boys Hostel' ? '#eff6ff' : b.block === 'Girls Hostel' ? '#fdf2f8' : '#f8fafc',
+                                                                    color: b.block === 'Boys Hostel' ? '#1d4ed8' : b.block === 'Girls Hostel' ? '#be185d' : '#334155',
+                                                                    border: '1px solid',
+                                                                    borderColor: b.block === 'Boys Hostel' ? '#bfdbfe' : b.block === 'Girls Hostel' ? '#fbcfe8' : '#cbd5e1'
+                                                                }}
+                                                            />
+                                                        </Box>
+                                                        <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                                            <IconButton size="small" color="primary" onClick={() => handleEdit(b)} sx={{ bgcolor: '#eff6ff', '&:hover': { bgcolor: '#dbeafe' } }}>
+                                                                <EditIcon sx={{ fontSize: 18 }} />
+                                                            </IconButton>
+                                                            <IconButton size="small" color="error" onClick={() => handleDelete(b._id)} sx={{ bgcolor: '#fef2f2', '&:hover': { bgcolor: '#fee2e2' } }}>
+                                                                <DeleteIcon sx={{ fontSize: 18 }} />
+                                                            </IconButton>
+                                                        </Box>
+                                                    </Box>
 
-                                            <Box sx={{ bgcolor: '#f8fafc', p: 1.5, borderRadius: 2, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
-                                                <Box>
-                                                    <Typography variant="caption" sx={{ color: '#64748b', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                                                        Floors
-                                                    </Typography>
-                                                    <Typography sx={{ fontWeight: 700, color: '#1e293b', fontSize: '1rem' }}>
-                                                        {floorCount}
-                                                    </Typography>
-                                                </Box>
-                                                <Box>
-                                                    <Typography variant="caption" sx={{ color: '#64748b', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                                                        Total Rooms
-                                                    </Typography>
-                                                    <Typography sx={{ fontWeight: 700, color: '#0b5299', fontSize: '1rem' }}>
-                                                        {totalRooms}
-                                                    </Typography>
-                                                </Box>
-                                            </Box>
+                                                    <Box sx={{ bgcolor: '#f8fafc', p: 1.5, borderRadius: 2, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
+                                                        <Box>
+                                                            <Typography variant="caption" sx={{ color: '#64748b', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                                                Floors
+                                                            </Typography>
+                                                            <Typography sx={{ fontWeight: 700, color: '#1e293b', fontSize: '1rem' }}>
+                                                                {floorCount}
+                                                            </Typography>
+                                                        </Box>
+                                                        <Box>
+                                                            <Typography variant="caption" sx={{ color: '#64748b', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                                                Total Rooms
+                                                            </Typography>
+                                                            <Typography sx={{ fontWeight: 700, color: '#0b5299', fontSize: '1rem' }}>
+                                                                {totalRooms}
+                                                            </Typography>
+                                                        </Box>
+                                                    </Box>
 
-                                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.6, fontSize: '0.85rem', pt: 0.5, borderTop: '1px solid #f1f5f9' }}>
-                                                <Typography variant="body2" sx={{ color: '#475569', display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                    <strong style={{ color: '#1e293b' }}>Warden:</strong> {b.warden || 'N/A'}
-                                                </Typography>
-                                                <Typography variant="body2" sx={{ color: '#475569', display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                    <strong style={{ color: '#1e293b' }}>Contact:</strong> {b.wardenContact || 'N/A'}
-                                                </Typography>
-                                            </Box>
-                                        </CardContent>
-                                    </Card>
-                                );
-                            })}
-                        </Box>
+                                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.6, fontSize: '0.85rem', pt: 0.5, borderTop: '1px solid #f1f5f9' }}>
+                                                        <Typography variant="body2" sx={{ color: '#475569', display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                            <strong style={{ color: '#1e293b' }}>Warden:</strong> {b.warden || 'N/A'}
+                                                        </Typography>
+                                                        <Typography variant="body2" sx={{ color: '#475569', display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                            <strong style={{ color: '#1e293b' }}>Contact:</strong> {b.wardenContact || 'N/A'}
+                                                        </Typography>
+                                                    </Box>
+                                                </CardContent>
+                                            </Card>
+                                        </AnimatedCard>
+                                    );
+                                })}
+                            </Box>
                     )}
                 </Box>
             ) : (
@@ -516,20 +615,63 @@ const ManageBlocks = () => {
                 <DialogTitle>{editId ? 'Edit Block' : 'Add New Block'}</DialogTitle>
                 <form onSubmit={handleSubmit}>
                     <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <TextField
-                            select
-                            label="Category"
-                            name="block"
-                            value={formData.block}
-                            onChange={handleChange}
-                            required
-                            fullWidth
-                        >
-                            <MenuItem value="Boys Hostel">Boys Hostel</MenuItem>
-                            <MenuItem value="Girls Hostel">Girls Hostel</MenuItem>
-                            <MenuItem value="Staff Hostel">Staff Hostel</MenuItem>
-                            <MenuItem value="Guest House">Guest House</MenuItem>
-                        </TextField>
+                        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+                            <TextField
+                                select
+                                label="Category / Building"
+                                name="block"
+                                value={formData.block || ''}
+                                onChange={handleChange}
+                                required
+                                fullWidth
+                                sx={{
+                                    flex: 1,
+                                    '& .MuiOutlinedInput-root': {
+                                        height: '56px'
+                                    }
+                                }}
+                            >
+                                {categories.map((cat) => (
+                                    <MenuItem key={cat._id || cat.name} value={cat.name}>
+                                        {cat.name}
+                                    </MenuItem>
+                                ))}
+                                {categories.length === 0 && (
+                                    <MenuItem disabled value="">
+                                        No categories found. Click 'Add Category' to create one.
+                                    </MenuItem>
+                                )}
+                            </TextField>
+                            <Tooltip title="Manage / Add Categories">
+                                <Button
+                                    variant="outlined"
+                                    onClick={() => setCategoryModalOpen(true)}
+                                    sx={{
+                                        minWidth: { xs: '44px', sm: '135px' },
+                                        height: '56px',
+                                        borderRadius: 1,
+                                        borderColor: '#cbd5e1',
+                                        color: '#0b5299',
+                                        textTransform: 'none',
+                                        fontWeight: 600,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: 0.5,
+                                        flexShrink: 0,
+                                        whiteSpace: 'nowrap',
+                                        boxSizing: 'border-box',
+                                        '&:hover': {
+                                            borderColor: '#0b5299',
+                                            bgcolor: 'rgba(11, 82, 153, 0.04)'
+                                        }
+                                    }}
+                                >
+                                    <AddIcon fontSize="small" />
+                                    <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>Add Category</Box>
+                                </Button>
+                            </Tooltip>
+                        </Box>
                         <TextField label="Block Name (e.g. Boys Hostel Block A)" name="name" value={formData.name} onChange={handleChange} required fullWidth />
 
                         <TextField label="Number of Floors" name="floorCount" type="number" value={formData.floorCount} onChange={handleChange} fullWidth slotProps={{ htmlInput: { min: 1, max: 20 } }} />
@@ -563,6 +705,99 @@ const ManageBlocks = () => {
                         <Button type="submit" variant="contained" sx={{ bgcolor: '#0b5299' }}>{editId ? 'Update Block' : 'Add Block'}</Button>
                     </DialogActions>
                 </form>
+            </Dialog>
+
+            {/* Category Management Dialog */}
+            <Dialog
+                open={categoryModalOpen}
+                onClose={() => setCategoryModalOpen(false)}
+                maxWidth="xs"
+                fullWidth
+                slotProps={{ paper: { sx: { borderRadius: 3, p: 1 } } }}
+            >
+                <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <CategoryIcon sx={{ color: '#0b5299', fontSize: 24 }} />
+                        <Typography variant="h6" sx={{ fontWeight: 700, color: '#0f172a', fontSize: '1.1rem' }}>
+                            Manage Categories
+                        </Typography>
+                    </Box>
+                    <IconButton size="small" onClick={() => setCategoryModalOpen(false)}>
+                        <CloseIcon fontSize="small" />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent sx={{ pt: 1 }}>
+                    <Typography variant="body2" sx={{ color: '#64748b', mb: 2 }}>
+                        Add or manage building / hostel categories. Saved directly to the database and dynamically loaded everywhere.
+                    </Typography>
+
+                    {/* Add New Category Input */}
+                    <Box component="form" onSubmit={handleAddCategory} sx={{ display: 'flex', gap: 1, mb: 2.5 }}>
+                        <TextField
+                            size="small"
+                            fullWidth
+                            placeholder="e.g. Deluxe Hostel, Block C..."
+                            value={newCategoryName}
+                            onChange={(e) => setNewCategoryName(e.target.value)}
+                            disabled={savingCategory}
+                            autoFocus
+                        />
+                        <Button
+                            type="submit"
+                            variant="contained"
+                            disabled={savingCategory || !newCategoryName.trim()}
+                            sx={{ bgcolor: '#0b5299', '&:hover': { bgcolor: '#083d73' }, textTransform: 'none', px: 2, flexShrink: 0 }}
+                        >
+                            {savingCategory ? <CircularProgress size={18} color="inherit" /> : 'Add'}
+                        </Button>
+                    </Box>
+
+                    <Typography variant="caption" sx={{ color: '#475569', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', mb: 1 }}>
+                        Existing Categories ({categories.length})
+                    </Typography>
+
+                    {/* Category List */}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, maxHeight: '260px', overflowY: 'auto', pr: 0.5 }}>
+                        {categories.map((cat) => (
+                            <Box
+                                key={cat._id || cat.name}
+                                sx={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    p: 1.2,
+                                    px: 1.5,
+                                    bgcolor: '#f8fafc',
+                                    borderRadius: 2,
+                                    border: '1px solid #e2e8f0'
+                                }}
+                            >
+                                <Typography sx={{ fontWeight: 600, color: '#1e293b', fontSize: '0.9rem' }}>
+                                    {cat.name}
+                                </Typography>
+                                <IconButton
+                                    size="small"
+                                    color="error"
+                                    onClick={() => handleDeleteCategory(cat)}
+                                    title="Delete Category"
+                                    sx={{ '&:hover': { bgcolor: '#fee2e2' } }}
+                                >
+                                    <DeleteIcon sx={{ fontSize: 18 }} />
+                                </IconButton>
+                            </Box>
+                        ))}
+                        {categories.length === 0 && (
+                            <Typography variant="body2" sx={{ color: '#94a3b8', textAlign: 'center', py: 2 }}>
+                                No categories found. Add one above.
+                            </Typography>
+                        )}
+                    </Box>
+                </DialogContent>
+                <DialogActions sx={{ p: 2, pt: 1 }}>
+                    <Button onClick={() => setCategoryModalOpen(false)} variant="contained" sx={{ bgcolor: '#0b5299', textTransform: 'none' }}>
+                        Done
+                    </Button>
+                </DialogActions>
             </Dialog>
         </Box>
     );

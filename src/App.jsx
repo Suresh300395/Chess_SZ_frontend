@@ -186,7 +186,7 @@ function App() {
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ForgotPasswordPage />} />
             <Route path="/user/dashboard" element={
-                <ProtectedRoute allowedRoles={['player', 'coach']}>
+                <ProtectedRoute allowedRoles={['player', 'coach', 'user']}>
                     <UserDashboard />
                 </ProtectedRoute>
             } />

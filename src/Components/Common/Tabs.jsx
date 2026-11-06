@@ -1,4 +1,4 @@
-import { Tabs as MuiTabs, Tab, Box, styled, IconButton, useMediaQuery, useTheme } from '@mui/material';
+import { Tabs as MuiTabs, Tab, Box, Typography, styled, IconButton, useMediaQuery, useTheme } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
@@ -26,29 +26,6 @@ const StyledTabs = styled(MuiTabs)({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    '@media (max-width: 899.95px)': {
-        flex: 1,
-        width: '100%',
-        maxWidth: '100%',
-        '& .MuiTabs-scroller': {
-            width: '100%',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-        },
-        '& .MuiTabs-flexContainer': {
-            width: '100%',
-            display: 'flex',
-            flex: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
-        },
-        '& .MuiTabs-indicator': {
-            width: '100% !important',
-            left: '0 !important',
-            transform: 'none !important',
-        }
-    }
 });
 
 const StyledTab = styled((props) => <Tab disableRipple {...props} />)({
@@ -91,23 +68,6 @@ const StyledTab = styled((props) => <Tab disableRipple {...props} />)({
             color: '#d06c38',
         }
     },
-    '@media (max-width: 899.95px)': {
-        fontSize: '15px',
-        padding: '8px 16px',
-        minWidth: 'unset',
-        maxWidth: 'none !important',
-        width: '100% !important',
-        flex: '1 1 100% !important',
-        display: 'flex !important',
-        alignItems: 'center !important',
-        justifyContent: 'center !important',
-        textAlign: 'center !important',
-        margin: '0 auto !important',
-        '&.Mui-selected': {
-            backgroundColor: '#d06c38',
-            borderRadius: '50px',
-        }
-    }
 });
 
 const Tabs = ({ tabs = [], activeTab, setActiveTab, onChange, sx }) => {
@@ -117,6 +77,7 @@ const Tabs = ({ tabs = [], activeTab, setActiveTab, onChange, sx }) => {
     // MUI Tabs takes an index for value, so we find the index of activeTab
     const value = tabs.findIndex(tab => getTabValue(tab) === activeTab);
     const activeIndex = value !== -1 ? value : 0;
+    const currentTab = tabs[activeIndex] || tabs[0];
 
     const handleChange = (event, newIndex) => {
         const selected = tabs[newIndex];
@@ -139,6 +100,116 @@ const Tabs = ({ tabs = [], activeTab, setActiveTab, onChange, sx }) => {
         if (onChange) onChange(null, val);
     };
 
+    // Mobile View: Render single active tab pill with previous / next navigation arrows
+    if (isMobile) {
+        return (
+            <Box sx={{
+                width: '100%',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                py: 0.5,
+                px: 1,
+                gap: { xs: 0.8, sm: 1.2 },
+                boxSizing: 'border-box',
+                ...sx
+            }}>
+                <IconButton
+                    onClick={handlePrev}
+                    disabled={activeIndex === 0}
+                    aria-label="Previous tab"
+                    sx={{
+                        bgcolor: '#ffffff',
+                        color: '#0b5299',
+                        boxShadow: '0 4px 10px rgba(11,82,153,0.1)',
+                        flexShrink: 0,
+                        width: { xs: 36, sm: 40 },
+                        height: { xs: 36, sm: 40 },
+                        '&:hover': { bgcolor: '#f0f0f0' },
+                        '&.Mui-disabled': { bgcolor: 'rgba(255,255,255,0.6)', opacity: 0.35 }
+                    }}
+                >
+                    <ChevronLeftIcon />
+                </IconButton>
+
+                <Box
+                    onClick={() => {
+                        if (tabs.length > 1) {
+                            const nextIdx = (activeIndex + 1) % tabs.length;
+                            const val = getTabValue(tabs[nextIdx]);
+                            if (setActiveTab) setActiveTab(val);
+                            if (onChange) onChange(null, val);
+                        }
+                    }}
+                    sx={{
+                        flex: 1,
+                        maxWidth: { xs: '290px', sm: '350px' },
+                        backgroundColor: '#d06c38',
+                        color: '#ffffff',
+                        borderRadius: '50px',
+                        py: '9px',
+                        px: { xs: 1.8, sm: 2.5 },
+                        boxShadow: '0 4px 12px rgba(208, 108, 56, 0.3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 1,
+                        cursor: tabs.length > 1 ? 'pointer' : 'default',
+                        userSelect: 'none',
+                        transition: 'all 0.25s ease',
+                        '&:active': { transform: 'scale(0.98)' }
+                    }}
+                >
+                    {getTabIcon(currentTab) && (
+                        <Box sx={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#ffffff',
+                            fontSize: '1.2rem',
+                            flexShrink: 0
+                        }}>
+                            {getTabIcon(currentTab)}
+                        </Box>
+                    )}
+                    <Typography
+                        sx={{
+                            fontWeight: 700,
+                            fontSize: { xs: '13px', sm: '14.5px' },
+                            color: '#ffffff',
+                            textAlign: 'center',
+                            lineHeight: 1.25,
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                        }}
+                    >
+                        {getTabLabel(currentTab)}
+                    </Typography>
+                </Box>
+
+                <IconButton
+                    onClick={handleNext}
+                    disabled={activeIndex === tabs.length - 1}
+                    aria-label="Next tab"
+                    sx={{
+                        bgcolor: '#ffffff',
+                        color: '#0b5299',
+                        boxShadow: '0 4px 10px rgba(11,82,153,0.1)',
+                        flexShrink: 0,
+                        width: { xs: 36, sm: 40 },
+                        height: { xs: 36, sm: 40 },
+                        '&:hover': { bgcolor: '#f0f0f0' },
+                        '&.Mui-disabled': { bgcolor: 'rgba(255,255,255,0.6)', opacity: 0.35 }
+                    }}
+                >
+                    <ChevronRightIcon />
+                </IconButton>
+            </Box>
+        );
+    }
+
+    // Desktop View: Render full pill with all tabs and sliding indicator
     return (
         <Box sx={{
             width: '100%',
@@ -147,33 +218,13 @@ const Tabs = ({ tabs = [], activeTab, setActiveTab, onChange, sx }) => {
             alignItems: 'center',
             py: 0.5,
             px: 0,
-            gap: { xs: 0.75, sm: 1 },
             boxSizing: 'border-box',
             ...sx
         }}>
-            {isMobile && (
-                <IconButton
-                    onClick={handlePrev}
-                    disabled={activeIndex === 0}
-                    sx={{
-                        bgcolor: '#ffffff',
-                        color: '#0b5299',
-                        boxShadow: '0 4px 10px rgba(11,82,153,0.1)',
-                        flexShrink: 0,
-                        width: { xs: 38, sm: 40 },
-                        height: { xs: 38, sm: 40 },
-                        '&:hover': { bgcolor: '#f0f0f0' },
-                        '&.Mui-disabled': { bgcolor: 'rgba(255,255,255,0.5)' }
-                    }}
-                >
-                    <ChevronLeftIcon />
-                </IconButton>
-            )}
-
             <StyledTabs
                 value={activeIndex}
                 onChange={handleChange}
-                variant={isMobile ? "fullWidth" : "scrollable"}
+                variant="scrollable"
                 scrollButtons={false}
             >
                 {tabs.map((tab, index) => (
@@ -182,38 +233,9 @@ const Tabs = ({ tabs = [], activeTab, setActiveTab, onChange, sx }) => {
                         icon={getTabIcon(tab)}
                         iconPosition={getTabIconPosition(tab)}
                         label={getTabLabel(tab)}
-                        sx={{
-                            display: (isMobile && activeIndex !== index) ? 'none !important' : 'flex !important',
-                            justifyContent: 'center !important',
-                            alignItems: 'center !important',
-                            textAlign: 'center !important',
-                            width: isMobile ? '100% !important' : 'auto',
-                            maxWidth: 'none !important',
-                            flex: isMobile ? '1 1 100% !important' : 'initial',
-                            margin: '0 auto !important',
-                        }}
                     />
                 ))}
             </StyledTabs>
-
-            {isMobile && (
-                <IconButton
-                    onClick={handleNext}
-                    disabled={activeIndex === tabs.length - 1}
-                    sx={{
-                        bgcolor: '#ffffff',
-                        color: '#0b5299',
-                        boxShadow: '0 4px 10px rgba(11,82,153,0.1)',
-                        flexShrink: 0,
-                        width: { xs: 38, sm: 40 },
-                        height: { xs: 38, sm: 40 },
-                        '&:hover': { bgcolor: '#f0f0f0' },
-                        '&.Mui-disabled': { bgcolor: 'rgba(255,255,255,0.5)' }
-                    }}
-                >
-                    <ChevronRightIcon />
-                </IconButton>
-            )}
         </Box>
     );
 };

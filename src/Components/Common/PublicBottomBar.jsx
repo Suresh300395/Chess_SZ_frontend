@@ -1,10 +1,25 @@
-import React, { useState } from 'react';
-import { Box, Typography } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { Box, Typography, Drawer, IconButton, Avatar, Menu, MenuItem } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
+import PersonIcon from '@mui/icons-material/Person';
 import DashboardIcon from '@mui/icons-material/Dashboard';
+import HomeIcon from '@mui/icons-material/Home';
+import LogoutIcon from '@mui/icons-material/Logout';
 import Authentication from '../Admin/Authentication';
-import { getCurrentUser } from '../../utils/auth';
+import { getCurrentUser, clearAuthSession } from '../../utils/auth';
+import { SOCKET_URL } from '../../utils/api';
+import { scrollToTabContainer } from '../../utils/scrollUtils';
+
+const resolvePhotoUrl = (photoPath) => {
+    if (!photoPath) return null;
+    if (photoPath.startsWith('http://') || photoPath.startsWith('https://') || photoPath.startsWith('data:')) {
+        return photoPath;
+    }
+    return `${SOCKET_URL}${photoPath.startsWith('/') ? '' : '/'}${photoPath}`;
+};
 
 // 3-squares Board Icon matching the design
 const LiveBoardIcon = ({ size = 20, color = 'currentColor' }) => (
@@ -52,6 +67,15 @@ const RegisterCalendarIcon = ({ size = 22, color = '#ffffff' }) => (
     </svg>
 );
 
+// 3-dots More Icon
+const MoreIcon = ({ size = 21, color = 'currentColor' }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
+        <circle cx="5" cy="12" r="2.2" />
+        <circle cx="12" cy="12" r="2.2" />
+        <circle cx="19" cy="12" r="2.2" />
+    </svg>
+);
+
 // Login Icon matching the design
 const AppLoginIcon = ({ size = 20, color = 'currentColor' }) => (
     <svg
@@ -74,7 +98,21 @@ const PublicBottomBar = ({ activeTab = 'Live Board', setActiveTab }) => {
     const navigate = useNavigate();
     const location = useLocation();
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-    const user = getCurrentUser();
+    const [isMoreDrawerOpen, setIsMoreDrawerOpen] = useState(false);
+    const [currentUser, setCurrentUser] = useState(getCurrentUser());
+    const [profileMenuAnchor, setProfileMenuAnchor] = useState(null);
+
+    useEffect(() => {
+        const handleAuthChange = () => {
+            setCurrentUser(getCurrentUser());
+        };
+        window.addEventListener('authChange', handleAuthChange);
+        window.addEventListener('storage', handleAuthChange);
+        return () => {
+            window.removeEventListener('authChange', handleAuthChange);
+            window.removeEventListener('storage', handleAuthChange);
+        };
+    }, []);
 
     const isHome = location.pathname === '/' || location.pathname === '';
 
@@ -85,7 +123,7 @@ const PublicBottomBar = ({ activeTab = 'Live Board', setActiveTab }) => {
             if (setActiveTab) {
                 setActiveTab(tabName);
             }
-            window.scrollTo({ top: 380, behavior: 'smooth' });
+            scrollToTabContainer();
         }
     };
 
@@ -93,21 +131,73 @@ const PublicBottomBar = ({ activeTab = 'Live Board', setActiveTab }) => {
         navigate('/registration');
     };
 
-    const handleLoginClick = () => {
-        if (user) {
-            navigate(user.role === 'player' ? '/user/dashboard' : '/admin/dashboard');
-        } else {
-            setIsLoginModalOpen(true);
-        }
+    const handleProfileClick = (event) => {
+        setProfileMenuAnchor(event.currentTarget);
     };
 
+    const handleProfileClose = () => {
+        if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+        }
+        setProfileMenuAnchor(null);
+    };
+
+    const handleLogout = () => {
+        if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+        }
+        setProfileMenuAnchor(null);
+        clearAuthSession(false);
+        setCurrentUser(null);
+        navigate('/');
+    };
+
+    const handleGoPath = (path) => {
+        if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+        }
+        setProfileMenuAnchor(null);
+        navigate(path);
+    };
+
+    const roleLower = (currentUser?.role || '').toLowerCase();
+    const isAdminOrSuperAdmin = roleLower === 'admin' || roleLower === 'superadmin';
+    const isUserOrPlayer = Boolean(currentUser) && !isAdminOrSuperAdmin;
+    const isDashboardPage = location.pathname.startsWith('/admin') || location.pathname.startsWith('/user') || location.pathname.includes('/dashboard');
+
+    const isAboutActive = isHome && activeTab === 'About';
     const isLiveBoardActive = isHome && activeTab === 'Live Board';
     const isRouteMapActive = isHome && activeTab === 'Route Map';
     const isCommitteeActive = isHome && activeTab === 'Organizing Committee';
+    const isMoreActive = isCommitteeActive || isAboutActive;
+    const isProfileActive = location.pathname.includes('/dashboard') || Boolean(profileMenuAnchor);
+
+    const moreModules = [
+        {
+            id: 'about',
+            name: 'About Tournament',
+            icon: <InfoOutlinedIcon />,
+            isActive: isAboutActive,
+            onClick: () => {
+                setIsMoreDrawerOpen(false);
+                handleTabClick('About');
+            }
+        },
+        {
+            id: 'committee',
+            name: 'Organizing Committee',
+            icon: <GroupsOutlinedIcon />,
+            isActive: isCommitteeActive,
+            onClick: () => {
+                setIsMoreDrawerOpen(false);
+                handleTabClick('Organizing Committee');
+            }
+        }
+    ];
 
     return (
         <>
-            {/* Clean Floating Bottom Navigation Bar */}
+            {/* Clean Floating Bottom Navigation Bar (Mobile only) */}
             <Box
                 sx={{
                     display: { xs: 'flex', md: 'none' },
@@ -123,7 +213,7 @@ const PublicBottomBar = ({ activeTab = 'Live Board', setActiveTab }) => {
                     boxShadow: '0 8px 24px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.04)',
                     border: '1px solid rgba(226, 232, 240, 0.85)',
                     px: { xs: 0.8, sm: 1.2 },
-                    py: 0.8,
+                    py: 0,
                     alignItems: 'center',
                     justifyContent: 'space-between',
                 }}
@@ -138,26 +228,21 @@ const PublicBottomBar = ({ activeTab = 'Live Board', setActiveTab }) => {
                         alignItems: 'center',
                         justifyContent: 'center',
                         cursor: 'pointer',
+                        py: 0.4,
+                        minHeight: '38px',
+                        transition: 'all 0.2s ease',
                     }}
                 >
-                    <Box
-                        sx={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            px: 0.6,
-                            py: 0.4,
-                            bgcolor: 'transparent',
-                            transition: 'all 0.2s ease',
-                        }}
-                    >
-                        <LiveBoardIcon size={20} color={isLiveBoardActive ? '#d06c38' : '#0b3558'} />
+                    <LiveBoardIcon
+                        size={isLiveBoardActive ? 23 : 20}
+                        color={isLiveBoardActive ? '#0b5299' : '#64748b'}
+                    />
+                    {!isLiveBoardActive && (
                         <Typography
                             sx={{
                                 fontSize: '10.5px',
-                                fontWeight: isLiveBoardActive ? 800 : 600,
-                                color: isLiveBoardActive ? '#d06c38' : '#0b3558',
+                                fontWeight: 400,
+                                color: '#64748b',
                                 mt: 0.3,
                                 whiteSpace: 'nowrap',
                                 lineHeight: 1,
@@ -166,17 +251,7 @@ const PublicBottomBar = ({ activeTab = 'Live Board', setActiveTab }) => {
                         >
                             Live Board
                         </Typography>
-                    </Box>
-                    <Box
-                        sx={{
-                            width: '22px',
-                            height: '3px',
-                            bgcolor: isLiveBoardActive ? '#d06c38' : 'transparent',
-                            borderRadius: '2px',
-                            mt: 0.3,
-                            transition: 'background-color 0.2s ease',
-                        }}
-                    />
+                    )}
                 </Box>
 
                 {/* 2. Route Map (Tab 2) */}
@@ -189,26 +264,21 @@ const PublicBottomBar = ({ activeTab = 'Live Board', setActiveTab }) => {
                         alignItems: 'center',
                         justifyContent: 'center',
                         cursor: 'pointer',
+                        py: 0.4,
+                        minHeight: '38px',
+                        transition: 'all 0.2s ease',
                     }}
                 >
-                    <Box
-                        sx={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            px: 0.6,
-                            py: 0.4,
-                            bgcolor: 'transparent',
-                            transition: 'all 0.2s ease',
-                        }}
-                    >
-                        <RouteMapIcon size={21} color={isRouteMapActive ? '#d06c38' : '#0b3558'} />
+                    <RouteMapIcon
+                        size={isRouteMapActive ? 23 : 21}
+                        color={isRouteMapActive ? '#0b5299' : '#64748b'}
+                    />
+                    {!isRouteMapActive && (
                         <Typography
                             sx={{
                                 fontSize: '10.5px',
-                                fontWeight: isRouteMapActive ? 800 : 600,
-                                color: isRouteMapActive ? '#d06c38' : '#0b3558',
+                                fontWeight: 400,
+                                color: '#64748b',
                                 mt: 0.3,
                                 whiteSpace: 'nowrap',
                                 lineHeight: 1,
@@ -217,17 +287,7 @@ const PublicBottomBar = ({ activeTab = 'Live Board', setActiveTab }) => {
                         >
                             Route Map
                         </Typography>
-                    </Box>
-                    <Box
-                        sx={{
-                            width: '22px',
-                            height: '3px',
-                            bgcolor: isRouteMapActive ? '#d06c38' : 'transparent',
-                            borderRadius: '2px',
-                            mt: 0.3,
-                            transition: 'background-color 0.2s ease',
-                        }}
-                    />
+                    )}
                 </Box>
 
                 {/* 3. Center Raised Floating Register Button (Tab 3) */}
@@ -238,7 +298,7 @@ const PublicBottomBar = ({ activeTab = 'Live Board', setActiveTab }) => {
                         alignItems: 'center',
                         justifyContent: 'center',
                         position: 'relative',
-                        top: '-18px',
+                        top: '-33px',
                         zIndex: 2,
                         flexShrink: 0,
                         mx: 0.4,
@@ -272,7 +332,7 @@ const PublicBottomBar = ({ activeTab = 'Live Board', setActiveTab }) => {
                         <Typography
                             sx={{
                                 fontSize: '9.5px',
-                                fontWeight: 800,
+                                fontWeight: 300,
                                 color: '#ffffff',
                                 lineHeight: 1,
                                 letterSpacing: '0.2px',
@@ -284,59 +344,43 @@ const PublicBottomBar = ({ activeTab = 'Live Board', setActiveTab }) => {
                     </Box>
                 </Box>
 
-                {/* 4. Organizing Committee (Tab 4) */}
+                {/* 4. More (Tab 4 with All Modules Drawer) */}
                 <Box
-                    onClick={() => handleTabClick('Organizing Committee')}
+                    onClick={() => setIsMoreDrawerOpen(true)}
                     sx={{
-                        flex: 1.15,
+                        flex: 1,
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
                         cursor: 'pointer',
+                        py: 0.4,
+                        minHeight: '38px',
+                        transition: 'all 0.2s ease',
                     }}
                 >
-                    <Box
-                        sx={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            px: 0.4,
-                            py: 0.4,
-                            bgcolor: 'transparent',
-                            transition: 'all 0.2s ease',
-                            textAlign: 'center',
-                        }}
-                    >
-                        <GroupsOutlinedIcon sx={{ fontSize: '22px', color: isCommitteeActive ? '#d06c38' : '#0b3558' }} />
+                    <MoreIcon
+                        size={(isMoreActive || isMoreDrawerOpen) ? 23 : 21}
+                        color={(isMoreActive || isMoreDrawerOpen) ? '#0b5299' : '#64748b'}
+                    />
+                    {!(isMoreActive || isMoreDrawerOpen) && (
                         <Typography
                             sx={{
-                                fontSize: '9.5px',
-                                fontWeight: isCommitteeActive ? 800 : 600,
-                                color: isCommitteeActive ? '#d06c38' : '#0b3558',
-                                mt: 0.2,
+                                fontSize: '10.5px',
+                                fontWeight: 400,
+                                color: '#64748b',
+                                mt: 0.3,
                                 textAlign: 'center',
-                                lineHeight: 1.1,
+                                lineHeight: 1,
                                 transition: 'color 0.2s ease',
                             }}
                         >
-                            Organizing<br />Committee
+                            More
                         </Typography>
-                    </Box>
-                    <Box
-                        sx={{
-                            width: '22px',
-                            height: '3px',
-                            bgcolor: isCommitteeActive ? '#d06c38' : 'transparent',
-                            borderRadius: '2px',
-                            mt: 0.3,
-                            transition: 'background-color 0.2s ease',
-                        }}
-                    />
+                    )}
                 </Box>
 
-                {/* Divider Line between Committee and Login */}
+                {/* Divider Line between More and Profile/Login */}
                 <Box
                     sx={{
                         width: '1px',
@@ -347,56 +391,410 @@ const PublicBottomBar = ({ activeTab = 'Live Board', setActiveTab }) => {
                     }}
                 />
 
-                {/* 5. Login / Dashboard (Tab 5) */}
-                <Box
-                    onClick={handleLoginClick}
-                    sx={{
-                        flex: 0.85,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        py: 0.4,
-                    }}
-                >
+                {/* 5. Profile Avatar (When Logged in) OR Login (When Logged out) */}
+                {currentUser ? (
                     <Box
+                        onClick={handleProfileClick}
                         sx={{
+                            flex: 0.85,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            py: 0.4,
+                            minHeight: '38px',
+                            transition: 'all 0.2s ease',
+                        }}
+                    >
+                        <Box
+                            sx={{
+                                width: isProfileActive ? 35 : 33,
+                                height: isProfileActive ? 35 : 33,
+                                borderRadius: '50%',
+                                border: isProfileActive ? '2px solid #0b5299' : '2px solid #64748b',
+                                p: '2px',
+                                boxSizing: 'border-box',
+                                bgcolor: '#ffffff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                                transition: 'all 0.2s ease',
+                            }}
+                        >
+                            {currentUser?.photo ? (
+                                <Avatar
+                                    src={resolvePhotoUrl(currentUser.photo)}
+                                    alt={currentUser.name || 'User'}
+                                    sx={{
+                                        width: isProfileActive ? 27 : 25,
+                                        height: isProfileActive ? 27 : 25,
+                                    }}
+                                />
+                            ) : (
+                                <Box
+                                    sx={{
+                                        width: isProfileActive ? 27 : 25,
+                                        height: isProfileActive ? 27 : 25,
+                                        borderRadius: '50%',
+                                        bgcolor: isProfileActive ? '#0b5299' : '#64748b',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        overflow: 'hidden',
+                                        flexShrink: 0,
+                                        transition: 'all 0.2s ease',
+                                    }}
+                                >
+                                    <PersonIcon
+                                        sx={{
+                                            fontSize: isProfileActive ? 20 : 18.5,
+                                            color: '#ffffff',
+                                            display: 'block',
+                                        }}
+                                    />
+                                </Box>
+                            )}
+                        </Box>
+                    </Box>
+                ) : (
+                    <Box
+                        onClick={() => setIsLoginModalOpen(true)}
+                        sx={{
+                            flex: 0.85,
                             display: 'flex',
                             flexDirection: 'column',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            px: 0.4,
+                            cursor: 'pointer',
                             py: 0.4,
+                            minHeight: '38px',
+                            transition: 'all 0.2s ease',
                         }}
                     >
-                        {user ? (
-                            <>
-                                <DashboardIcon sx={{ fontSize: '21px', color: '#0b3558' }} />
-                                <Typography sx={{ fontSize: '10px', fontWeight: 600, color: '#0b3558', mt: 0.3, whiteSpace: 'nowrap', lineHeight: 1 }}>
-                                    Dashboard
-                                </Typography>
-                            </>
-                        ) : (
-                            <>
-                                <AppLoginIcon size={20} color="#0b3558" />
-                                <Typography sx={{ fontSize: '10.5px', fontWeight: 600, color: '#0b3558', mt: 0.3, whiteSpace: 'nowrap', lineHeight: 1 }}>
-                                    Login
-                                </Typography>
-                            </>
+                        <AppLoginIcon
+                            size={isLoginModalOpen ? 23 : 20}
+                            color={isLoginModalOpen ? '#0b5299' : '#64748b'}
+                        />
+                        {!isLoginModalOpen && (
+                            <Typography
+                                sx={{
+                                    fontSize: '10.5px',
+                                    fontWeight: 400,
+                                    color: '#64748b',
+                                    mt: 0.3,
+                                    whiteSpace: 'nowrap',
+                                    lineHeight: 1,
+                                    transition: 'color 0.2s ease',
+                                }}
+                            >
+                                Login
+                            </Typography>
                         )}
                     </Box>
+                )}
+            </Box>
+
+            {/* Profile Menu for Logged In User in PublicBottomBar */}
+            {currentUser && (
+                <Menu
+                    anchorEl={profileMenuAnchor}
+                    open={Boolean(profileMenuAnchor)}
+                    onClose={handleProfileClose}
+                    disableRestoreFocus
+                    autoFocus={false}
+                    transitionDuration={{ enter: 200, exit: 0 }}
+                    anchorOrigin={{
+                        vertical: 'top',
+                        horizontal: 'center',
+                    }}
+                    transformOrigin={{
+                        vertical: 'bottom',
+                        horizontal: 'center',
+                    }}
+                    slotProps={{
+                        paper: {
+                            elevation: 8,
+                            sx: {
+                                mb: 1.5,
+                                borderRadius: '16px',
+                                minWidth: '220px',
+                                p: 1.2,
+                                boxShadow: '0 -4px 24px rgba(0,0,0,0.12), 0 8px 24px rgba(0,0,0,0.08)',
+                                border: '1px solid #e2e8f0',
+                            }
+                        },
+                        list: {
+                            autoFocusItem: false,
+                            autoFocus: false,
+                        }
+                    }}
+                >
+                    {/* User Card Header */}
                     <Box
                         sx={{
-                            width: '22px',
-                            height: '3px',
-                            bgcolor: 'transparent',
-                            borderRadius: '2px',
-                            mt: 0.3,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1.2,
+                            p: 1,
+                            mb: 0.8,
+                            bgcolor: '#f8fafc',
+                            borderRadius: '10px',
+                            border: '1px solid #edf2f7',
                         }}
-                    />
+                    >
+                        <Box
+                            sx={{
+                                width: 42,
+                                height: 42,
+                                borderRadius: '50%',
+                                border: '2px solid #0b5299',
+                                p: '2px',
+                                boxSizing: 'border-box',
+                                bgcolor: '#ffffff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                            }}
+                        >
+                            <Avatar
+                                src={resolvePhotoUrl(currentUser?.photo)}
+                                sx={{ width: 34, height: 34, bgcolor: '#0b5299' }}
+                            >
+                                <PersonIcon sx={{ fontSize: 22, color: '#ffffff' }} />
+                            </Avatar>
+                        </Box>
+                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                            <Typography
+                                sx={{
+                                    fontSize: '13px',
+                                    fontWeight: 700,
+                                    color: '#0f172a',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    lineHeight: 1.2,
+                                }}
+                            >
+                                {currentUser?.name || currentUser?.username || 'User'}
+                            </Typography>
+                            <Typography
+                                sx={{
+                                    fontSize: '11px',
+                                    fontWeight: 500,
+                                    color: '#64748b',
+                                    textTransform: 'capitalize',
+                                    lineHeight: 1.2,
+                                    mt: 0.3,
+                                }}
+                            >
+                                {currentUser?.role || 'Player'}
+                            </Typography>
+                        </Box>
+                    </Box>
+
+                    {/* Dynamic Navigation Option: If on dashboard -> show Home; If on home/public -> show Dashboard */}
+                    {isDashboardPage ? (
+                        <MenuItem
+                            onClick={(e) => {
+                                e.currentTarget.blur();
+                                handleGoPath('/');
+                            }}
+                            sx={{
+                                borderRadius: '8px',
+                                py: 1,
+                                px: 1.2,
+                                gap: 1.2,
+                                color: '#0b5299',
+                                '&:hover': { bgcolor: '#f1f5f9' },
+                                mb: 0.5,
+                            }}
+                        >
+                            <HomeIcon sx={{ fontSize: 19, color: '#0b5299' }} />
+                            <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#0b5299' }}>
+                                Home
+                            </Typography>
+                        </MenuItem>
+                    ) : (
+                        <MenuItem
+                            onClick={(e) => {
+                                e.currentTarget.blur();
+                                handleGoPath(isAdminOrSuperAdmin ? '/admin/dashboard' : '/user/dashboard');
+                            }}
+                            sx={{
+                                borderRadius: '8px',
+                                py: 1,
+                                px: 1.2,
+                                gap: 1.2,
+                                color: '#0b5299',
+                                '&:hover': { bgcolor: '#f1f5f9' },
+                                mb: 0.5,
+                            }}
+                        >
+                            <DashboardIcon sx={{ fontSize: 19, color: '#0b5299' }} />
+                            <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#0b5299' }}>
+                                {isAdminOrSuperAdmin ? 'Dashboard' : 'User Dashboard'}
+                            </Typography>
+                        </MenuItem>
+                    )}
+
+                    {/* Logout Option */}
+                    <MenuItem
+                        onClick={(e) => {
+                            e.currentTarget.blur();
+                            handleLogout();
+                        }}
+                        sx={{
+                            borderRadius: '8px',
+                            py: 1,
+                            px: 1.2,
+                            gap: 1.2,
+                            color: '#d32f2f',
+                            bgcolor: '#fff5f5',
+                            '&:hover': { bgcolor: '#ffebee' },
+                            mt: 0.2,
+                        }}
+                    >
+                        <LogoutIcon sx={{ fontSize: 19, color: '#d32f2f' }} />
+                        <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#d32f2f' }}>
+                            Logout
+                        </Typography>
+                    </MenuItem>
+                </Menu>
+            )}
+
+            {/* Bottom Sheet Drawer for All Modules (Matching Image 2) */}
+            <Drawer
+                anchor="bottom"
+                open={isMoreDrawerOpen}
+                onClose={() => {
+                    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+                        document.activeElement.blur();
+                    }
+                    setIsMoreDrawerOpen(false);
+                }}
+                disableRestoreFocus
+                transitionDuration={{ enter: 225, exit: 0 }}
+                slotProps={{
+                    paper: {
+                        sx: {
+                            borderRadius: '18px 18px 0 0',
+                            maxHeight: '85vh',
+                            bgcolor: '#ffffff',
+                            overflowX: 'hidden !important',
+                            overflowY: 'auto',
+                            boxShadow: '0 -10px 40px rgba(0,0,0,0.18)',
+                            maxWidth: '520px',
+                            mx: 'auto'
+                        }
+                    }
+                }}
+            >
+                <Box
+                    sx={{
+                        p: { xs: 1.5, sm: 2.5 },
+                        pb: { xs: 3.5, sm: 4 },
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        overflowX: 'hidden !important'
+                    }}
+                >
+                    {/* Drag pill handle */}
+                    <Box sx={{ width: 40, height: 4, bgcolor: '#cbd5e1', borderRadius: 2, mx: 'auto', mb: 1.5 }} />
+
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, px: 0.5 }}>
+                        <Box sx={{ minWidth: 0, pr: 1 }}>
+                            <Typography variant="h6" fontWeight="bold" sx={{ color: '#0b5299', fontSize: { xs: '1.05rem', sm: '1.2rem' } }}>
+                                All Modules
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#64748b', fontSize: { xs: '11px', sm: '12px' } }}>
+                                Tap any module below to quickly navigate
+                            </Typography>
+                        </Box>
+                        <IconButton onClick={() => setIsMoreDrawerOpen(false)} size="small" sx={{ bgcolor: '#f1f5f9', flexShrink: 0 }}>
+                            <CloseRoundedIcon fontSize="small" />
+                        </IconButton>
+                    </Box>
+
+                    {/* Modules Grid - Strictly fits screen width with 2 columns */}
+                    <Box
+                        sx={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                            gap: { xs: 1, sm: 1.25 },
+                            overflowY: 'auto',
+                            overflowX: 'hidden !important',
+                            maxHeight: '60vh',
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            p: 0.25
+                        }}
+                    >
+                        {moreModules.map((item) => {
+                            const isSelected = item.isActive;
+                            return (
+                                <Box
+                                    key={item.id}
+                                    onClick={item.onClick}
+                                    sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: { xs: 0.9, sm: 1.1 },
+                                        p: { xs: 0.9, sm: 1.2 },
+                                        minWidth: 0,
+                                        width: '100%',
+                                        boxSizing: 'border-box',
+                                        borderRadius: 1.5,
+                                        bgcolor: isSelected ? 'rgba(208, 108, 56, 0.08)' : '#f8fafc',
+                                        border: isSelected ? '1.5px solid #d06c38' : '1px solid #e2e8f0',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.15s ease',
+                                        '&:active': { transform: 'scale(0.97)', bgcolor: 'rgba(208, 108, 56, 0.12)' }
+                                    }}
+                                >
+                                    <Box
+                                        sx={{
+                                            width: { xs: 32, sm: 36 },
+                                            height: { xs: 32, sm: 36 },
+                                            borderRadius: '8px',
+                                            bgcolor: isSelected ? '#d06c38' : '#ffffff',
+                                            color: isSelected ? '#ffffff' : '#0b5299',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            boxShadow: '0 2px 5px rgba(0,0,0,0.06)',
+                                            flexShrink: 0,
+                                            '& svg': {
+                                                fontSize: { xs: 18, sm: 20 }
+                                            }
+                                        }}
+                                    >
+                                        {item.icon}
+                                    </Box>
+                                    <Typography
+                                        sx={{
+                                            fontWeight: isSelected ? 700 : 600,
+                                            color: isSelected ? '#d06c38' : '#334155',
+                                            fontSize: { xs: '11px', sm: '12px' },
+                                            lineHeight: 1.25,
+                                            minWidth: 0,
+                                            flex: 1,
+                                            overflow: 'hidden',
+                                            display: '-webkit-box',
+                                            WebkitLineClamp: 2,
+                                            WebkitBoxOrient: 'vertical',
+                                            wordBreak: 'break-word'
+                                        }}
+                                    >
+                                        {item.name}
+                                    </Typography>
+                                </Box>
+                            );
+                        })}
+                    </Box>
                 </Box>
-            </Box>
+            </Drawer>
 
             <Authentication open={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
         </>
