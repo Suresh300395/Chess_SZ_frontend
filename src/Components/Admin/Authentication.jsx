@@ -138,9 +138,9 @@ const Authentication = ({ open, onClose, initialUsername = '', initialPassword =
                         <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
                             <TextField
                                 fullWidth
-                                label="Username / Email / Mobile"
+                                label="Username / Mobile"
                                 name="username"
-                                placeholder="Enter username, email or mobile"
+                                placeholder="Enter username or mobile number"
                                 value={credentials.username}
                                 onChange={handleChange}
                                 required

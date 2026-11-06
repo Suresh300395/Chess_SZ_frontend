@@ -1197,13 +1197,23 @@ const Home = () => {
                                         gridTemplateColumns: {
                                             xs: '1fr',
                                             sm: committeeMembers.length === 1 ? '1fr' : 'repeat(2, 1fr)',
-                                            md: committeeMembers.length <= 2 ? (committeeMembers.length === 1 ? '1fr' : 'repeat(2, 1fr)') : 'repeat(3, 1fr)',
+                                            md: committeeMembers.length <= 2
+                                                ? (committeeMembers.length === 1 ? '1fr' : 'repeat(2, 1fr)')
+                                                : 'repeat(auto-fit, minmax(310px, 1fr))',
                                             lg: committeeMembers.length === 1 ? '1fr'
                                                 : committeeMembers.length === 2 ? 'repeat(2, 1fr)'
-                                                    : committeeMembers.length === 3 ? 'repeat(3, 1fr)'
-                                                        : 'repeat(4, 1fr)'
+                                                : committeeMembers.length === 4 ? 'repeat(2, 1fr)'
+                                                : 'repeat(3, 1fr)',
+                                            xl: committeeMembers.length === 1 ? '1fr'
+                                                : committeeMembers.length === 2 ? 'repeat(2, 1fr)'
+                                                : committeeMembers.length === 4 ? 'repeat(2, 1fr)'
+                                                : 'repeat(3, 1fr)'
                                         },
-                                        gap: { xs: 2, sm: 2.5, md: 3 }
+                                        gap: { xs: 2, sm: 2.5, md: 3 },
+                                        maxWidth: committeeMembers.length === 1
+                                            ? '480px'
+                                            : (committeeMembers.length === 2 || committeeMembers.length === 4 ? '920px' : '100%'),
+                                        mx: 'auto'
                                     }}>
                                         {committeeMembers.map((member, index) => (
                                             <CommitteeCard
@@ -1213,7 +1223,7 @@ const Home = () => {
                                                     name: member.memberName,
                                                     role: member.designation,
                                                     position: member.position,
-                                                    image: member.photo,
+                                                    image: resolveImgUrl(member.photo),
                                                     email: member.email,
                                                     phone: member.phone
                                                 }}
