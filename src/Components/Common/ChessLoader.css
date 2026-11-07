@@ -1,0 +1,323 @@
+/* ==========================================================================
+   Aditya University Chess King Loader Styles
+   Brand Colors:
+     Orange: #d06c38
+     Gold:   #BE9337
+     Blue:   #0b5299
+     Navy:   #0D233B
+   ========================================================================== */
+
+.aditya-chess-loader-container {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  user-select: none;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
+  padding: 8px;
+}
+
+.aditya-chess-loader-fullscreen-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(13, 35, 59, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 9999;
+  animation: chessFadeIn 0.3s ease-out forwards;
+}
+
+.chess-svg-wrapper {
+  width: var(--loader-size, 80px);
+  height: auto;
+  aspect-ratio: 70 / 140;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 8px 18px rgba(11, 82, 153, 0.25));
+  animation: chessFloat 3s ease-in-out infinite;
+}
+
+.chess-king-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  display: block;
+}
+
+/* Pedestal soft ground shadow */
+.chess-pedestal-shadow {
+  fill: rgba(13, 35, 59, 0.35);
+  animation: chessShadowPulse 3s ease-in-out infinite;
+  transform-origin: 75px 144px;
+}
+
+/* ==========================================================================
+   1. OUTLINE / FRAME ANIMATION (Aditya University Colors)
+   ========================================================================== */
+
+.chess-aditya-frame {
+  animation: adityaGlowPulse 2.8s ease-in-out infinite alternate;
+}
+
+/* Animated gradient stops for outline */
+.aditya-stop-1 {
+  animation: stopColorCycle1 4s linear infinite;
+}
+.aditya-stop-2 {
+  animation: stopColorCycle2 4s linear infinite;
+}
+.aditya-stop-3 {
+  animation: stopColorCycle3 4s linear infinite;
+}
+.aditya-stop-4 {
+  animation: stopColorCycle4 4s linear infinite;
+}
+
+@keyframes stopColorCycle1 {
+  0%, 100% { stop-color: #d06c38; }  /* Orange */
+  25%      { stop-color: #BE9337; }  /* Gold */
+  50%      { stop-color: #0b5299; }  /* Blue */
+  75%      { stop-color: #0D233B; }  /* Navy */
+}
+
+@keyframes stopColorCycle2 {
+  0%, 100% { stop-color: #BE9337; }  /* Gold */
+  25%      { stop-color: #0b5299; }  /* Blue */
+  50%      { stop-color: #0D233B; }  /* Navy */
+  75%      { stop-color: #d06c38; }  /* Orange */
+}
+
+@keyframes stopColorCycle3 {
+  0%, 100% { stop-color: #0b5299; }  /* Blue */
+  25%      { stop-color: #0D233B; }  /* Navy */
+  50%      { stop-color: #d06c38; }  /* Orange */
+  75%      { stop-color: #BE9337; }  /* Gold */
+}
+
+@keyframes stopColorCycle4 {
+  0%, 100% { stop-color: #0D233B; }  /* Navy */
+  25%      { stop-color: #d06c38; }  /* Orange */
+  50%      { stop-color: #BE9337; }  /* Gold */
+  75%      { stop-color: #0b5299; }  /* Blue */
+}
+
+/* Contour dashed tracer moving along the boundary */
+.chess-contour-tracer {
+  stroke: #ffffff;
+  stroke-opacity: 0.7;
+  stroke-dasharray: 20 40;
+  animation: contourFlow 2.4s linear infinite;
+}
+
+@keyframes contourFlow {
+  to {
+    stroke-dashoffset: -120;
+  }
+}
+
+/* ==========================================================================
+   2. MIDDLE / INTERIOR FILL ANIMATIONS (Black & White Fill Shifts)
+   ========================================================================== */
+
+/* Variant: Morph (Smoothly flips between White King & Black King) */
+.morph .chess-chamber {
+  animation: chessFillMorph 3.2s ease-in-out infinite;
+}
+
+.morph .chess-chamber-crown {
+  animation-delay: 0s;
+}
+
+.morph .chess-chamber-collar {
+  animation-delay: 0.25s;
+}
+
+.morph .chess-chamber-base {
+  animation-delay: 0.5s;
+}
+
+@keyframes chessFillMorph {
+  0%, 100% {
+    fill: #ffffff;               /* White piece */
+    filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.8));
+  }
+  30% {
+    fill: #f5eedc;               /* Ivory/Cream transition */
+  }
+  50% {
+    fill: #14171d;               /* Deep Obsidian Black piece */
+    filter: drop-shadow(0 0 2px rgba(11, 82, 153, 0.5));
+  }
+  80% {
+    fill: #222a36;               /* Dark Navy-Charcoal */
+  }
+}
+
+/* Variant: Staggered Cadence */
+.stagger .chess-chamber-crown {
+  animation: chessStaggerCrown 2.4s ease-in-out infinite;
+}
+.stagger .chess-chamber-collar {
+  animation: chessStaggerCollar 2.4s ease-in-out infinite;
+}
+.stagger .chess-chamber-base {
+  animation: chessStaggerBase 2.4s ease-in-out infinite;
+}
+
+@keyframes chessStaggerCrown {
+  0%, 100% { fill: #ffffff; }
+  33%      { fill: #11151c; }
+  66%      { fill: #ffffff; }
+}
+@keyframes chessStaggerCollar {
+  0%, 100% { fill: #11151c; }
+  33%      { fill: #ffffff; }
+  66%      { fill: #11151c; }
+}
+@keyframes chessStaggerBase {
+  0%, 100% { fill: #ffffff; }
+  33%      { fill: #11151c; }
+  66%      { fill: #ffffff; }
+}
+
+/* Variant: Liquid Rising Wave */
+.liquid .chess-chamber {
+  fill: #12161f; /* Dark background */
+}
+
+.liquid-level-rect {
+  animation: liquidRise 3s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
+  transform-origin: center bottom;
+}
+
+@keyframes liquidRise {
+  0% {
+    transform: translateY(135px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+.chess-liquid-fill {
+  fill: #ffffff;
+  filter: drop-shadow(0 -3px 6px rgba(208, 108, 56, 0.5));
+}
+
+/* ==========================================================================
+   3. SHIMMER LIGHT SWEEP
+   ========================================================================== */
+
+.chess-shimmer-sweep {
+  opacity: 0.6;
+  mix-blend-mode: overlay;
+  animation: shimmerSweep 2.8s ease-in-out infinite;
+  transform-origin: center;
+}
+
+@keyframes shimmerSweep {
+  0% {
+    transform: translateX(-80px) rotate(-20deg);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.8;
+  }
+  70% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateX(80px) rotate(-20deg);
+    opacity: 0;
+  }
+}
+
+/* ==========================================================================
+   4. GLOW & FLOATING EFFECTS
+   ========================================================================== */
+
+@keyframes chessFloat {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes chessShadowPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.35;
+  }
+  50% {
+    transform: scale(0.85);
+    opacity: 0.2;
+  }
+}
+
+@keyframes adityaGlowPulse {
+  0% {
+    filter: drop-shadow(0 0 2px rgba(208, 108, 56, 0.4))
+            drop-shadow(0 0 6px rgba(190, 147, 55, 0.3));
+  }
+  50% {
+    filter: drop-shadow(0 0 4px rgba(11, 82, 153, 0.6))
+            drop-shadow(0 0 10px rgba(13, 35, 59, 0.5));
+  }
+  100% {
+    filter: drop-shadow(0 0 5px rgba(208, 108, 56, 0.7))
+            drop-shadow(0 0 12px rgba(190, 147, 55, 0.5));
+  }
+}
+
+/* ==========================================================================
+   5. CAPTION & TYPOGRAPHY
+   ========================================================================== */
+
+.chess-loader-caption {
+  margin-top: 12px;
+  font-size: calc(var(--loader-size, 80px) * 0.16);
+  min-font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, #d06c38, #BE9337, #0b5299);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.caption-dots {
+  display: inline-flex;
+  margin-left: 2px;
+}
+
+.dot-1 {
+  animation: dotPulse 1.4s infinite 0.1s;
+}
+.dot-2 {
+  animation: dotPulse 1.4s infinite 0.3s;
+}
+.dot-3 {
+  animation: dotPulse 1.4s infinite 0.5s;
+}
+
+@keyframes dotPulse {
+  0%, 100% { opacity: 0.2; }
+  50%      { opacity: 1; }
+}
+
+@keyframes chessFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+

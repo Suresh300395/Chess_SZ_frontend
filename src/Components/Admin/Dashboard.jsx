@@ -7,9 +7,12 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import CloseIcon from '@mui/icons-material/Close';
 import GridViewRoundedIcon from '@mui/icons-material/GridViewRounded';
 import TableRowsRoundedIcon from '@mui/icons-material/TableRowsRounded';
+import TableChartIcon from '@mui/icons-material/TableChart';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import io from 'socket.io-client';
 import { registrationAPI, SOCKET_URL } from '../../utils/api';
 import { formatDateDDMMYYYY } from '../../utils/dateUtils';
+import { exportTeamsToExcel, exportTeamsToPDF, exportSingleTeamToPDF } from '../../utils/exportUtils';
 import { AnimatedCard, AnimatedText } from '../animations';
 
 
@@ -274,45 +277,103 @@ const Dashboard = () => {
                         Registered Teams Overview
                     </Typography>
                 </AnimatedText>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, bgcolor: '#ffffff', p: 0.4, borderRadius: 2, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-                    <Tooltip title="Cards View">
-                        <IconButton
-                            size="small"
-                            onClick={() => setTeamsViewMode('cards')}
-                            sx={{
-                                p: 0.6,
-                                borderRadius: 1.5,
-                                bgcolor: teamsViewMode === 'cards' ? '#0b5299' : 'transparent',
-                                color: teamsViewMode === 'cards' ? '#ffffff' : '#64748b',
-                                boxShadow: teamsViewMode === 'cards' ? '0 1px 3px rgba(11,82,153,0.3)' : 'none',
-                                '&:hover': {
-                                    bgcolor: teamsViewMode === 'cards' ? '#0b5299' : 'rgba(0,0,0,0.06)',
-                                    color: teamsViewMode === 'cards' ? '#ffffff' : '#0b5299'
-                                }
-                            }}
-                        >
-                            <GridViewRoundedIcon sx={{ fontSize: 18 }} />
-                        </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Table View">
-                        <IconButton
-                            size="small"
-                            onClick={() => setTeamsViewMode('table')}
-                            sx={{
-                                p: 0.6,
-                                borderRadius: 1.5,
-                                bgcolor: teamsViewMode === 'table' ? '#0b5299' : 'transparent',
-                                color: teamsViewMode === 'table' ? '#ffffff' : '#64748b',
-                                boxShadow: teamsViewMode === 'table' ? '0 1px 3px rgba(11,82,153,0.3)' : 'none',
-                                '&:hover': {
-                                    bgcolor: teamsViewMode === 'table' ? '#0b5299' : 'rgba(0,0,0,0.06)',
-                                    color: teamsViewMode === 'table' ? '#ffffff' : '#0b5299'
-                                }
-                            }}
-                        >
-                            <TableRowsRoundedIcon sx={{ fontSize: 18 }} />
-                        </IconButton>
-                    </Tooltip>
+
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, flexWrap: 'wrap' }}>
+                    {/* Excel Download Button */}
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => exportTeamsToExcel(registrations)}
+                        startIcon={<TableChartIcon sx={{ fontSize: '18px !important', color: '#107c41' }} />}
+                        sx={{
+                            textTransform: 'none',
+                            fontWeight: 600,
+                            fontSize: '13px',
+                            color: '#107c41',
+                            borderColor: '#86efac',
+                            bgcolor: '#f0fdf4',
+                            borderRadius: 2,
+                            px: 1.5,
+                            py: 0.6,
+                            boxShadow: '0 1px 2px rgba(16, 124, 65, 0.05)',
+                            '&:hover': {
+                                bgcolor: '#dcfce7',
+                                borderColor: '#107c41',
+                                color: '#0e6a37'
+                            }
+                        }}
+                    >
+                        Excel
+                    </Button>
+
+                    {/* PDF Download Button */}
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => exportTeamsToPDF(registrations, { totalTeams, totalPlayers })}
+                        startIcon={<PictureAsPdfIcon sx={{ fontSize: '18px !important', color: '#dc2626' }} />}
+                        sx={{
+                            textTransform: 'none',
+                            fontWeight: 600,
+                            fontSize: '13px',
+                            color: '#dc2626',
+                            borderColor: '#fca5a5',
+                            bgcolor: '#fef2f2',
+                            borderRadius: 2,
+                            px: 1.5,
+                            py: 0.6,
+                            boxShadow: '0 1px 2px rgba(220, 38, 38, 0.05)',
+                            '&:hover': {
+                                bgcolor: '#fee2e2',
+                                borderColor: '#dc2626',
+                                color: '#b91c1c'
+                            }
+                        }}
+                    >
+                        PDF
+                    </Button>
+
+                    {/* View Mode Toggle */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, bgcolor: '#ffffff', p: 0.4, borderRadius: 2, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                        <Tooltip title="Cards View">
+                            <IconButton
+                                size="small"
+                                onClick={() => setTeamsViewMode('cards')}
+                                sx={{
+                                    p: 0.6,
+                                    borderRadius: 1.5,
+                                    bgcolor: teamsViewMode === 'cards' ? '#0b5299' : 'transparent',
+                                    color: teamsViewMode === 'cards' ? '#ffffff' : '#64748b',
+                                    boxShadow: teamsViewMode === 'cards' ? '0 1px 3px rgba(11,82,153,0.3)' : 'none',
+                                    '&:hover': {
+                                        bgcolor: teamsViewMode === 'cards' ? '#0b5299' : 'rgba(0,0,0,0.06)',
+                                        color: teamsViewMode === 'cards' ? '#ffffff' : '#0b5299'
+                                    }
+                                }}
+                            >
+                                <GridViewRoundedIcon sx={{ fontSize: 18 }} />
+                            </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Table View">
+                            <IconButton
+                                size="small"
+                                onClick={() => setTeamsViewMode('table')}
+                                sx={{
+                                    p: 0.6,
+                                    borderRadius: 1.5,
+                                    bgcolor: teamsViewMode === 'table' ? '#0b5299' : 'transparent',
+                                    color: teamsViewMode === 'table' ? '#ffffff' : '#64748b',
+                                    boxShadow: teamsViewMode === 'table' ? '0 1px 3px rgba(11,82,153,0.3)' : 'none',
+                                    '&:hover': {
+                                        bgcolor: teamsViewMode === 'table' ? '#0b5299' : 'rgba(0,0,0,0.06)',
+                                        color: teamsViewMode === 'table' ? '#ffffff' : '#0b5299'
+                                    }
+                                }}
+                            >
+                                <TableRowsRoundedIcon sx={{ fontSize: 18 }} />
+                            </IconButton>
+                        </Tooltip>
+                    </Box>
                 </Box>
             </Box>
 
@@ -564,18 +625,47 @@ const Dashboard = () => {
                             Team Details - {selectedReg?.universityName}
                         </Typography>
                     </Box>
-                    <IconButton
-                        size="small"
-                        onClick={handleCloseDialog}
-                        sx={{ 
-                            color: '#ffffff', 
-                            flexShrink: 0,
-                            p: 0.5,
-                            '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' } 
-                        }}
-                    >
-                        <CloseIcon fontSize="small" />
-                    </IconButton>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+                        <Tooltip title="Print / Download Team PDF">
+                            <Button
+                                size="small"
+                                variant="contained"
+                                onClick={() => exportSingleTeamToPDF(selectedReg)}
+                                startIcon={<PictureAsPdfIcon sx={{ fontSize: '16px !important' }} />}
+                                sx={{
+                                    bgcolor: 'rgba(255, 255, 255, 0.15)',
+                                    color: '#ffffff',
+                                    fontWeight: 600,
+                                    fontSize: '12px',
+                                    textTransform: 'none',
+                                    borderRadius: 1.5,
+                                    py: 0.4,
+                                    px: 1.2,
+                                    boxShadow: 'none',
+                                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                                    '&:hover': {
+                                        bgcolor: 'rgba(255, 255, 255, 0.28)',
+                                        boxShadow: 'none'
+                                    }
+                                }}
+                            >
+                                Team PDF
+                            </Button>
+                        </Tooltip>
+
+                        <IconButton
+                            size="small"
+                            onClick={handleCloseDialog}
+                            sx={{ 
+                                color: '#ffffff', 
+                                flexShrink: 0,
+                                p: 0.5,
+                                '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' } 
+                            }}
+                        >
+                            <CloseIcon fontSize="small" />
+                        </IconButton>
+                    </Box>
                 </DialogTitle>
 
                 <DialogContent dividers sx={{ p: { xs: 1.5, sm: 3 }, bgcolor: '#ffffff' }}>

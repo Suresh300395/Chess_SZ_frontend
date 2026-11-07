@@ -18,6 +18,7 @@ const Header = () => {
     const location = useLocation();
 
     const isDashboard = location.pathname.startsWith('/admin') || location.pathname.startsWith('/user') || location.pathname.includes('/dashboard');
+    const isRegistrationPage = location.pathname.startsWith('/registration');
 
     useEffect(() => {
         const handleScroll = (e) => {
@@ -85,38 +86,40 @@ const Header = () => {
                         </Box>
                     ) : (
                         <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 1.5 }}>
-                            <Button
-                                component={Link}
-                                to="/registration"
-                                sx={{
-                                    background: 'linear-gradient(90deg, #d06c38 0%, #db6c30ff 100%)',
-                                    color: '#ffffff !important',
-                                    borderRadius: '8px',
-                                    textTransform: 'none',
-                                    fontWeight: 400,
-                                    fontSize: { xs: '13px', sm: '15px' },
-                                    letterSpacing: '0.2px',
-                                    px: { xs: 1.4, sm: 2.4 },
-                                    py: { xs: 0.6, sm: 0.9 },
-                                    height: { xs: '36px', sm: '42px' },
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: { xs: 0.8, sm: 1.1 },
-                                    transition: 'all 0.25s ease',
-                                    textDecoration: 'none !important',
-                                    whiteSpace: 'nowrap',
-                                    '&:hover': {
-                                        background: 'linear-gradient(90deg, #FF7B1A 0%, #FF5A0D 100%)',
-                                    }
-                                }}
-                            >
-                                <PersonAddAlt1OutlinedIcon sx={{ fontSize: { xs: '18px', sm: '21px' }, color: '#ffffff' }} />
-                                <Box sx={{ width: '1.5px', height: { xs: '14px', sm: '18px' }, bgcolor: 'rgba(255, 255, 255, 0.45)' }} />
-                                <Typography component="span" sx={{ fontWeight: 700, fontSize: { xs: '13px', sm: '15px' }, color: '#ffffff', lineHeight: 1 }}>
-                                    Register Now
-                                </Typography>
-                                <EastIcon sx={{ fontSize: { xs: '17px', sm: '20px' }, color: '#ffffff', ml: 0.2 }} />
-                            </Button>
+                            {!isRegistrationPage && (
+                                <Button
+                                    component={Link}
+                                    to="/registration"
+                                    sx={{
+                                        background: 'linear-gradient(90deg, #d06c38 0%, #db6c30ff 100%)',
+                                        color: '#ffffff !important',
+                                        borderRadius: '8px',
+                                        textTransform: 'none',
+                                        fontWeight: 400,
+                                        fontSize: { xs: '13px', sm: '15px' },
+                                        letterSpacing: '0.2px',
+                                        px: { xs: 1.4, sm: 2.4 },
+                                        py: { xs: 0.6, sm: 0.9 },
+                                        height: { xs: '36px', sm: '42px' },
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: { xs: 0.8, sm: 1.1 },
+                                        transition: 'all 0.25s ease',
+                                        textDecoration: 'none !important',
+                                        whiteSpace: 'nowrap',
+                                        '&:hover': {
+                                            background: 'linear-gradient(90deg, #FF7B1A 0%, #FF5A0D 100%)',
+                                        }
+                                    }}
+                                >
+                                    <PersonAddAlt1OutlinedIcon sx={{ fontSize: { xs: '18px', sm: '21px' }, color: '#ffffff' }} />
+                                    <Box sx={{ width: '1.5px', height: { xs: '14px', sm: '18px' }, bgcolor: 'rgba(255, 255, 255, 0.45)' }} />
+                                    <Typography component="span" sx={{ fontWeight: 700, fontSize: { xs: '13px', sm: '15px' }, color: '#ffffff', lineHeight: 1 }}>
+                                        Register Now
+                                    </Typography>
+                                    <EastIcon sx={{ fontSize: { xs: '17px', sm: '20px' }, color: '#ffffff', ml: 0.2 }} />
+                                </Button>
+                            )}
 
                             <Button
                                 onClick={() => setIsLoginModalOpen(true)}
