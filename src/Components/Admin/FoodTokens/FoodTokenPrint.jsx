@@ -48,11 +48,13 @@ const generateTokenHTML = (token, qrDataUrl) => {
 
             <!-- Tear-off cut strip with scissors -->
             <div class="cut-strip">
+                <span class="cut-line edge"></span>
                 <span class="cut-scissors left">&#x2702;</span>
                 <span class="cut-line"></span>
                 <span class="cut-text">TEAR HERE</span>
                 <span class="cut-line"></span>
                 <span class="cut-scissors right">&#x2702;</span>
+                <span class="cut-line edge"></span>
             </div>
         </div>
     `;
@@ -77,12 +79,12 @@ const thermalStyles = `
         print-color-adjust: exact;
     }
     .token-container {
-        width: 100%;
-        max-width: 72mm;
+        width: 80mm;
+        max-width: 80mm;
         height: 80mm;
         max-height: 80mm;
         margin: 0 auto;
-        padding: 2mm 2mm 1.5mm 2mm;
+        padding: 2mm 0 1.2mm 0;
         text-align: center;
         page-break-inside: avoid;
         break-inside: avoid;
@@ -105,11 +107,24 @@ const thermalStyles = `
             margin: 0 !important;
             padding: 0 !important;
             width: 80mm !important;
+            height: 80mm !important;
             font-family: 'IBM Plex Mono', monospace !important;
+        }
+        .token-container {
+            width: 80mm !important;
+            max-width: 80mm !important;
+            height: 80mm !important;
+            max-height: 80mm !important;
+            margin: 0 !important;
+            padding: 2mm 0 1.2mm 0 !important;
         }
     }
     .token-body {
         width: 100%;
+        max-width: 72mm;
+        margin: 0 auto;
+        padding: 0 2mm;
+        box-sizing: border-box;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -190,10 +205,12 @@ const thermalStyles = `
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 1.5mm;
+        width: 80mm;
+        max-width: 80mm;
         width: 100%;
-        margin-top: auto;
-        padding-top: 1mm;
+        margin: auto 0 0 0;
+        padding: 0;
+        box-sizing: border-box;
         color: #000000;
         font-family: 'IBM Plex Mono', monospace;
     }
@@ -202,10 +219,15 @@ const thermalStyles = `
         border-bottom: 1.2px dashed #000000;
         height: 0;
     }
+    .cut-line.edge {
+        flex: 0 0 2mm;
+        width: 2mm;
+    }
     .cut-scissors {
         font-size: 10pt;
         line-height: 1;
         display: inline-block;
+        padding: 0 0.8mm;
     }
     .cut-scissors.left {
         transform: scaleX(-1);

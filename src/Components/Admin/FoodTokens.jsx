@@ -47,6 +47,14 @@ import DownloadIcon from '@mui/icons-material/Download';
 import WbSunnyOutlinedIcon from '@mui/icons-material/WbSunnyOutlined';
 import RestaurantOutlinedIcon from '@mui/icons-material/RestaurantOutlined';
 import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import TodayIcon from '@mui/icons-material/Today';
+import DateRangeIcon from '@mui/icons-material/DateRange';
+import ViewListIcon from '@mui/icons-material/ViewList';
+import SaveIcon from '@mui/icons-material/Save';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutlined';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import io from 'socket.io-client';
 import { toast } from 'sonner';
 import CustomTabs from '../Common/Tabs';
@@ -195,21 +203,77 @@ const FoodTokens = () => {
     const [bulkDialogMeals, setBulkDialogMeals] = useState({});
     const [issuingMultiBulk, setIssuingMultiBulk] = useState(false);
 
+    // Missing Departure Details State (for players without departure date)
+    const [missingDepPlayers, setMissingDepPlayers] = useState([]);
+    const [loadingMissingDep, setLoadingMissingDep] = useState(false);
+    const [editingDepDates, setEditingDepDates] = useState({});
+    const [savingDepPlayerRef, setSavingDepPlayerRef] = useState(null);
+    const [missingDepSearch, setMissingDepSearch] = useState('');
+
     // -------------------------------------------------------------
     // TAB 2: TOKENS REPORT & STATS STATE
     // -------------------------------------------------------------
     // -------------------------------------------------------------
     const [stats, setStats] = useState(null);
-    const [tokensList, setTokensList] = useState([]);
-    const [totalTokens, setTotalTokens] = useState(0);
-    const [loadingTokens, setLoadingTokens] = useState(false);
-    const [page, setPage] = useState(0);
-    const [rowsPerPage, setRowsPerPage] = useState(20);
+    const [tokenReportSubTab, setTokenReportSubTab] = useState('REDEEMED'); // 'ISSUED' | 'REDEEMED' | 'BOTH' | 'ALL'
     const [filterMeal, setFilterMeal] = useState('');
     const [filterStatus, setFilterStatus] = useState('');
     const [filterPersonType, setFilterPersonType] = useState('');
+    const [filterMealDate, setFilterMealDate] = useState(''); // Date filter (YYYY-MM-DD)
     const [filterSearch, setFilterSearch] = useState('');
+    const [debouncedFilterSearch, setDebouncedFilterSearch] = useState('');
     const [tokensViewMode, setTokensViewMode] = useState('table');
+    const [exportingCsv, setExportingCsv] = useState(false);
+    const summaryDateInputRef = useRef(null);
+    // Date range filter for summary table
+    const getTodayYMD = () => {
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    };
+    const [summaryDateMode, setSummaryDateMode] = useState('today'); // 'today' | 'custom' | 'all'
+    const [summaryFromDate, setSummaryFromDate] = useState(getTodayYMD);
+    const [summaryToDate, setSummaryToDate] = useState(getTodayYMD);
+
+    // Debounce search query to prevent typing lag
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedFilterSearch(filterSearch);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [filterSearch]);
+
+    // 1. ISSUED TOKENS STATE
+    const [issuedList, setIssuedList] = useState([]);
+    const [totalIssuedTokens, setTotalIssuedTokens] = useState(0);
+    const [loadingIssued, setLoadingIssued] = useState(false);
+    const [issuedPage, setIssuedPage] = useState(0);
+    const [issuedRowsPerPage, setIssuedRowsPerPage] = useState(20);
+
+    // 2. REDEEMED TOKENS STATE
+    const [redeemedList, setRedeemedList] = useState([]);
+    const [totalRedeemedTokens, setTotalRedeemedTokens] = useState(0);
+    const [loadingRedeemed, setLoadingRedeemed] = useState(false);
+    const [redeemedPage, setRedeemedPage] = useState(0);
+    const [redeemedRowsPerPage, setRedeemedRowsPerPage] = useState(20);
+
+    // 3. ALL TOKENS STATE (for 'ALL' tab)
+    const [allTokensList, setAllTokensList] = useState([]);
+    const [totalAllTokens, setTotalAllTokens] = useState(0);
+    const [loadingAll, setLoadingAll] = useState(false);
+    const [allPage, setAllPage] = useState(0);
+    const [allRowsPerPage, setAllRowsPerPage] = useState(20);
+
+    // Backward-compatibility aliases
+    const tokensList = tokenReportSubTab === 'REDEEMED' ? redeemedList : tokenReportSubTab === 'ALL' ? allTokensList : issuedList;
+    const loadingTokens = tokenReportSubTab === 'REDEEMED' ? loadingRedeemed : tokenReportSubTab === 'ALL' ? loadingAll : loadingIssued;
+    const totalTokens = tokenReportSubTab === 'REDEEMED' ? totalRedeemedTokens : tokenReportSubTab === 'ALL' ? totalAllTokens : totalIssuedTokens;
+    const page = tokenReportSubTab === 'REDEEMED' ? redeemedPage : tokenReportSubTab === 'ALL' ? allPage : issuedPage;
+    const setPage = tokenReportSubTab === 'REDEEMED' ? setRedeemedPage : tokenReportSubTab === 'ALL' ? setAllPage : setIssuedPage;
+    const rowsPerPage = tokenReportSubTab === 'REDEEMED' ? redeemedRowsPerPage : tokenReportSubTab === 'ALL' ? allRowsPerPage : issuedRowsPerPage;
+    const setRowsPerPage = tokenReportSubTab === 'REDEEMED' ? setRedeemedRowsPerPage : tokenReportSubTab === 'ALL' ? setAllRowsPerPage : setIssuedRowsPerPage;
 
     // Cancel Dialog
     const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
@@ -220,9 +284,9 @@ const FoodTokens = () => {
     // -------------------------------------------------------------
     // SHARED REFRESH CALLBACKS
     // -------------------------------------------------------------
-    const fetchStats = useCallback(async () => {
+    const fetchStats = useCallback(async (params = {}) => {
         try {
-            const res = await foodTokenAPI.getStats();
+            const res = await foodTokenAPI.getStats(params);
             const data = await res.json();
             if (res.ok) setStats(data);
         } catch (err) {
@@ -230,30 +294,120 @@ const FoodTokens = () => {
         }
     }, []);
 
-    const fetchTokensList = useCallback(async () => {
-        setLoadingTokens(true);
+    // Build stats params based on summaryDateMode
+    const buildSummaryStatsParams = useCallback((mode, fromDate, toDate) => {
+        if (mode === 'today') {
+            const today = (() => {
+                const d = new Date();
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${y}-${m}-${day}`;
+            })();
+            return { fromDate: today, toDate: today };
+        }
+        if (mode === 'custom') {
+            const p = {};
+            if (fromDate) p.fromDate = fromDate;
+            if (toDate) p.toDate = toDate;
+            return p;
+        }
+        return {}; // 'all'
+    }, []);
+
+    const handleDateFilterChange = (dateVal) => {
+        setFilterMealDate(dateVal);
+        setIssuedPage(0);
+        setRedeemedPage(0);
+        setAllPage(0);
+        fetchStats(dateVal ? { mealDate: dateVal } : {});
+    };
+
+    const fetchIssuedTokens = useCallback(async () => {
+        setLoadingIssued(true);
         try {
             const params = {
-                page: page + 1,
-                limit: rowsPerPage
+                page: issuedPage + 1,
+                limit: issuedRowsPerPage,
+                status: 'ISSUED'
             };
             if (filterMeal) params.mealType = filterMeal;
-            if (filterStatus) params.status = filterStatus;
+            if (filterMealDate) params.mealDate = filterMealDate;
             if (filterPersonType) params.personType = filterPersonType;
-            if (filterSearch) params.search = filterSearch;
+            if (debouncedFilterSearch && debouncedFilterSearch.trim()) params.search = debouncedFilterSearch.trim();
 
             const res = await foodTokenAPI.getAll(params);
             const data = await res.json();
             if (res.ok) {
-                setTokensList(data.tokens || []);
-                setTotalTokens(data.total || 0);
+                setIssuedList(data.tokens || []);
+                setTotalIssuedTokens(data.total || 0);
             }
         } catch (err) {
-            console.error('Tokens list error:', err);
+            console.error('Issued tokens error:', err);
         } finally {
-            setLoadingTokens(false);
+            setLoadingIssued(false);
         }
-    }, [page, rowsPerPage, filterMeal, filterStatus, filterPersonType, filterSearch]);
+    }, [issuedPage, issuedRowsPerPage, filterMeal, filterMealDate, filterPersonType, debouncedFilterSearch]);
+
+    const fetchRedeemedTokens = useCallback(async () => {
+        setLoadingRedeemed(true);
+        try {
+            const params = {
+                page: redeemedPage + 1,
+                limit: redeemedRowsPerPage,
+                status: 'REDEEMED'
+            };
+            if (filterMeal) params.mealType = filterMeal;
+            if (filterMealDate) params.mealDate = filterMealDate;
+            if (filterPersonType) params.personType = filterPersonType;
+            if (debouncedFilterSearch && debouncedFilterSearch.trim()) params.search = debouncedFilterSearch.trim();
+
+            const res = await foodTokenAPI.getAll(params);
+            const data = await res.json();
+            if (res.ok) {
+                setRedeemedList(data.tokens || []);
+                setTotalRedeemedTokens(data.total || 0);
+            }
+        } catch (err) {
+            console.error('Redeemed tokens error:', err);
+        } finally {
+            setLoadingRedeemed(false);
+        }
+    }, [redeemedPage, redeemedRowsPerPage, filterMeal, filterMealDate, filterPersonType, debouncedFilterSearch]);
+
+    const fetchAllTokens = useCallback(async () => {
+        setLoadingAll(true);
+        try {
+            const params = {
+                page: allPage + 1,
+                limit: allRowsPerPage
+            };
+            if (filterMeal) params.mealType = filterMeal;
+            if (filterMealDate) params.mealDate = filterMealDate;
+            if (filterStatus) params.status = filterStatus;
+            if (filterPersonType) params.personType = filterPersonType;
+            if (debouncedFilterSearch && debouncedFilterSearch.trim()) params.search = debouncedFilterSearch.trim();
+
+            const res = await foodTokenAPI.getAll(params);
+            const data = await res.json();
+            if (res.ok) {
+                setAllTokensList(data.tokens || []);
+                setTotalAllTokens(data.total || 0);
+            }
+        } catch (err) {
+            console.error('All tokens error:', err);
+        } finally {
+            setLoadingAll(false);
+        }
+    }, [allPage, allRowsPerPage, filterMeal, filterMealDate, filterStatus, filterPersonType, debouncedFilterSearch]);
+
+    const fetchTokensList = useCallback(() => {
+        fetchIssuedTokens();
+        fetchRedeemedTokens();
+        if (tokenReportSubTab === 'ALL') {
+            fetchAllTokens();
+        }
+    }, [fetchIssuedTokens, fetchRedeemedTokens, fetchAllTokens, tokenReportSubTab]);
 
     const searchPeople = useCallback(async (query) => {
         if (!query || !query.trim()) {
@@ -289,6 +443,91 @@ const FoodTokens = () => {
         }
     }, []);
 
+    const fetchMissingDeparturePlayers = useCallback(async () => {
+        setLoadingMissingDep(true);
+        try {
+            const res = await foodTokenAPI.getMissingDeparture();
+            const data = await res.json();
+            if (res.ok) {
+                const list = data.players || [];
+                setMissingDepPlayers(list);
+                setEditingDepDates(prev => {
+                    const next = { ...prev };
+                    list.forEach(p => {
+                        if (!next[p.playerRef]) {
+                            next[p.playerRef] = {
+                                departureDate: p.departureDate || '',
+                                departureTime: p.departureTime || ''
+                            };
+                        }
+                    });
+                    return next;
+                });
+            } else {
+                console.error('Failed to fetch missing departure players:', data.message);
+            }
+        } catch (err) {
+            console.error('Error fetching missing departure players:', err);
+        } finally {
+            setLoadingMissingDep(false);
+        }
+    }, []);
+
+    const handleDepDateChange = (playerRef, field, value) => {
+        setEditingDepDates(prev => ({
+            ...prev,
+            [playerRef]: {
+                ...(prev[playerRef] || {}),
+                [field]: value
+            }
+        }));
+    };
+
+    const handleSavePlayerDeparture = async (player) => {
+        const editData = editingDepDates[player.playerRef] || {};
+        const departureDate = editData.departureDate;
+        const departureTime = editData.departureTime || '';
+
+        if (!departureDate || !departureDate.trim()) {
+            toast.warning(`Please select a departure date for ${player.playerName}`);
+            return;
+        }
+
+        setSavingDepPlayerRef(player.playerRef);
+        try {
+            const res = await foodTokenAPI.updateDeparture({
+                registrationId: player.registrationId,
+                playerRef: player.playerRef,
+                departureDate: departureDate.trim(),
+                departureTime: departureTime.trim()
+            });
+            const data = await res.json();
+            if (res.ok) {
+                toast.success(data.message || `Departure details saved for ${player.playerName}! Tokens enabled.`);
+                await fetchMissingDeparturePlayers();
+                if (searchQueryRef.current && searchQueryRef.current.trim()) {
+                    searchPeople(searchQueryRef.current);
+                }
+                setSelectedPerson(prev => {
+                    if (!prev || prev.personRef !== player.playerRef) return prev;
+                    return {
+                        ...prev,
+                        hasDepartureDate: true,
+                        departureDate: departureDate.trim(),
+                        departureTime: departureTime.trim()
+                    };
+                });
+            } else {
+                toast.error(data.message || 'Failed to update departure details');
+            }
+        } catch (err) {
+            console.error('Save departure error:', err);
+            toast.error('Network error while updating departure details');
+        } finally {
+            setSavingDepPlayerRef(null);
+        }
+    };
+
     // Refs for socket callbacks to avoid re-subscribing on state change
     const searchQueryRef = useRef(searchQuery);
     searchQueryRef.current = searchQuery;
@@ -307,8 +546,11 @@ const FoodTokens = () => {
                 if (activeTabRef.current === 'Tokens Report') {
                     fetchStats();
                     fetchTokensList();
-                } else if (activeTabRef.current === 'Issue Tokens' && searchQueryRef.current.trim()) {
-                    searchPeople(searchQueryRef.current);
+                } else if (activeTabRef.current === 'Issue Tokens') {
+                    if (searchQueryRef.current.trim()) {
+                        searchPeople(searchQueryRef.current);
+                    }
+                    fetchMissingDeparturePlayers();
                 }
             });
         } catch (e) {
@@ -318,7 +560,14 @@ const FoodTokens = () => {
         return () => {
             if (socket) socket.disconnect();
         };
-    }, [fetchStats, fetchTokensList, searchPeople]);
+    }, [fetchStats, fetchTokensList, searchPeople, fetchMissingDeparturePlayers]);
+
+    // Fetch missing departure players when Issue Tokens tab is active
+    useEffect(() => {
+        if (activeTab === 'Issue Tokens') {
+            fetchMissingDeparturePlayers();
+        }
+    }, [activeTab, fetchMissingDeparturePlayers]);
 
     // Debounce search query - only runs when search query is typed
     useEffect(() => {
@@ -336,6 +585,10 @@ const FoodTokens = () => {
     // Issue Token for a specific meal and date
     const handleIssue = async (mealType, targetDate) => {
         if (!selectedPerson) return;
+        if (selectedPerson.hasDepartureDate === false || !selectedPerson.departureDate) {
+            toast.error(`Cannot issue token: ${selectedPerson.name} has no departure date. Please add departure details below.`);
+            return;
+        }
         const dateToUse = targetDate || getTodayDateString();
         const key = `${dateToUse}_${mealType}`;
         setIssuingKey(key);
@@ -421,6 +674,10 @@ const FoodTokens = () => {
     // Bulk Issue All Remaining Meals for a Single Person on a specific Date
     const handleIssueDay = async (targetDate) => {
         if (!selectedPerson) return;
+        if (selectedPerson.hasDepartureDate === false || !selectedPerson.departureDate) {
+            toast.error(`Cannot issue tokens: ${selectedPerson.name} has no departure date. Please add departure details below.`);
+            return;
+        }
         setIssuingDayDate(targetDate);
         try {
             const payload = {
@@ -491,6 +748,10 @@ const FoodTokens = () => {
     // Open Dialog for Team Tokens with day-wise checkboxes
     const handleOpenTeamDialog = () => {
         if (!selectedPerson || !selectedPerson.registrationId) return;
+        if (selectedPerson.hasDepartureDate === false || !selectedPerson.departureDate) {
+            toast.error(`Cannot issue team tokens: ${selectedPerson.name} has no departure date. Please add departure details below.`);
+            return;
+        }
         const stayDates = generateDateRange(selectedPerson.arrivalDate, selectedPerson.departureDate);
         const initialMap = {};
         stayDates.forEach(date => {
@@ -588,6 +849,11 @@ const FoodTokens = () => {
     // MULTI-SELECTION & UNIVERSITY BULK ISSUE HANDLERS
     // -------------------------------------------------------------
     const handleTogglePersonSelect = (personRef) => {
+        const person = peopleList.find(p => p.personRef === personRef);
+        if (person && (person.hasDepartureDate === false || !person.departureDate)) {
+            toast.warning(`Cannot select ${person.name}: Departure date is missing. Please add departure details below.`);
+            return;
+        }
         setSelectedPeopleRefs(prev => {
             if (prev.includes(personRef)) {
                 return prev.filter(id => id !== personRef);
@@ -598,10 +864,15 @@ const FoodTokens = () => {
     };
 
     const handleToggleSelectAllPeople = () => {
-        if (selectedPeopleRefs.length === peopleList.length) {
+        const eligiblePeople = peopleList.filter(p => p.hasDepartureDate !== false && Boolean(p.departureDate));
+        if (eligiblePeople.length === 0) {
+            toast.warning('No eligible participants with departure details found.');
+            return;
+        }
+        if (selectedPeopleRefs.length === eligiblePeople.length) {
             setSelectedPeopleRefs([]);
         } else {
-            setSelectedPeopleRefs(peopleList.map(p => p.personRef));
+            setSelectedPeopleRefs(eligiblePeople.map(p => p.personRef));
         }
     };
 
@@ -617,15 +888,21 @@ const FoodTokens = () => {
     };
 
     const handleOpenBulkDialog = (customPeople = null) => {
-        const targetPeople = customPeople || (
+        const rawTarget = customPeople || (
             selectedPeopleRefs.length > 0
                 ? peopleList.filter(p => selectedPeopleRefs.includes(p.personRef))
                 : peopleList
         );
 
+        const targetPeople = (rawTarget || []).filter(p => p.hasDepartureDate !== false && Boolean(p.departureDate));
+
         if (!targetPeople || targetPeople.length === 0) {
-            toast.warning('Please select at least one person to issue tokens');
+            toast.warning('No eligible participants to issue tokens. Please add departure details below.');
             return;
+        }
+
+        if (rawTarget && rawTarget.length > targetPeople.length) {
+            toast.info(`Excluded ${rawTarget.length - targetPeople.length} participant(s) without departure dates.`);
         }
 
         const dates = getPeopleStayDates(targetPeople);
@@ -737,15 +1014,23 @@ const FoodTokens = () => {
 
 
     useEffect(() => {
-        fetchStats();
+        const today = (() => {
+            const d = new Date();
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        })();
+        fetchStats({ fromDate: today, toDate: today });
     }, [fetchStats]);
 
     useEffect(() => {
         if (activeTab === 'Tokens Report') {
-            fetchStats();
+            const p = buildSummaryStatsParams(summaryDateMode, summaryFromDate, summaryToDate);
+            fetchStats(p);
             fetchTokensList();
         }
-    }, [activeTab, fetchStats, fetchTokensList]);
+    }, [activeTab, fetchStats, fetchTokensList, buildSummaryStatsParams, summaryDateMode, summaryFromDate, summaryToDate]);
 
 
     // Cancel action
@@ -780,41 +1065,89 @@ const FoodTokens = () => {
         }
     };
 
-    // Export tokens to CSV
-    const handleExportCSV = () => {
-        if (!tokensList.length) {
-            toast.info('No token records to export');
-            return;
+    // Export tokens to CSV (Fetches all matching tokens across all pages, tab-wise)
+    const handleExportCSV = async () => {
+        setExportingCsv(true);
+        const toastId = toast.loading('Preparing full CSV export...');
+        try {
+            let fileSuffix = 'report';
+            const params = {
+                all: 'true',
+                limit: 0
+            };
+
+            if (filterMeal) params.mealType = filterMeal;
+            if (filterMealDate) params.mealDate = filterMealDate;
+            if (filterPersonType) params.personType = filterPersonType;
+            if (debouncedFilterSearch && debouncedFilterSearch.trim()) params.search = debouncedFilterSearch.trim();
+
+            if (tokenReportSubTab === 'ISSUED') {
+                params.status = 'ISSUED';
+                fileSuffix = 'issued';
+            } else if (tokenReportSubTab === 'REDEEMED') {
+                params.status = 'REDEEMED';
+                fileSuffix = 'redeemed';
+            } else if (tokenReportSubTab === 'BOTH') {
+                fileSuffix = 'issued_and_redeemed';
+            } else {
+                if (filterStatus) params.status = filterStatus;
+                fileSuffix = 'all';
+            }
+
+            const res = await foodTokenAPI.getAll(params);
+            const data = await res.json();
+            let listToExport = (data && data.tokens) ? data.tokens : [];
+
+            if (tokenReportSubTab === 'BOTH') {
+                listToExport = listToExport.filter(t => t.status === 'ISSUED' || t.status === 'REDEEMED');
+            }
+
+            if (!listToExport.length) {
+                toast.dismiss(toastId);
+                toast.info('No token records found to export');
+                return;
+            }
+
+            const headers = ['Code', 'Name', 'Role', 'Identifier', 'Team/University', 'Meal Type', 'Date', 'Hostel Block', 'Room', 'Status', 'Issued By', 'Print Count', 'Redeemed At', 'Redeemed By'];
+            const csvRows = [headers.join(',')];
+
+            listToExport.forEach(t => {
+                const row = [
+                    `"${t.code || ''}"`,
+                    `"${t.name || ''}"`,
+                    `"${t.personType || ''}"`,
+                    `"${t.identifier || ''}"`,
+                    `"${t.teamOrSport || ''}"`,
+                    `"${t.mealType || ''}"`,
+                    `"${formatDateDDMMYYYY(t.mealDate)}"`,
+                    `"${t.block || ''}"`,
+                    `"${t.room || ''}"`,
+                    `"${t.status || ''}"`,
+                    `"${t.issuedBy || ''}"`,
+                    t.printCount || 1,
+                    t.redeemedAt ? `"${new Date(t.redeemedAt).toLocaleString('en-IN')}"` : '""',
+                    `"${t.redeemedBy || ''}"`
+                ];
+                csvRows.push(row.join(','));
+            });
+
+            const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `food_tokens_${fileSuffix}_${new Date().toISOString().slice(0, 10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            toast.dismiss(toastId);
+            toast.success(`Exported ${listToExport.length} token records successfully!`);
+        } catch (err) {
+            console.error('CSV export error:', err);
+            toast.dismiss(toastId);
+            toast.error('Failed to export CSV: ' + err.message);
+        } finally {
+            setExportingCsv(false);
         }
-
-        const headers = ['Code', 'Name', 'Identifier', 'Role', 'Team/University', 'Meal Type', 'Date', 'Status', 'Issued By', 'Print Count', 'Redeemed At'];
-        const csvRows = [headers.join(',')];
-
-        tokensList.forEach(t => {
-            const row = [
-                `"${t.code}"`,
-                `"${t.name || ''}"`,
-                `"${t.identifier || ''}"`,
-                `"${t.personType || ''}"`,
-                `"${t.teamOrSport || ''}"`,
-                `"${t.mealType || ''}"`,
-                `"${formatDateDDMMYYYY(t.mealDate)}"`,
-                `"${t.status || ''}"`,
-                `"${t.issuedBy || ''}"`,
-                t.printCount || 1,
-                t.redeemedAt ? `"${new Date(t.redeemedAt).toLocaleString()}"` : '""'
-            ];
-            csvRows.push(row.join(','));
-        });
-
-        const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', `food_tokens_${new Date().toISOString().slice(0, 10)}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
     };
 
     // Team Dialog Calculations
@@ -924,7 +1257,8 @@ const FoodTokens = () => {
                                 <Box>
                                     {/* University / Multi-Selection Action Toolbar */}
                                     {(() => {
-                                        const isAllSelected = peopleList.length > 0 && selectedPeopleRefs.length === peopleList.length;
+                                        const eligiblePeople = peopleList.filter(p => p.hasDepartureDate !== false && Boolean(p.departureDate && p.departureDate.trim()));
+                                        const isAllSelected = eligiblePeople.length > 0 && selectedPeopleRefs.length === eligiblePeople.length;
                                         const isSomeSelected = selectedPeopleRefs.length > 0 && !isAllSelected;
                                         const detectedUniv = peopleList[0]?.teamOrSport || '';
                                         const isUniformUniv = peopleList.every(p => p.teamOrSport === detectedUniv);
@@ -955,6 +1289,7 @@ const FoodTokens = () => {
                                                                 checked={isAllSelected}
                                                                 indeterminate={isSomeSelected}
                                                                 onChange={handleToggleSelectAllPeople}
+                                                                disabled={eligiblePeople.length === 0}
                                                                 sx={{
                                                                     color: '#0b5299',
                                                                     '&.Mui-checked': { color: '#0b5299' },
@@ -964,7 +1299,7 @@ const FoodTokens = () => {
                                                         }
                                                         label={
                                                             <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
-                                                                Select All ({peopleList.length})
+                                                                Select All ({eligiblePeople.length}{eligiblePeople.length < peopleList.length ? ` / ${peopleList.length}` : ''})
                                                             </Typography>
                                                         }
                                                         sx={{ mr: 0 }}
@@ -1010,7 +1345,7 @@ const FoodTokens = () => {
 
                                                 {/* Right: Actions */}
                                                 <Stack direction="row" spacing={1.5} alignItems="center">
-                                                    {selectedPeopleRefs.length > 0 && selectedPeopleRefs.length < peopleList.length && (
+                                                    {selectedPeopleRefs.length > 0 && selectedPeopleRefs.length < eligiblePeople.length && (
                                                         <Button
                                                             variant="contained"
                                                             size="small"
@@ -1035,7 +1370,8 @@ const FoodTokens = () => {
                                                         variant="contained"
                                                         size="small"
                                                         startIcon={<PrintIcon sx={{ fontSize: 18 }} />}
-                                                        onClick={() => handleOpenBulkDialog(peopleList)}
+                                                        onClick={() => handleOpenBulkDialog(eligiblePeople)}
+                                                        disabled={eligiblePeople.length === 0}
                                                         sx={{
                                                             bgcolor: '#d06c38',
                                                             '&:hover': { bgcolor: '#b85928' },
@@ -1047,7 +1383,7 @@ const FoodTokens = () => {
                                                             boxShadow: '0 2px 8px rgba(208, 108, 56, 0.25)'
                                                         }}
                                                     >
-                                                        Issue All ({peopleList.length} People)
+                                                        Issue All ({eligiblePeople.length} People)
                                                     </Button>
                                                 </Stack>
                                             </Paper>
@@ -1067,6 +1403,7 @@ const FoodTokens = () => {
                                             const isSelected = selectedPerson?.personRef === person.personRef;
                                             const isChecked = selectedPeopleRefs.includes(person.personRef);
                                             const issuedCount = Object.keys(person.tokensToday || {}).length;
+                                            const hasDep = person.hasDepartureDate !== false && Boolean(person.departureDate && person.departureDate.trim());
 
                                             return (
                                                 <Box
@@ -1081,42 +1418,79 @@ const FoodTokens = () => {
                                                         mb: 1.5,
                                                         borderRadius: 2,
                                                         cursor: 'pointer',
-                                                        border: isSelected ? '2px solid #0b5299' : isChecked ? '2px solid #3b82f6' : '1px solid #e2e8f0',
-                                                        bgcolor: isSelected ? '#f0f7ff' : isChecked ? '#f8fafc' : '#ffffff',
+                                                        border: isSelected
+                                                            ? '2px solid #0b5299'
+                                                            : !hasDep
+                                                                ? '1px dashed #f97316'
+                                                                : isChecked
+                                                                    ? '2px solid #3b82f6'
+                                                                    : '1px solid #e2e8f0',
+                                                        bgcolor: isSelected
+                                                            ? '#f0f7ff'
+                                                            : !hasDep
+                                                                ? '#fffaf0'
+                                                                : isChecked
+                                                                    ? '#f8fafc'
+                                                                    : '#ffffff',
+                                                        opacity: !hasDep && !isSelected ? 0.78 : 1,
                                                         boxShadow: isChecked || isSelected ? '0 2px 8px rgba(11, 82, 153, 0.08)' : 'none',
                                                         transition: 'all 0.2s',
-                                                        '&:hover': { bgcolor: isSelected ? '#f0f7ff' : '#f8fafc', borderColor: '#0b5299' }
+                                                        '&:hover': {
+                                                            bgcolor: isSelected ? '#f0f7ff' : !hasDep ? '#fff7ed' : '#f8fafc',
+                                                            borderColor: !hasDep ? '#ea580c' : '#0b5299'
+                                                        }
                                                     }}
                                                 >
                                                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                            <Checkbox
-                                                                size="small"
-                                                                checked={isChecked}
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleTogglePersonSelect(person.personRef);
-                                                                }}
-                                                                sx={{
-                                                                    p: 0,
-                                                                    color: '#94a3b8',
-                                                                    '&.Mui-checked': { color: '#0b5299' }
-                                                                }}
-                                                            />
-                                                            <Typography sx={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>
+                                                            <Tooltip title={!hasDep ? "Departure date missing. Add departure details below to enable food tokens." : ""}>
+                                                                <span>
+                                                                    <Checkbox
+                                                                        size="small"
+                                                                        checked={isChecked}
+                                                                        disabled={!hasDep}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleTogglePersonSelect(person.personRef);
+                                                                        }}
+                                                                        sx={{
+                                                                            p: 0,
+                                                                            color: !hasDep ? '#cbd5e1' : '#94a3b8',
+                                                                            '&.Mui-checked': { color: '#0b5299' }
+                                                                        }}
+                                                                    />
+                                                                </span>
+                                                            </Tooltip>
+                                                            <Typography sx={{ fontWeight: 700, fontSize: '15px', color: !hasDep ? '#64748b' : '#0f172a' }}>
                                                                 {person.name}
                                                             </Typography>
                                                         </Box>
-                                                        <Chip
-                                                            size="small"
-                                                            label={person.roleLabel}
-                                                            sx={{
-                                                                fontSize: '11px',
-                                                                fontWeight: 600,
-                                                                bgcolor: person.personType === 'MANAGER' ? '#f3e8ff' : person.personType === 'COACH' ? '#dcfce7' : '#e0f2fe',
-                                                                color: person.personType === 'MANAGER' ? '#7e22ce' : person.personType === 'COACH' ? '#15803d' : '#0369a1'
-                                                            }}
-                                                        />
+                                                        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+                                                            {!hasDep && (
+                                                                <Chip
+                                                                    size="small"
+                                                                    label="⚠️ No Departure"
+                                                                    sx={{
+                                                                        fontSize: '10px',
+                                                                        fontWeight: 700,
+                                                                        height: 20,
+                                                                        bgcolor: '#ffedd5',
+                                                                        color: '#c2410c',
+                                                                        border: '1px solid #fed7aa'
+                                                                    }}
+                                                                />
+                                                            )}
+                                                            <Chip
+                                                                size="small"
+                                                                label={person.roleLabel}
+                                                                sx={{
+                                                                    fontSize: '11px',
+                                                                    fontWeight: 600,
+                                                                    bgcolor: person.personType === 'MANAGER' ? '#f3e8ff' : person.personType === 'COACH' ? '#dcfce7' : '#e0f2fe',
+                                                                    color: person.personType === 'MANAGER' ? '#7e22ce' : person.personType === 'COACH' ? '#15803d' : '#0369a1'
+                                                                }}
+                                                            />
+                                                        </Box>
                                                     </Box>
 
                                                     <Typography sx={{ fontSize: '13px', color: '#475569', mt: 0.5, pl: 3.5 }}>
@@ -1124,8 +1498,14 @@ const FoodTokens = () => {
                                                     </Typography>
 
                                                     {person.arrivalDate && (
-                                                        <Typography sx={{ fontSize: '12px', color: '#0b5299', fontWeight: 600, mt: 0.5, pl: 3.5 }}>
-                                                            Stay: {formatDateDDMMYYYY(person.arrivalDate)} → {formatDateDDMMYYYY(person.departureDate || person.arrivalDate)}
+                                                        <Typography sx={{
+                                                            fontSize: '12px',
+                                                            color: !hasDep ? '#c2410c' : '#0b5299',
+                                                            fontWeight: 600,
+                                                            mt: 0.5,
+                                                            pl: 3.5
+                                                        }}>
+                                                            Stay: {formatDateDDMMYYYY(person.arrivalDate)} → {hasDep ? formatDateDDMMYYYY(person.departureDate) : 'Departure Missing (Disabled)'}
                                                         </Typography>
                                                     )}
 
@@ -1136,10 +1516,16 @@ const FoodTokens = () => {
                                                         </Typography>
                                                         <Chip
                                                             size="small"
-                                                            label={person.tokensByDate ? `${Object.values(person.tokensByDate).reduce((acc, meals) => acc + Object.keys(meals).length, 0)} Total Tokens` : `${issuedCount}/4 Today`}
-                                                            color="primary"
-                                                            variant="outlined"
-                                                            sx={{ fontSize: '10px', height: 20, fontWeight: 700 }}
+                                                            label={!hasDep ? "Disabled" : (person.tokensByDate ? `${Object.values(person.tokensByDate).reduce((acc, meals) => acc + Object.keys(meals).length, 0)} Total Tokens` : `${issuedCount}/4 Today`)}
+                                                            color={!hasDep ? "default" : "primary"}
+                                                            variant={!hasDep ? "filled" : "outlined"}
+                                                            sx={{
+                                                                fontSize: '10px',
+                                                                height: 20,
+                                                                fontWeight: 700,
+                                                                bgcolor: !hasDep ? '#f1f5f9' : undefined,
+                                                                color: !hasDep ? '#94a3b8' : undefined
+                                                            }}
                                                         />
                                                     </Box>
                                                 </Box>
@@ -1172,13 +1558,26 @@ const FoodTokens = () => {
                                                         color: selectedPerson.personType === 'MANAGER' ? '#7e22ce' : selectedPerson.personType === 'COACH' ? '#15803d' : '#0369a1'
                                                     }}
                                                 />
+                                                {(selectedPerson.hasDepartureDate === false || !selectedPerson.departureDate) && (
+                                                    <Chip
+                                                        size="small"
+                                                        label="⚠️ No Departure Date"
+                                                        sx={{
+                                                            fontSize: '11px',
+                                                            fontWeight: 700,
+                                                            bgcolor: '#ffedd5',
+                                                            color: '#c2410c',
+                                                            border: '1px solid #fed7aa'
+                                                        }}
+                                                    />
+                                                )}
                                             </Box>
                                             <Typography sx={{ color: '#475569', fontSize: '14px', mt: 0.5 }}>
                                                 {selectedPerson.teamOrSport} • Mobile: {selectedPerson.identifier}
                                             </Typography>
                                             {(selectedPerson.arrivalDate || selectedPerson.departureDate) && (
-                                                <Typography sx={{ color: '#0b5299', fontSize: '13px', fontWeight: 700, mt: 0.5 }}>
-                                                    Stay Period: {formatDateDDMMYYYY(selectedPerson.arrivalDate)} {selectedPerson.arrivalTime || ''} → {formatDateDDMMYYYY(selectedPerson.departureDate || selectedPerson.arrivalDate)} {selectedPerson.departureTime || ''}
+                                                <Typography sx={{ color: (selectedPerson.hasDepartureDate === false || !selectedPerson.departureDate) ? '#c2410c' : '#0b5299', fontSize: '13px', fontWeight: 700, mt: 0.5 }}>
+                                                    Stay Period: {formatDateDDMMYYYY(selectedPerson.arrivalDate)} {selectedPerson.arrivalTime || ''} → {(selectedPerson.hasDepartureDate === false || !selectedPerson.departureDate) ? 'Missing (Disabled)' : `${formatDateDDMMYYYY(selectedPerson.departureDate)} ${selectedPerson.departureTime || ''}`}
                                                 </Typography>
                                             )}
                                             {selectedPerson.block && (
@@ -1194,13 +1593,36 @@ const FoodTokens = () => {
                                                 size="small"
                                                 startIcon={issuingTeamBulk ? <CircularProgress size={16} /> : <ConfirmationNumberOutlinedIcon sx={{ fontSize: 18 }} />}
                                                 onClick={handleOpenTeamDialog}
-                                                disabled={issuingTeamBulk}
+                                                disabled={issuingTeamBulk || selectedPerson.hasDepartureDate === false || !selectedPerson.departureDate}
                                                 sx={{ borderColor: '#d06c38', color: '#d06c38', '&:hover': { borderColor: '#b85928', bgcolor: '#fff5f0' } }}
                                             >
                                                 Issue All Tokens
                                             </Button>
                                         )}
                                     </Box>
+
+                                    {/* Warning banner if departure date is missing */}
+                                    {(selectedPerson.hasDepartureDate === false || !selectedPerson.departureDate) && (
+                                        <Alert
+                                            severity="warning"
+                                            icon={<WarningAmberIcon />}
+                                            sx={{
+                                                mb: 3,
+                                                borderRadius: 2,
+                                                border: '1px solid #fed7aa',
+                                                bgcolor: '#fff7ed',
+                                                color: '#9a3412',
+                                                '& .MuiAlert-icon': { color: '#ea580c' }
+                                            }}
+                                        >
+                                            <Typography sx={{ fontWeight: 700, fontSize: '14px' }}>
+                                                Departure Date Missing — Food Tokens Disabled
+                                            </Typography>
+                                            <Typography sx={{ fontSize: '13px', mt: 0.5 }}>
+                                                Food tokens cannot be issued for <strong>{selectedPerson.name}</strong> because departure date & time were not provided at registration. Please add departure details in the <strong>"Players Missing Departure Details"</strong> section below to enable token generation.
+                                            </Typography>
+                                        </Alert>
+                                    )}
 
                                     {/* Multi-Day Token Sections */}
                                     {(() => {
@@ -1417,7 +1839,7 @@ const FoodTokens = () => {
                                                                                         <Button
                                                                                             variant="contained"
                                                                                             size="small"
-                                                                                            disabled={Boolean(issuingKey) || isDayLoading}
+                                                                                            disabled={Boolean(issuingKey) || isDayLoading || selectedPerson.hasDepartureDate === false || !selectedPerson.departureDate}
                                                                                             onClick={(e) => {
                                                                                                 e.stopPropagation();
                                                                                                 handleIssue(meal, date);
@@ -1457,7 +1879,7 @@ const FoodTokens = () => {
                                                                             fullWidth
                                                                             variant={allIssued ? 'outlined' : 'contained'}
                                                                             size="medium"
-                                                                            disabled={isDayLoading || Boolean(issuingKey)}
+                                                                            disabled={isDayLoading || Boolean(issuingKey) || selectedPerson.hasDepartureDate === false || !selectedPerson.departureDate}
                                                                             onClick={(e) => {
                                                                                 e.stopPropagation();
                                                                                 handleIssueDay(date);
@@ -1505,562 +1927,360 @@ const FoodTokens = () => {
                             )}
                         </Paper>
                     </Box>
+
+                    {/* Bottom: Players Missing Departure Details */}
+                    <Box sx={{ width: '100%' }}>
+                        <Paper sx={{ p: 3, borderRadius: 3, border: '1px solid #fed7aa', bgcolor: '#ffffff' }}>
+                            {/* Header */}
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, flexWrap: 'wrap', gap: 2, mb: 2.5 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                                    <Box sx={{ p: 1, borderRadius: 2, bgcolor: '#fff7ed', color: '#ea580c', display: 'flex' }}>
+                                        <WarningAmberIcon sx={{ fontSize: 24 }} />
+                                    </Box>
+                                    <Box>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <Typography variant="h6" sx={{ fontWeight: 800, color: '#0f172a' }}>
+                                                Players Missing Departure Details
+                                            </Typography>
+                                            <Chip
+                                                size="small"
+                                                label={`${missingDepPlayers.length} Pending`}
+                                                sx={{
+                                                    fontWeight: 700,
+                                                    fontSize: '12px',
+                                                    bgcolor: missingDepPlayers.length > 0 ? '#ffedd5' : '#dcfce7',
+                                                    color: missingDepPlayers.length > 0 ? '#c2410c' : '#15803d'
+                                                }}
+                                            />
+                                        </Box>
+                                        <Typography sx={{ fontSize: '13px', color: '#64748b', mt: 0.25 }}>
+                                            Add departure date and time to enable food token generation for these registered participants.
+                                        </Typography>
+                                    </Box>
+                                </Box>
+
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                    <TextField
+                                        size="small"
+                                        placeholder="Search by name, university..."
+                                        value={missingDepSearch}
+                                        onChange={(e) => setMissingDepSearch(e.target.value)}
+                                        slotProps={{
+                                            input: {
+                                                startAdornment: (
+                                                    <InputAdornment position="start">
+                                                        <SearchIcon sx={{ color: '#94a3b8', fontSize: 20 }} />
+                                                    </InputAdornment>
+                                                )
+                                            }
+                                        }}
+                                        sx={{ minWidth: 230 }}
+                                    />
+                                    <Button
+                                        variant="outlined"
+                                        size="small"
+                                        startIcon={loadingMissingDep ? <CircularProgress size={16} /> : <RefreshIcon sx={{ fontSize: 18 }} />}
+                                        onClick={fetchMissingDeparturePlayers}
+                                        disabled={loadingMissingDep}
+                                        sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600, color: '#0b5299', borderColor: '#cbd5e1' }}
+                                    >
+                                        Refresh
+                                    </Button>
+                                </Box>
+                            </Box>
+
+                            {/* Content */}
+                            {loadingMissingDep ? (
+                                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 6 }}>
+                                    <CircularProgress size={36} sx={{ color: '#0b5299' }} />
+                                </Box>
+                            ) : (() => {
+                                const filtered = missingDepPlayers.filter(p => {
+                                    if (!missingDepSearch.trim()) return true;
+                                    const s = missingDepSearch.toLowerCase().trim();
+                                    return (
+                                        (p.playerName && p.playerName.toLowerCase().includes(s)) ||
+                                        (p.universityName && p.universityName.toLowerCase().includes(s)) ||
+                                        (p.mobileNo && p.mobileNo.includes(s))
+                                    );
+                                });
+
+                                if (missingDepPlayers.length === 0) {
+                                    return (
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 4, bgcolor: '#f0fdf4', borderRadius: 2, border: '1px dashed #86efac' }}>
+                                            <CheckCircleOutlineIcon sx={{ fontSize: 44, color: '#16a34a', mb: 1 }} />
+                                            <Typography sx={{ fontWeight: 700, fontSize: '15px', color: '#15803d' }}>
+                                                All Registered Players Have Departure Details!
+                                            </Typography>
+                                            <Typography sx={{ fontSize: '13px', color: '#166534', mt: 0.5 }}>
+                                                All participants are eligible for food token generation.
+                                            </Typography>
+                                        </Box>
+                                    );
+                                }
+
+                                if (filtered.length === 0) {
+                                    return (
+                                        <Box sx={{ textAlign: 'center', py: 4, color: '#64748b' }}>
+                                            <Typography sx={{ fontSize: '14px' }}>
+                                                No players matching "{missingDepSearch}".
+                                            </Typography>
+                                        </Box>
+                                    );
+                                }
+
+                                return (
+                                    <TableContainer sx={{ border: '1px solid #e2e8f0', borderRadius: 2, maxHeight: 420 }}>
+                                        <Table size="small" stickyHeader>
+                                            <TableHead>
+                                                <TableRow sx={{ bgcolor: '#f8fafc' }}>
+                                                    <TableCell sx={{ fontWeight: 700, py: 1.5, color: '#334155', bgcolor: '#f8fafc' }}>Player Name</TableCell>
+                                                    <TableCell sx={{ fontWeight: 700, py: 1.5, color: '#334155', bgcolor: '#f8fafc' }}>University / Team</TableCell>
+                                                    <TableCell sx={{ fontWeight: 700, py: 1.5, color: '#334155', bgcolor: '#f8fafc' }}>Arrival Info</TableCell>
+                                                    <TableCell sx={{ fontWeight: 700, py: 1.5, color: '#334155', bgcolor: '#f8fafc' }}>Departure Date</TableCell>
+                                                    <TableCell sx={{ fontWeight: 700, py: 1.5, color: '#334155', bgcolor: '#f8fafc' }}>Departure Time</TableCell>
+                                                    <TableCell sx={{ fontWeight: 700, py: 1.5, color: '#334155', bgcolor: '#f8fafc', textAlign: 'center' }}>Action</TableCell>
+                                                </TableRow>
+                                            </TableHead>
+                                            <TableBody>
+                                                {filtered.map((player) => {
+                                                    const editData = editingDepDates[player.playerRef] || {
+                                                        departureDate: '',
+                                                        departureTime: ''
+                                                    };
+                                                    const isSaving = savingDepPlayerRef === player.playerRef;
+
+                                                    return (
+                                                        <TableRow key={player.playerRef} hover sx={{ '&:hover': { bgcolor: '#f8fafc' } }}>
+                                                            <TableCell sx={{ py: 1.5 }}>
+                                                                <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>
+                                                                    {player.playerName}
+                                                                </Typography>
+                                                                <Typography sx={{ fontSize: '12px', color: '#64748b' }}>
+                                                                    {player.mobileNo || 'No phone'}
+                                                                </Typography>
+                                                            </TableCell>
+                                                            <TableCell sx={{ py: 1.5 }}>
+                                                                <Typography sx={{ fontWeight: 600, fontSize: '13px', color: '#334155' }}>
+                                                                    {player.universityName}
+                                                                </Typography>
+                                                                {player.block && (
+                                                                    <Typography sx={{ fontSize: '11px', color: '#64748b' }}>
+                                                                        {player.block} (Room {player.room})
+                                                                    </Typography>
+                                                                )}
+                                                            </TableCell>
+                                                            <TableCell sx={{ py: 1.5 }}>
+                                                                <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#0b5299' }}>
+                                                                    {formatDateDDMMYYYY(player.arrivalDate)}
+                                                                </Typography>
+                                                                {player.arrivalTime && (
+                                                                    <Typography sx={{ fontSize: '11px', color: '#64748b' }}>
+                                                                        Time: {player.arrivalTime}
+                                                                    </Typography>
+                                                                )}
+                                                            </TableCell>
+                                                            <TableCell sx={{ py: 1.5 }}>
+                                                                <TextField
+                                                                    type="date"
+                                                                    size="small"
+                                                                    value={editData.departureDate || ''}
+                                                                    onChange={(e) => handleDepDateChange(player.playerRef, 'departureDate', e.target.value)}
+                                                                    slotProps={{
+                                                                        inputLabel: { shrink: true }
+                                                                    }}
+                                                                    sx={{ width: 160 }}
+                                                                />
+                                                            </TableCell>
+                                                            <TableCell sx={{ py: 1.5 }}>
+                                                                <TextField
+                                                                    type="time"
+                                                                    size="small"
+                                                                    value={editData.departureTime || ''}
+                                                                    onChange={(e) => handleDepDateChange(player.playerRef, 'departureTime', e.target.value)}
+                                                                    slotProps={{
+                                                                        inputLabel: { shrink: true }
+                                                                    }}
+                                                                    sx={{ width: 130 }}
+                                                                />
+                                                            </TableCell>
+                                                            <TableCell sx={{ py: 1.5, textAlign: 'center' }}>
+                                                                <Button
+                                                                    variant="contained"
+                                                                    size="small"
+                                                                    startIcon={isSaving ? <CircularProgress size={14} color="inherit" /> : <SaveIcon sx={{ fontSize: 16 }} />}
+                                                                    disabled={isSaving || !editData.departureDate}
+                                                                    onClick={() => handleSavePlayerDeparture(player)}
+                                                                    sx={{
+                                                                        bgcolor: '#16a34a',
+                                                                        '&:hover': { bgcolor: '#15803d' },
+                                                                        textTransform: 'none',
+                                                                        fontWeight: 700,
+                                                                        fontSize: '12px',
+                                                                        borderRadius: 2,
+                                                                        px: 1.75,
+                                                                        whiteSpace: 'nowrap'
+                                                                    }}
+                                                                >
+                                                                    {isSaving ? 'Saving...' : 'Save & Enable'}
+                                                                </Button>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    );
+                                                })}
+                                            </TableBody>
+                                        </Table>
+                                    </TableContainer>
+                                );
+                            })()}
+                        </Paper>
+                    </Box>
                 </Box>
             )}
 
             {/* ============================================================= */}
             {/* TAB 2: TOKENS REPORT & MANAGEMENT */}
             {/* ============================================================= */}
-            {activeTab === 'Tokens Report' && (
-                <Box>
-                    {/* Stats Summary Cards */}
-                    {/* Stats Summary Card (Full Width - Dashboard Style) */}
-                    {stats && (
-                        <Box sx={{ width: '100%', mb: 3 }}>
-                            <Card
-                                sx={{
-                                    position: 'relative',
-                                    overflow: 'hidden',
-                                    borderRadius: '16px',
-                                    background: 'linear-gradient(145deg, #ffffff 0%, #f0f7ff 100%)',
-                                    border: '1px solid #e2e8f0',
-                                    boxShadow: '0 2px 12px rgba(15, 23, 42, 0.04)',
-                                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    width: '100%',
-                                    '&:hover': {
-                                        transform: 'translateY(-2px)',
-                                        boxShadow: '0 10px 24px rgba(15, 23, 42, 0.08)',
-                                        borderColor: '#93c5fd'
-                                    }
-                                }}
-                            >
-                                {/* Corner Category Badge */}
-                                <Chip
-                                    label="Total"
-                                    size="small"
-                                    sx={{
-                                        position: 'absolute',
-                                        top: 14,
-                                        right: 14,
-                                        bgcolor: '#eff6ff',
-                                        color: '#1d4ed8',
-                                        fontWeight: 600,
-                                        fontSize: '0.72rem',
-                                        height: '22px',
-                                        borderRadius: '6px',
-                                        zIndex: 1
-                                    }}
-                                />
-
-                                {/* Subtle decorative watermark icon in bottom-right corner */}
-                                <Box sx={{
-                                    position: 'absolute',
-                                    right: -8,
-                                    bottom: -8,
-                                    opacity: 0.04,
-                                    pointerEvents: 'none',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center'
-                                }}>
-                                    <ConfirmationNumberOutlinedIcon sx={{ fontSize: 90, color: '#0b5299' }} />
-                                </Box>
-
-                                <CardContent sx={{ py: 2, pr: 2, pl: 1.25, '&:last-child': { pb: 2 } }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5, mb: 1.5 }}>
-                                        {/* Icon badge */}
-                                        <Box sx={{
-                                            width: 52,
-                                            height: 52,
-                                            borderRadius: '12px',
-                                            background: 'linear-gradient(135deg, #0b5299 0%, #1e40af 100%)',
-                                            boxShadow: '0 4px 12px rgba(11, 82, 153, 0.22)',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            flexShrink: 0,
-                                            transition: 'transform 0.2s',
-                                            '&:hover': { transform: 'scale(1.05)' }
-                                        }}>
-                                            <ConfirmationNumberOutlinedIcon sx={{ fontSize: 26, color: '#ffffff' }} />
-                                        </Box>
-
-                                        <Box>
-                                            <Typography
-                                                variant="caption"
-                                                sx={{
-                                                    color: '#64748b',
-                                                    fontWeight: 600,
-                                                    fontSize: '0.75rem',
-                                                    letterSpacing: '0.5px',
-                                                    textTransform: 'uppercase',
-                                                    display: 'block',
-                                                    mb: 0.5
-                                                }}
-                                            >
-                                                TOTAL TOKENS ISSUED
-                                            </Typography>
-                                            <Typography
-                                                sx={{
-                                                    fontWeight: 800,
-                                                    color: '#0f172a',
-                                                    fontSize: { xs: '2rem', md: '2.2rem' },
-                                                    lineHeight: 1
-                                                }}
-                                            >
-                                                {stats.overall?.totalIssued || 0}
-                                            </Typography>
-                                        </Box>
-                                    </Box>
-
-                                    {/* Subtitle */}
-                                    <Typography
-                                        variant="caption"
-                                        sx={{
-                                            color: '#94a3b8',
-                                            fontSize: '0.8rem',
-                                            fontWeight: 500,
-                                            display: 'block'
-                                        }}
-                                    >
-                                        Total Active Food Coupons
-                                    </Typography>
-                                </CardContent>
-                            </Card>
-                        </Box>
-                    )}
-
-                    {/* Breakdown by Meal Type (Dashboard Style) */}
-                    {stats?.byMeal && (
-                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 2, mb: 3, width: '100%' }}>
-                            {[
-                                {
-                                    mealKey: 'Breakfast',
-                                    title: 'BREAKFAST',
-                                    count: stats.byMeal?.['Breakfast']?.issued || 0,
-                                    subtitle: 'Morning Meal Tokens',
-                                    badge: 'Morning',
-                                    icon: <WbSunnyOutlinedIcon sx={{ fontSize: 26, color: '#ffffff' }} />,
-                                    bgIcon: <WbSunnyOutlinedIcon sx={{ fontSize: 90, color: '#d97706' }} />,
-                                    gradient: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)',
-                                    shadow: 'rgba(217, 119, 6, 0.22)',
-                                    bgGradient: 'linear-gradient(145deg, #ffffff 0%, #fffbeb 100%)',
-                                    borderColor: '#e2e8f0',
-                                    hoverBorder: '#fde68a',
-                                    badgeBg: '#fffbeb',
-                                    badgeColor: '#b45309'
-                                },
-                                {
-                                    mealKey: 'Lunch',
-                                    title: 'LUNCH',
-                                    count: stats.byMeal?.['Lunch']?.issued || 0,
-                                    subtitle: 'Afternoon Meal Tokens',
-                                    badge: 'Afternoon',
-                                    icon: <RestaurantOutlinedIcon sx={{ fontSize: 26, color: '#ffffff' }} />,
-                                    bgIcon: <RestaurantOutlinedIcon sx={{ fontSize: 90, color: '#059669' }} />,
-                                    gradient: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
-                                    shadow: 'rgba(5, 150, 105, 0.22)',
-                                    bgGradient: 'linear-gradient(145deg, #ffffff 0%, #f6fdf9 100%)',
-                                    borderColor: '#e2e8f0',
-                                    hoverBorder: '#a7f3d0',
-                                    badgeBg: '#ecfdf5',
-                                    badgeColor: '#047857'
-                                },
-                                {
-                                    mealKey: 'Dinner',
-                                    title: 'DINNER',
-                                    count: stats.byMeal?.['Dinner']?.issued || 0,
-                                    subtitle: 'Night Meal Tokens',
-                                    badge: 'Night',
-                                    icon: <DarkModeOutlinedIcon sx={{ fontSize: 26, color: '#ffffff' }} />,
-                                    bgIcon: <DarkModeOutlinedIcon sx={{ fontSize: 90, color: '#0b5299' }} />,
-                                    gradient: 'linear-gradient(135deg, #0b5299 0%, #1e40af 100%)',
-                                    shadow: 'rgba(11, 82, 153, 0.22)',
-                                    bgGradient: 'linear-gradient(145deg, #ffffff 0%, #f0f7ff 100%)',
-                                    borderColor: '#e2e8f0',
-                                    hoverBorder: '#93c5fd',
-                                    badgeBg: '#eff6ff',
-                                    badgeColor: '#1d4ed8'
-                                }
-                            ].map((stat, idx) => (
-                                <Card
-                                    key={idx}
-                                    sx={{
-                                        position: 'relative',
-                                        overflow: 'hidden',
-                                        borderRadius: '16px',
-                                        background: stat.bgGradient,
-                                        border: `1px solid ${stat.borderColor}`,
-                                        boxShadow: '0 2px 12px rgba(15, 23, 42, 0.04)',
-                                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                                        height: '100%',
-                                        '&:hover': {
-                                            transform: 'translateY(-3px)',
-                                            boxShadow: '0 10px 24px rgba(15, 23, 42, 0.08)',
-                                            borderColor: stat.hoverBorder
-                                        }
-                                    }}
-                                >
-                                    {/* Corner Category Badge */}
-                                    <Chip
-                                        label={stat.badge}
-                                        size="small"
-                                        sx={{
-                                            position: 'absolute',
-                                            top: 12,
-                                            right: 12,
-                                            bgcolor: stat.badgeBg,
-                                            color: stat.badgeColor,
-                                            fontWeight: 600,
-                                            fontSize: '0.72rem',
-                                            height: '22px',
-                                            borderRadius: '6px',
-                                            zIndex: 1
-                                        }}
-                                    />
-
-                                    {/* Subtle decorative watermark icon in bottom-right corner */}
-                                    <Box sx={{
-                                        position: 'absolute',
-                                        right: -8,
-                                        bottom: -8,
-                                        opacity: 0.04,
-                                        pointerEvents: 'none',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center'
-                                    }}>
-                                        {stat.bgIcon}
-                                    </Box>
-
-                                    <CardContent sx={{ py: 2, pr: 2, pl: 1.25, '&:last-child': { pb: 2 } }}>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5, mb: 1.5 }}>
-                                            {/* Icon badge */}
-                                            <Box sx={{
-                                                width: 52,
-                                                height: 52,
-                                                borderRadius: '12px',
-                                                background: stat.gradient,
-                                                boxShadow: `0 4px 12px ${stat.shadow}`,
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                flexShrink: 0,
-                                                transition: 'transform 0.2s',
-                                                '&:hover': { transform: 'scale(1.05)' }
-                                            }}>
-                                                {stat.icon}
-                                            </Box>
-
-                                            <Box>
-                                                <Typography
-                                                    variant="caption"
-                                                    sx={{
-                                                        color: '#64748b',
-                                                        fontWeight: 600,
-                                                        fontSize: '0.75rem',
-                                                        letterSpacing: '0.5px',
-                                                        textTransform: 'uppercase',
-                                                        display: 'block',
-                                                        mb: 0.5
-                                                    }}
-                                                >
-                                                    {stat.title}
-                                                </Typography>
-                                                <Typography
-                                                    sx={{
-                                                        fontWeight: 800,
-                                                        color: '#0f172a',
-                                                        fontSize: { xs: '2rem', md: '2.2rem' },
-                                                        lineHeight: 1
-                                                    }}
-                                                >
-                                                    {stat.count}
-                                                </Typography>
-                                            </Box>
-                                        </Box>
-
-                                        {/* Subtitle */}
-                                        <Typography
-                                            variant="caption"
-                                            sx={{
-                                                color: '#94a3b8',
-                                                fontSize: '0.8rem',
-                                                fontWeight: 500,
-                                                display: 'block'
-                                            }}
-                                        >
-                                            {stat.subtitle}
-                                        </Typography>
-                                    </CardContent>
-                                </Card>
-                            ))}
-                        </Box>
-                    )}
-
-                    {/* Table Filters & Actions */}
-                    <Paper sx={{ p: 2.5, borderRadius: 3, mb: 3 }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' }, mb: 2, flexWrap: 'wrap', gap: 2 }}>
-                            <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', flex: 1, width: '100%' }}>
-                                <TextField
-                                    size="small"
-                                    placeholder="Search code, name, team..."
-                                    value={filterSearch}
-                                    onChange={(e) => setFilterSearch(e.target.value)}
-                                    sx={{ minWidth: { xs: '100%', sm: 180, md: 220 }, flex: { xs: '1 1 100%', sm: '1 1 auto' } }}
-                                />
-
-                                <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 120 }, flex: { xs: '1 1 100%', sm: '1 1 auto' } }}>
-                                    <InputLabel>Meal Type</InputLabel>
-                                    <Select value={filterMeal} label="Meal Type" onChange={(e) => setFilterMeal(e.target.value)}>
-                                        <MenuItem value="">All Meals</MenuItem>
-                                        {MEAL_TYPES.map(m => <MenuItem key={m} value={m}>{m}</MenuItem>)}
-                                    </Select>
-                                </FormControl>
-
-                                <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 120 }, flex: { xs: '1 1 100%', sm: '1 1 auto' } }}>
-                                    <InputLabel>Status</InputLabel>
-                                    <Select value={filterStatus} label="Status" onChange={(e) => setFilterStatus(e.target.value)}>
-                                        <MenuItem value="">All Statuses</MenuItem>
-                                        <MenuItem value="ISSUED">Issued</MenuItem>
-                                    </Select>
-                                </FormControl>
-
-                                <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 120 }, flex: { xs: '1 1 100%', sm: '1 1 auto' } }}>
-                                    <InputLabel>Role / Type</InputLabel>
-                                    <Select value={filterPersonType} label="Role / Type" onChange={(e) => setFilterPersonType(e.target.value)}>
-                                        <MenuItem value="">All Roles</MenuItem>
-                                        <MenuItem value="PLAYER">Player</MenuItem>
-                                        <MenuItem value="COACH">Coach</MenuItem>
-                                        <MenuItem value="MANAGER">Manager</MenuItem>
-                                    </Select>
-                                </FormControl>
-                            </Box>
-
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: { xs: '100%', sm: 'auto' }, justifyContent: { xs: 'space-between', sm: 'flex-end' } }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, bgcolor: '#ffffff', p: 0.4, borderRadius: 2, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-                                    <Tooltip title="Cards View">
-                                        <IconButton
-                                            size="small"
-                                            onClick={() => setTokensViewMode('cards')}
-                                            sx={{
-                                                p: 0.6,
-                                                borderRadius: 1.5,
-                                                bgcolor: tokensViewMode === 'cards' ? '#0b5299' : 'transparent',
-                                                color: tokensViewMode === 'cards' ? '#ffffff' : '#64748b',
-                                                boxShadow: tokensViewMode === 'cards' ? '0 1px 3px rgba(11,82,153,0.3)' : 'none',
-                                                '&:hover': {
-                                                    bgcolor: tokensViewMode === 'cards' ? '#0b5299' : 'rgba(0,0,0,0.06)',
-                                                    color: tokensViewMode === 'cards' ? '#ffffff' : '#0b5299'
-                                                }
-                                            }}
-                                        >
-                                            <GridViewRoundedIcon sx={{ fontSize: 18 }} />
-                                        </IconButton>
-                                    </Tooltip>
-                                    <Tooltip title="Table View">
-                                        <IconButton
-                                            size="small"
-                                            onClick={() => setTokensViewMode('table')}
-                                            sx={{
-                                                p: 0.6,
-                                                borderRadius: 1.5,
-                                                bgcolor: tokensViewMode === 'table' ? '#0b5299' : 'transparent',
-                                                color: tokensViewMode === 'table' ? '#ffffff' : '#64748b',
-                                                boxShadow: tokensViewMode === 'table' ? '0 1px 3px rgba(11,82,153,0.3)' : 'none',
-                                                '&:hover': {
-                                                    bgcolor: tokensViewMode === 'table' ? '#0b5299' : 'rgba(0,0,0,0.06)',
-                                                    color: tokensViewMode === 'table' ? '#ffffff' : '#0b5299'
-                                                }
-                                            }}
-                                        >
-                                            <TableRowsRoundedIcon sx={{ fontSize: 18 }} />
-                                        </IconButton>
-                                    </Tooltip>
-                                </Box>
-
-                                <Button
-                                    variant="outlined"
-                                    startIcon={<DownloadIcon />}
-                                    onClick={handleExportCSV}
-                                    sx={{ color: '#0b5299', borderColor: '#0b5299', flex: { xs: 1, sm: 'none' } }}
-                                >
-                                    Export CSV
-                                </Button>
-                            </Box>
-                        </Box>
-
-                        {/* Tokens Data Cards or Table */}
-                        {tokensViewMode === 'cards' ? (
-                            <Box sx={{ p: { xs: 1, sm: 2 } }}>
-                                {loadingTokens ? (
-                                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-                                        <CircularProgress size={32} sx={{ color: '#0b5299' }} />
-                                    </Box>
-                                ) : tokensList.length === 0 ? (
-                                    <Box sx={{ textAlign: 'center', py: 6, color: 'text.secondary' }}>
-                                        No food tokens found for the selected criteria.
-                                    </Box>
+            {activeTab === 'Tokens Report' && (() => {
+                // Table rendering helper
+                const renderTable = (list, loading, total, currentPage, setCurrentPage, currentRowsPerPage, setCurrentRowsPerPage, isRedeemed, isAll) => (
+                    <TableContainer sx={{ overflowX: 'auto', width: '100%' }}>
+                        <Table size="small" sx={{ minWidth: 920 }}>
+                            <TableHead sx={{ bgcolor: isRedeemed ? '#f0fdf4' : isAll ? '#f8fafc' : '#f0f7ff' }}>
+                                <TableRow>
+                                    <TableCell sx={{ fontWeight: 700, py: 1.5 }}>Token Code</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, py: 1.5 }}>Participant Name</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, py: 1.5 }}>Role & Contact</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, py: 1.5 }}>University / Team</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, py: 1.5 }}>Meal & Date</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, py: 1.5 }}>Hostel</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, py: 1.5 }}>Status</TableCell>
+                                    {(isRedeemed || isAll) && (
+                                        <TableCell sx={{ fontWeight: 700, py: 1.5 }}>Redemption Details</TableCell>
+                                    )}
+                                    <TableCell sx={{ fontWeight: 700, py: 1.5, textAlign: 'center' }}>Prints</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, py: 1.5, textAlign: 'right' }}>Actions</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {loading ? (
+                                    <TableRow>
+                                        <TableCell colSpan={isRedeemed || isAll ? 10 : 9} sx={{ textAlign: 'center', py: 5 }}>
+                                            <CircularProgress size={28} sx={{ color: isRedeemed ? '#16a34a' : '#0b5299' }} />
+                                        </TableCell>
+                                    </TableRow>
+                                ) : list.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={isRedeemed || isAll ? 10 : 9} sx={{ textAlign: 'center', py: 5, color: 'text.secondary' }}>
+                                            {isRedeemed
+                                                ? 'No redeemed food tokens found for the selected criteria.'
+                                                : 'No issued food tokens found for the selected criteria.'}
+                                        </TableCell>
+                                    </TableRow>
                                 ) : (
-                                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 2 }}>
-                                        {tokensList.map((token) => (
-                                            <Card
-                                                key={token._id}
-                                                variant="outlined"
-                                                sx={{
-                                                    borderRadius: 2.5,
-                                                    border: '1px solid #e2e8f0',
-                                                    boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
-                                                    transition: 'all 0.2s ease',
-                                                    display: 'flex',
-                                                    flexDirection: 'column',
-                                                    '&:hover': {
-                                                        boxShadow: '0 6px 16px rgba(11,82,153,0.1)',
-                                                        borderColor: '#93c5fd'
-                                                    }
-                                                }}
-                                            >
-                                                <CardContent sx={{ p: 2, flex: 1, display: 'flex', flexDirection: 'column', gap: 1.5, '&:last-child': { pb: 2 } }}>
-                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                        <Typography sx={{ fontFamily: 'monospace', fontWeight: 800, color: '#0b5299', fontSize: '0.95rem', bgcolor: '#eff6ff', px: 1, py: 0.3, borderRadius: 1 }}>
-                                                            {token.code}
+                                    list.map((token) => (
+                                        <TableRow key={token._id} hover sx={{ '&:hover': { bgcolor: isRedeemed ? '#f0fdf4' : '#f0f7ff' } }}>
+                                            <TableCell sx={{ fontFamily: 'monospace', fontWeight: 800, color: isRedeemed ? '#15803d' : '#0b5299', fontSize: '0.9rem' }}>
+                                                {token.code}
+                                            </TableCell>
+                                            <TableCell sx={{ fontWeight: 600 }}>{token.name}</TableCell>
+                                            <TableCell>
+                                                <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                                                    <Typography variant="caption" sx={{ fontWeight: 700, color: '#334155' }}>
+                                                        {token.personType}
+                                                    </Typography>
+                                                    {token.identifier && (
+                                                        <Typography variant="caption" sx={{ color: '#64748b' }}>
+                                                            {token.identifier}
                                                         </Typography>
-                                                        <Chip
-                                                            size="small"
-                                                            label={token.status}
-                                                            color={token.status === 'ISSUED' ? 'success' : 'error'}
-                                                            sx={{ fontWeight: 700, fontSize: '11px' }}
-                                                        />
+                                                    )}
+                                                </Box>
+                                            </TableCell>
+                                            <TableCell sx={{ color: '#475569' }}>{token.teamOrSport || '-'}</TableCell>
+                                            <TableCell>
+                                                <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                                                    <Typography variant="body2" sx={{ fontWeight: 700, color: isRedeemed ? '#15803d' : '#0b5299' }}>
+                                                        {token.mealType}
+                                                    </Typography>
+                                                    <Typography variant="caption" sx={{ color: '#64748b' }}>
+                                                        {formatDateDDMMYYYY(token.mealDate)}
+                                                    </Typography>
+                                                </Box>
+                                            </TableCell>
+                                            <TableCell sx={{ color: '#475569', fontSize: '0.85rem' }}>
+                                                {token.block || token.room ? (
+                                                    <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                                                        <Typography variant="caption" sx={{ fontWeight: 600, color: '#334155' }}>
+                                                            {token.block || 'Hostel'}
+                                                        </Typography>
+                                                        <Typography variant="caption" sx={{ color: '#64748b' }}>
+                                                            Room: {token.room || 'N/A'}
+                                                        </Typography>
                                                     </Box>
-
-                                                    <Box>
-                                                        <Typography sx={{ fontWeight: 700, color: '#0f172a', fontSize: '1rem', lineHeight: 1.3 }}>
-                                                            {token.name}
-                                                        </Typography>
-                                                        <Typography variant="body2" sx={{ color: '#64748b', mt: 0.3, fontSize: '0.85rem' }}>
-                                                            {token.teamOrSport || 'No University/Team'}
-                                                        </Typography>
-                                                    </Box>
-
-                                                    <Box sx={{ bgcolor: '#f8fafc', p: 1.2, borderRadius: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                        <Box>
-                                                            <Typography variant="caption" sx={{ color: '#64748b', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                                                                Meal & Date
+                                                ) : (
+                                                    '-'
+                                                )}
+                                            </TableCell>
+                                            <TableCell>
+                                                <Chip
+                                                    size="small"
+                                                    label={token.status}
+                                                    sx={{
+                                                        fontWeight: 700,
+                                                        fontSize: '11px',
+                                                        bgcolor: token.status === 'REDEEMED' ? '#dcfce7' : token.status === 'ISSUED' ? '#dbeafe' : '#fee2e2',
+                                                        color: token.status === 'REDEEMED' ? '#15803d' : token.status === 'ISSUED' ? '#1d4ed8' : '#b91c1c',
+                                                        border: '1px solid',
+                                                        borderColor: token.status === 'REDEEMED' ? '#86efac' : token.status === 'ISSUED' ? '#93c5fd' : '#fca5a5'
+                                                    }}
+                                                />
+                                            </TableCell>
+                                            {(isRedeemed || isAll) && (
+                                                <TableCell sx={{ fontSize: '0.8rem' }}>
+                                                    {token.status === 'REDEEMED' && token.redeemedAt ? (
+                                                        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                                                            <Typography variant="caption" sx={{ color: '#15803d', fontWeight: 700 }}>
+                                                                {new Date(token.redeemedAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })} {new Date(token.redeemedAt).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' })}
                                                             </Typography>
-                                                            <Typography sx={{ fontWeight: 600, color: '#1e293b', fontSize: '0.85rem' }}>
-                                                                {token.mealType} • {formatDateDDMMYYYY(token.mealDate)}
+                                                            <Typography variant="caption" sx={{ color: '#64748b' }}>
+                                                                by {token.redeemedBy || 'Staff'}
                                                             </Typography>
                                                         </Box>
-                                                        <Chip
+                                                    ) : (
+                                                        <Typography variant="caption" sx={{ color: '#94a3b8' }}>
+                                                            Not redeemed
+                                                        </Typography>
+                                                    )}
+                                                </TableCell>
+                                            )}
+                                            <TableCell sx={{ textAlign: 'center', fontWeight: 600 }}>{token.printCount || 1}</TableCell>
+                                            <TableCell sx={{ textAlign: 'right' }}>
+                                                <Tooltip title="Reprint token receipt">
+                                                    <span>
+                                                        <IconButton
                                                             size="small"
-                                                            label={`Prints: ${token.printCount || 1}`}
-                                                            variant="outlined"
-                                                            sx={{ fontSize: '0.75rem', height: 22 }}
-                                                        />
-                                                    </Box>
-
-                                                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', pt: 0.5, borderTop: '1px solid #f1f5f9' }}>
-                                                        <Button
-                                                            size="small"
-                                                            variant="outlined"
-                                                            startIcon={<PrintIcon fontSize="small" />}
-                                                            disabled={token.status !== 'ISSUED'}
+                                                            disabled={token.status === 'CANCELLED'}
                                                             onClick={() => handleReprint(token._id)}
-                                                            sx={{
-                                                                color: '#0b5299',
-                                                                borderColor: '#bfdbfe',
-                                                                textTransform: 'none',
-                                                                fontWeight: 600,
-                                                                fontSize: '0.82rem',
-                                                                '&:hover': { borderColor: '#0b5299', bgcolor: '#eff6ff' }
-                                                            }}
+                                                            sx={{ color: isRedeemed ? '#16a34a' : '#0b5299' }}
                                                         >
-                                                            Reprint Token
-                                                        </Button>
-                                                    </Box>
-                                                </CardContent>
-                                            </Card>
-                                        ))}
-                                    </Box>
+                                                            <PrintIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </span>
+                                                </Tooltip>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
                                 )}
-                            </Box>
-                        ) : (
-                        <TableContainer sx={{ overflowX: 'auto', width: '100%' }}>
-                            <Table size="small" sx={{ minWidth: 650 }}>
-                                <TableHead sx={{ bgcolor: '#f8fafc' }}>
-                                    <TableRow>
-                                        <TableCell sx={{ fontWeight: 700 }}>Token Code</TableCell>
-                                        <TableCell sx={{ fontWeight: 700 }}>Participant Name</TableCell>
-                                        <TableCell sx={{ fontWeight: 700 }}>University / Team</TableCell>
-                                        <TableCell sx={{ fontWeight: 700 }}>Meal</TableCell>
-                                        <TableCell sx={{ fontWeight: 700 }}>Date</TableCell>
-                                        <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
-                                        <TableCell sx={{ fontWeight: 700 }}>Prints</TableCell>
-                                        <TableCell sx={{ fontWeight: 700, textAlign: 'right' }}>Actions</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {loadingTokens ? (
-                                        <TableRow>
-                                            <TableCell colSpan={8} sx={{ textAlign: 'center', py: 4 }}>
-                                                <CircularProgress size={28} sx={{ color: '#0b5299' }} />
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : tokensList.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell colSpan={8} sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>
-                                                No food tokens found for the selected criteria.
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        tokensList.map((token) => (
-                                            <TableRow key={token._id} hover>
-                                                <TableCell sx={{ fontFamily: 'monospace', fontWeight: 800, color: '#0b5299' }}>
-                                                    {token.code}
-                                                </TableCell>
-                                                <TableCell sx={{ fontWeight: 600 }}>{token.name}</TableCell>
-                                                <TableCell sx={{ color: '#475569' }}>{token.teamOrSport}</TableCell>
-                                                <TableCell sx={{ fontWeight: 600 }}>{token.mealType}</TableCell>
-                                                <TableCell sx={{ fontWeight: 600 }}>{formatDateDDMMYYYY(token.mealDate)}</TableCell>
-                                                <TableCell>
-                                                    <Chip
-                                                        size="small"
-                                                        label={token.status}
-                                                        color={token.status === 'ISSUED' ? 'success' : 'error'}
-                                                        sx={{ fontWeight: 700, fontSize: '11px' }}
-                                                    />
-                                                </TableCell>
-                                                <TableCell>{token.printCount || 1}</TableCell>
-                                                <TableCell sx={{ textAlign: 'right' }}>
-                                                    <Tooltip title="Reprint token receipt">
-                                                        <span>
-                                                            <IconButton
-                                                                size="small"
-                                                                disabled={token.status !== 'ISSUED'}
-                                                                onClick={() => handleReprint(token._id)}
-                                                                sx={{ color: '#0b5299' }}
-                                                            >
-                                                                <PrintIcon fontSize="small" />
-                                                            </IconButton>
-                                                        </span>
-                                                    </Tooltip>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                        )}
-
+                            </TableBody>
+                        </Table>
                         <TablePagination
                             rowsPerPageOptions={[10, 20, 50]}
                             component="div"
-                            count={totalTokens}
-                            rowsPerPage={rowsPerPage}
-                            page={page}
-                            onPageChange={(e, newPage) => setPage(newPage)}
-                            onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
+                            count={total}
+                            rowsPerPage={currentRowsPerPage}
+                            page={currentPage}
+                            onPageChange={(e, newPage) => setCurrentPage(newPage)}
+                            onRowsPerPageChange={(e) => { setCurrentRowsPerPage(parseInt(e.target.value, 10)); setCurrentPage(0); }}
                             labelRowsPerPage={
                                 <Box component="span" sx={{ fontSize: 'inherit' }}>
                                     <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>Rows per page:</Box>
@@ -2094,9 +2314,847 @@ const FoodTokens = () => {
                                 }
                             }}
                         />
-                    </Paper>
-                </Box>
-            )}
+                    </TableContainer>
+                );
+
+                // Cards rendering helper
+                const renderCards = (list, loading, isRedeemed) => (
+                    <Box sx={{ p: { xs: 1, sm: 2 } }}>
+                        {loading ? (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+                                <CircularProgress size={32} sx={{ color: isRedeemed ? '#16a34a' : '#0b5299' }} />
+                            </Box>
+                        ) : list.length === 0 ? (
+                            <Box sx={{ textAlign: 'center', py: 6, color: 'text.secondary' }}>
+                                {isRedeemed
+                                    ? 'No redeemed food tokens found for the selected criteria.'
+                                    : 'No issued food tokens found for the selected criteria.'}
+                            </Box>
+                        ) : (
+                            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 2 }}>
+                                {list.map((token) => (
+                                    <Card
+                                        key={token._id}
+                                        variant="outlined"
+                                        sx={{
+                                            borderRadius: 2.5,
+                                            border: '1px solid',
+                                            borderColor: isRedeemed ? '#bbf7d0' : '#e2e8f0',
+                                            boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                                            transition: 'all 0.2s ease',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            '&:hover': {
+                                                boxShadow: isRedeemed ? '0 6px 16px rgba(22,163,74,0.12)' : '0 6px 16px rgba(11,82,153,0.1)',
+                                                borderColor: isRedeemed ? '#86efac' : '#93c5fd'
+                                            }
+                                        }}
+                                    >
+                                        <CardContent sx={{ p: 2, flex: 1, display: 'flex', flexDirection: 'column', gap: 1.5, '&:last-child': { pb: 2 } }}>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <Typography sx={{ fontFamily: 'monospace', fontWeight: 800, color: isRedeemed ? '#15803d' : '#0b5299', fontSize: '0.95rem', bgcolor: isRedeemed ? '#f0fdf4' : '#eff6ff', px: 1, py: 0.3, borderRadius: 1 }}>
+                                                    {token.code}
+                                                </Typography>
+                                                <Chip
+                                                    size="small"
+                                                    label={token.status}
+                                                    sx={{
+                                                        fontWeight: 700,
+                                                        fontSize: '11px',
+                                                        bgcolor: token.status === 'REDEEMED' ? '#dcfce7' : token.status === 'ISSUED' ? '#dbeafe' : '#fee2e2',
+                                                        color: token.status === 'REDEEMED' ? '#15803d' : token.status === 'ISSUED' ? '#1d4ed8' : '#b91c1c',
+                                                        border: '1px solid',
+                                                        borderColor: token.status === 'REDEEMED' ? '#86efac' : token.status === 'ISSUED' ? '#93c5fd' : '#fca5a5'
+                                                    }}
+                                                />
+                                            </Box>
+
+                                            <Box>
+                                                <Typography sx={{ fontWeight: 700, color: '#0f172a', fontSize: '1rem', lineHeight: 1.3 }}>
+                                                    {token.name}
+                                                </Typography>
+                                                <Typography variant="body2" sx={{ color: '#64748b', mt: 0.3, fontSize: '0.85rem' }}>
+                                                    {token.personType} {token.identifier ? `• ${token.identifier}` : ''} {token.teamOrSport ? `• ${token.teamOrSport}` : ''}
+                                                </Typography>
+                                            </Box>
+
+                                            <Box sx={{ bgcolor: '#f8fafc', p: 1.2, borderRadius: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <Box>
+                                                    <Typography variant="caption" sx={{ color: '#64748b', display: 'block', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                                        Meal & Date
+                                                    </Typography>
+                                                    <Typography sx={{ fontWeight: 600, color: '#1e293b', fontSize: '0.85rem' }}>
+                                                        {token.mealType} • {formatDateDDMMYYYY(token.mealDate)}
+                                                    </Typography>
+                                                </Box>
+                                                <Chip
+                                                    size="small"
+                                                    label={`Prints: ${token.printCount || 1}`}
+                                                    variant="outlined"
+                                                    sx={{ fontSize: '0.75rem', height: 22 }}
+                                                />
+                                            </Box>
+
+                                            {(token.block || token.room) && (
+                                                <Typography variant="caption" sx={{ color: '#64748b', display: 'block', px: 0.5 }}>
+                                                    Hostel: {token.block || 'N/A'} - Room: {token.room || 'N/A'}
+                                                </Typography>
+                                            )}
+
+                                            {token.status === 'REDEEMED' && token.redeemedAt && (
+                                                <Box sx={{ bgcolor: '#f0fdf4', p: 1, borderRadius: 1.5, border: '1px solid #bbf7d0' }}>
+                                                    <Typography variant="caption" sx={{ color: '#15803d', fontWeight: 600, display: 'block' }}>
+                                                        Redeemed: {new Date(token.redeemedAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })} {new Date(token.redeemedAt).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' })}
+                                                    </Typography>
+                                                    <Typography variant="caption" sx={{ color: '#166534' }}>
+                                                        by {token.redeemedBy || 'Staff'}
+                                                    </Typography>
+                                                </Box>
+                                            )}
+
+                                            <Box sx={{ display: 'flex', justifyContent: 'flex-end', pt: 0.5, borderTop: '1px solid #f1f5f9' }}>
+                                                <Button
+                                                    size="small"
+                                                    variant="outlined"
+                                                    startIcon={<PrintIcon fontSize="small" />}
+                                                    disabled={token.status === 'CANCELLED'}
+                                                    onClick={() => handleReprint(token._id)}
+                                                    sx={{
+                                                        color: isRedeemed ? '#16a34a' : '#0b5299',
+                                                        borderColor: isRedeemed ? '#bbf7d0' : '#bfdbfe',
+                                                        textTransform: 'none',
+                                                        fontWeight: 600,
+                                                        fontSize: '0.82rem',
+                                                        '&:hover': {
+                                                            borderColor: isRedeemed ? '#16a34a' : '#0b5299',
+                                                            bgcolor: isRedeemed ? '#f0fdf4' : '#eff6ff'
+                                                        }
+                                                    }}
+                                                >
+                                                    Reprint Token
+                                                </Button>
+                                            </Box>
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </Box>
+                        )}
+                    </Box>
+                );
+
+                return (
+                    <Box>
+                        {/* 1. Stats Summary Cards */}
+                        {stats && (
+                            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 2, mb: 3, width: '100%' }}>
+                                {/* Total Active Tokens Created */}
+                                <Card
+                                    sx={{
+                                        position: 'relative',
+                                        overflow: 'hidden',
+                                        borderRadius: '16px',
+                                        background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+                                        border: '1px solid #e2e8f0',
+                                        boxShadow: '0 2px 12px rgba(15, 23, 42, 0.04)',
+                                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                                        '&:hover': {
+                                            transform: 'translateY(-2px)',
+                                            boxShadow: '0 10px 24px rgba(15, 23, 42, 0.08)',
+                                            borderColor: '#cbd5e1'
+                                        }
+                                    }}
+                                >
+                                    <Chip
+                                        label="Overall"
+                                        size="small"
+                                        sx={{
+                                            position: 'absolute',
+                                            top: 12,
+                                            right: 12,
+                                            bgcolor: '#f1f5f9',
+                                            color: '#475569',
+                                            fontWeight: 600,
+                                            fontSize: '0.72rem',
+                                            height: '22px',
+                                            borderRadius: '6px'
+                                        }}
+                                    />
+                                    <CardContent sx={{ py: 2, pr: 2, pl: 1.5, '&:last-child': { pb: 2 } }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                                            <Box sx={{
+                                                width: 48,
+                                                height: 48,
+                                                borderRadius: '12px',
+                                                background: 'linear-gradient(135deg, #475569 0%, #334155 100%)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                color: '#fff',
+                                                boxShadow: '0 4px 12px rgba(71, 85, 105, 0.25)'
+                                            }}>
+                                                <ConfirmationNumberOutlinedIcon sx={{ fontSize: 24 }} />
+                                            </Box>
+                                            <Box>
+                                                <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, fontSize: '0.72rem', letterSpacing: '0.5px', textTransform: 'uppercase', display: 'block' }}>
+                                                    TOTAL TOKENS CREATED
+                                                </Typography>
+                                                <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: { xs: '1.8rem', md: '2rem' }, lineHeight: 1 }}>
+                                                    {(stats.overall?.totalIssued || 0) + (stats.overall?.totalRedeemed || 0)}
+                                                </Typography>
+                                            </Box>
+                                        </Box>
+                                        <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.78rem', fontWeight: 500, display: 'block' }}>
+                                            Total food tokens created for event
+                                        </Typography>
+                                    </CardContent>
+                                </Card>
+
+                                {/* Issued (Pending) Tokens Card - Clickable */}
+                                <Card
+                                    onClick={() => setTokenReportSubTab('ISSUED')}
+                                    sx={{
+                                        position: 'relative',
+                                        overflow: 'hidden',
+                                        borderRadius: '16px',
+                                        background: tokenReportSubTab === 'ISSUED' ? 'linear-gradient(145deg, #eff6ff 0%, #dbeafe 100%)' : 'linear-gradient(145deg, #ffffff 0%, #f0f7ff 100%)',
+                                        border: tokenReportSubTab === 'ISSUED' ? '2px solid #0b5299' : '1px solid #bfdbfe',
+                                        boxShadow: tokenReportSubTab === 'ISSUED' ? '0 6px 16px rgba(11, 82, 153, 0.16)' : '0 2px 12px rgba(11, 82, 153, 0.05)',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                                        '&:hover': {
+                                            transform: 'translateY(-2px)',
+                                            boxShadow: '0 10px 24px rgba(11, 82, 153, 0.15)',
+                                            borderColor: '#0b5299'
+                                        }
+                                    }}
+                                >
+                                    <Chip
+                                        label="Pending"
+                                        size="small"
+                                        sx={{
+                                            position: 'absolute',
+                                            top: 12,
+                                            right: 12,
+                                            bgcolor: '#eff6ff',
+                                            color: '#1d4ed8',
+                                            fontWeight: 700,
+                                            fontSize: '0.72rem',
+                                            height: '22px',
+                                            borderRadius: '6px'
+                                        }}
+                                    />
+                                    <CardContent sx={{ py: 2, pr: 2, pl: 1.5, '&:last-child': { pb: 2 } }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                                            <Box sx={{
+                                                width: 48,
+                                                height: 48,
+                                                borderRadius: '12px',
+                                                background: 'linear-gradient(135deg, #0b5299 0%, #1e40af 100%)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                color: '#fff',
+                                                boxShadow: '0 4px 12px rgba(11, 82, 153, 0.25)'
+                                            }}>
+                                                <ConfirmationNumberOutlinedIcon sx={{ fontSize: 24 }} />
+                                            </Box>
+                                            <Box>
+                                                <Typography variant="caption" sx={{ color: '#0b5299', fontWeight: 700, fontSize: '0.72rem', letterSpacing: '0.5px', textTransform: 'uppercase', display: 'block' }}>
+                                                    ISSUED (PENDING)
+                                                </Typography>
+                                                <Typography sx={{ fontWeight: 800, color: '#0b5299', fontSize: { xs: '1.8rem', md: '2rem' }, lineHeight: 1 }}>
+                                                    {stats.overall?.totalIssued || 0}
+                                                </Typography>
+                                            </Box>
+                                        </Box>
+                                        <Typography variant="caption" sx={{ color: '#0b5299', fontSize: '0.78rem', fontWeight: 600, display: 'block' }}>
+                                            Click to view Issued Table
+                                        </Typography>
+                                    </CardContent>
+                                </Card>
+
+                                {/* Redeemed (Served) Tokens Card - Clickable */}
+                                <Card
+                                    onClick={() => setTokenReportSubTab('REDEEMED')}
+                                    sx={{
+                                        position: 'relative',
+                                        overflow: 'hidden',
+                                        borderRadius: '16px',
+                                        background: tokenReportSubTab === 'REDEEMED' ? 'linear-gradient(145deg, #f0fdf4 0%, #dcfce7 100%)' : 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 100%)',
+                                        border: tokenReportSubTab === 'REDEEMED' ? '2px solid #16a34a' : '1px solid #bbf7d0',
+                                        boxShadow: tokenReportSubTab === 'REDEEMED' ? '0 6px 16px rgba(22, 163, 74, 0.16)' : '0 2px 12px rgba(22, 163, 74, 0.05)',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                                        '&:hover': {
+                                            transform: 'translateY(-2px)',
+                                            boxShadow: '0 10px 24px rgba(22, 163, 74, 0.15)',
+                                            borderColor: '#16a34a'
+                                        }
+                                    }}
+                                >
+                                    <Chip
+                                        label="Meals Served"
+                                        size="small"
+                                        sx={{
+                                            position: 'absolute',
+                                            top: 12,
+                                            right: 12,
+                                            bgcolor: '#ecfdf5',
+                                            color: '#047857',
+                                            fontWeight: 700,
+                                            fontSize: '0.72rem',
+                                            height: '22px',
+                                            borderRadius: '6px'
+                                        }}
+                                    />
+                                    <CardContent sx={{ py: 2, pr: 2, pl: 1.5, '&:last-child': { pb: 2 } }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                                            <Box sx={{
+                                                width: 48,
+                                                height: 48,
+                                                borderRadius: '12px',
+                                                background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                color: '#fff',
+                                                boxShadow: '0 4px 12px rgba(22, 163, 74, 0.25)'
+                                            }}>
+                                                <RestaurantIcon sx={{ fontSize: 24 }} />
+                                            </Box>
+                                            <Box>
+                                                <Typography variant="caption" sx={{ color: '#15803d', fontWeight: 700, fontSize: '0.72rem', letterSpacing: '0.5px', textTransform: 'uppercase', display: 'block' }}>
+                                                    REDEEMED (SERVED)
+                                                </Typography>
+                                                <Typography sx={{ fontWeight: 800, color: '#15803d', fontSize: { xs: '1.8rem', md: '2rem' }, lineHeight: 1 }}>
+                                                    {stats.overall?.totalRedeemed || 0}
+                                                </Typography>
+                                            </Box>
+                                        </Box>
+                                        <Typography variant="caption" sx={{ color: '#16a34a', fontSize: '0.78rem', fontWeight: 600, display: 'block' }}>
+                                            Click to view Redeemed Table
+                                        </Typography>
+                                    </CardContent>
+                                </Card>
+                            </Box>
+                        )}
+
+                        {/* Breakdown by Meal Type (Dashboard Style) */}
+                        {stats?.byMeal && (
+                            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 2, mb: 3, width: '100%' }}>
+                                {[
+                                    {
+                                        mealKey: 'Breakfast',
+                                        title: 'BREAKFAST',
+                                        total: (stats.byMeal?.['Breakfast']?.issued || 0) + (stats.byMeal?.['Breakfast']?.redeemed || 0),
+                                        issued: stats.byMeal?.['Breakfast']?.issued || 0,
+                                        redeemed: stats.byMeal?.['Breakfast']?.redeemed || 0,
+                                        subtitle: 'Morning Meal Tokens',
+                                        badge: 'Morning',
+                                        icon: <WbSunnyOutlinedIcon sx={{ fontSize: 26, color: '#ffffff' }} />,
+                                        bgIcon: <WbSunnyOutlinedIcon sx={{ fontSize: 90, color: '#d97706' }} />,
+                                        gradient: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)',
+                                        shadow: 'rgba(217, 119, 6, 0.22)',
+                                        bgGradient: 'linear-gradient(145deg, #ffffff 0%, #fffbeb 100%)',
+                                        borderColor: '#e2e8f0',
+                                        hoverBorder: '#fde68a',
+                                        badgeBg: '#fffbeb',
+                                        badgeColor: '#b45309'
+                                    },
+                                    {
+                                        mealKey: 'Lunch',
+                                        title: 'LUNCH',
+                                        total: (stats.byMeal?.['Lunch']?.issued || 0) + (stats.byMeal?.['Lunch']?.redeemed || 0),
+                                        issued: stats.byMeal?.['Lunch']?.issued || 0,
+                                        redeemed: stats.byMeal?.['Lunch']?.redeemed || 0,
+                                        subtitle: 'Afternoon Meal Tokens',
+                                        badge: 'Afternoon',
+                                        icon: <RestaurantOutlinedIcon sx={{ fontSize: 26, color: '#ffffff' }} />,
+                                        bgIcon: <RestaurantOutlinedIcon sx={{ fontSize: 90, color: '#059669' }} />,
+                                        gradient: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                                        shadow: 'rgba(5, 150, 105, 0.22)',
+                                        bgGradient: 'linear-gradient(145deg, #ffffff 0%, #f6fdf9 100%)',
+                                        borderColor: '#e2e8f0',
+                                        hoverBorder: '#a7f3d0',
+                                        badgeBg: '#ecfdf5',
+                                        badgeColor: '#047857'
+                                    },
+                                    {
+                                        mealKey: 'Dinner',
+                                        title: 'DINNER',
+                                        total: (stats.byMeal?.['Dinner']?.issued || 0) + (stats.byMeal?.['Dinner']?.redeemed || 0),
+                                        issued: stats.byMeal?.['Dinner']?.issued || 0,
+                                        redeemed: stats.byMeal?.['Dinner']?.redeemed || 0,
+                                        subtitle: 'Night Meal Tokens',
+                                        badge: 'Night',
+                                        icon: <DarkModeOutlinedIcon sx={{ fontSize: 26, color: '#ffffff' }} />,
+                                        bgIcon: <DarkModeOutlinedIcon sx={{ fontSize: 90, color: '#0b5299' }} />,
+                                        gradient: 'linear-gradient(135deg, #0b5299 0%, #1e40af 100%)',
+                                        shadow: 'rgba(11, 82, 153, 0.22)',
+                                        bgGradient: 'linear-gradient(145deg, #ffffff 0%, #f0f7ff 100%)',
+                                        borderColor: '#e2e8f0',
+                                        hoverBorder: '#93c5fd',
+                                        badgeBg: '#eff6ff',
+                                        badgeColor: '#1d4ed8'
+                                    }
+                                ].map((stat, idx) => (
+                                    <Card
+                                        key={idx}
+                                        sx={{
+                                            position: 'relative',
+                                            overflow: 'hidden',
+                                            borderRadius: '16px',
+                                            background: stat.bgGradient,
+                                            border: `1px solid ${stat.borderColor}`,
+                                            boxShadow: '0 2px 12px rgba(15, 23, 42, 0.04)',
+                                            transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                                            height: '100%',
+                                            '&:hover': {
+                                                transform: 'translateY(-3px)',
+                                                boxShadow: '0 10px 24px rgba(15, 23, 42, 0.08)',
+                                                borderColor: stat.hoverBorder
+                                            }
+                                        }}
+                                    >
+                                        <Chip
+                                            label={stat.badge}
+                                            size="small"
+                                            sx={{
+                                                position: 'absolute',
+                                                top: 12,
+                                                right: 12,
+                                                bgcolor: stat.badgeBg,
+                                                color: stat.badgeColor,
+                                                fontWeight: 600,
+                                                fontSize: '0.72rem',
+                                                height: '22px',
+                                                borderRadius: '6px',
+                                                zIndex: 1
+                                            }}
+                                        />
+
+                                        <Box sx={{
+                                            position: 'absolute',
+                                            right: -8,
+                                            bottom: -8,
+                                            opacity: 0.04,
+                                            pointerEvents: 'none',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center'
+                                        }}>
+                                            {stat.bgIcon}
+                                        </Box>
+
+                                        <CardContent sx={{ py: 2, pr: 2, pl: 1.25, '&:last-child': { pb: 2 } }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5, mb: 1.5 }}>
+                                                <Box sx={{
+                                                    width: 52,
+                                                    height: 52,
+                                                    borderRadius: '12px',
+                                                    background: stat.gradient,
+                                                    boxShadow: `0 4px 12px ${stat.shadow}`,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    flexShrink: 0,
+                                                    transition: 'transform 0.2s',
+                                                    '&:hover': { transform: 'scale(1.05)' }
+                                                }}>
+                                                    {stat.icon}
+                                                </Box>
+
+                                                <Box>
+                                                    <Typography
+                                                        variant="caption"
+                                                        sx={{
+                                                            color: '#64748b',
+                                                            fontWeight: 600,
+                                                            fontSize: '0.75rem',
+                                                            letterSpacing: '0.5px',
+                                                            textTransform: 'uppercase',
+                                                            display: 'block',
+                                                            mb: 0.5
+                                                        }}
+                                                    >
+                                                        {stat.title}
+                                                    </Typography>
+                                                    <Typography
+                                                        sx={{
+                                                            fontWeight: 800,
+                                                            color: '#0f172a',
+                                                            fontSize: { xs: '2rem', md: '2.2rem' },
+                                                            lineHeight: 1
+                                                        }}
+                                                    >
+                                                        {stat.total}
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                                                <Chip
+                                                    label={`Issued: ${stat.issued}`}
+                                                    size="small"
+                                                    sx={{ fontSize: '0.72rem', height: 20, bgcolor: '#eff6ff', color: '#1d4ed8', fontWeight: 600 }}
+                                                />
+                                                <Chip
+                                                    label={`Redeemed: ${stat.redeemed}`}
+                                                    size="small"
+                                                    sx={{ fontSize: '0.72rem', height: 20, bgcolor: '#ecfdf5', color: '#047857', fontWeight: 600 }}
+                                                />
+                                            </Box>
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </Box>
+                        )}
+
+                        {/* 2. DATE-WISE MEAL TOKENS & REDEMPTION SUMMARY TABLE */}
+                        {stats && (
+                            <Paper sx={{
+                                p: { xs: 2, sm: 2.5 },
+                                mb: 3,
+                                borderRadius: 3,
+                                border: '1px solid #e2e8f0',
+                                bgcolor: '#ffffff',
+                                boxShadow: '0 2px 10px rgba(15, 23, 42, 0.04)'
+                            }}>
+                                {/* Header row */}
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 1.5, mb: 2, pb: 1.5, borderBottom: '1px solid #f1f5f9' }}>
+                                    <Box>
+                                        <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: { xs: '1rem', sm: '1.1rem' }, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            📅 Meal Tokens & Redemption Summary
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.78rem' }}>
+                                            Date-wise issued, breakfast, lunch, dinner & redeemed count
+                                        </Typography>
+                                    </Box>
+
+                                    {/* Date Mode Selector */}
+                                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+                                        {/* Dropdown: Today / Custom / All */}
+                                        <FormControl size="small" sx={{ minWidth: 130 }}>
+                                            <Select
+                                                value={summaryDateMode}
+                                                onChange={(e) => {
+                                                    const mode = e.target.value;
+                                                    setSummaryDateMode(mode);
+                                                    const today = (() => {
+                                                        const d = new Date();
+                                                        const y = d.getFullYear();
+                                                        const m = String(d.getMonth() + 1).padStart(2, '0');
+                                                        const day = String(d.getDate()).padStart(2, '0');
+                                                        return `${y}-${m}-${day}`;
+                                                    })();
+                                                    if (mode === 'today') {
+                                                        setSummaryFromDate(today);
+                                                        setSummaryToDate(today);
+                                                        fetchStats({ fromDate: today, toDate: today });
+                                                    } else if (mode === 'all') {
+                                                        fetchStats({});
+                                                    }
+                                                    // For 'custom', user will pick dates
+                                                }}
+                                                displayEmpty
+                                                renderValue={(val) => {
+                                                    if (val === 'today') return (
+                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                                                            <TodayIcon sx={{ fontSize: 16, color: '#0b5299' }} />
+                                                            <span>Today</span>
+                                                        </Box>
+                                                    );
+                                                    if (val === 'custom') return (
+                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                                                            <DateRangeIcon sx={{ fontSize: 16, color: '#7c3aed' }} />
+                                                            <span>Custom</span>
+                                                        </Box>
+                                                    );
+                                                    return (
+                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                                                            <ViewListIcon sx={{ fontSize: 16, color: '#047857' }} />
+                                                            <span>All Dates</span>
+                                                        </Box>
+                                                    );
+                                                }}
+                                                sx={{
+                                                    fontWeight: 700,
+                                                    fontSize: '0.84rem',
+                                                    borderRadius: 2,
+                                                    color: '#0b5299',
+                                                    '& .MuiOutlinedInput-notchedOutline': { borderColor: '#0b5299' },
+                                                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#083d73' },
+                                                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#0b5299' },
+                                                    '& .MuiSelect-select': { py: 0.8, pl: 1.5, pr: 3 }
+                                                }}
+                                            >
+                                                <MenuItem value="today" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: '0.85rem', fontWeight: 600 }}>
+                                                    <TodayIcon sx={{ fontSize: 17, color: '#0b5299' }} /> Today
+                                                </MenuItem>
+                                                <MenuItem value="custom" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: '0.85rem', fontWeight: 600 }}>
+                                                    <DateRangeIcon sx={{ fontSize: 17, color: '#7c3aed' }} /> Custom
+                                                </MenuItem>
+                                                <MenuItem value="all" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: '0.85rem', fontWeight: 600 }}>
+                                                    <ViewListIcon sx={{ fontSize: 17, color: '#047857' }} /> All Dates
+                                                </MenuItem>
+                                            </Select>
+                                        </FormControl>
+
+                                        {/* From–To date pickers when Custom is selected */}
+                                        {summaryDateMode === 'custom' && (
+                                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+                                                <TextField
+                                                    type="date"
+                                                    size="small"
+                                                    label="From"
+                                                    value={summaryFromDate}
+                                                    onChange={(e) => {
+                                                        setSummaryFromDate(e.target.value);
+                                                        fetchStats({ fromDate: e.target.value, toDate: summaryToDate });
+                                                    }}
+                                                    slotProps={{ inputLabel: { shrink: true } }}
+                                                    sx={{ width: 145, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                                                />
+                                                <Typography sx={{ color: '#64748b', fontWeight: 600, fontSize: '0.85rem' }}>→</Typography>
+                                                <TextField
+                                                    type="date"
+                                                    size="small"
+                                                    label="To"
+                                                    value={summaryToDate}
+                                                    onChange={(e) => {
+                                                        setSummaryToDate(e.target.value);
+                                                        fetchStats({ fromDate: summaryFromDate, toDate: e.target.value });
+                                                    }}
+                                                    slotProps={{ inputLabel: { shrink: true } }}
+                                                    sx={{ width: 145, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                                                />
+                                            </Box>
+                                        )}
+                                    </Box>
+                                </Box>
+
+                                {/* Date-wise Table */}
+                                {stats.byDate && stats.byDate.length > 0 ? (
+                                    <TableContainer sx={{ overflowX: 'auto', width: '100%', borderRadius: 2, border: '1px solid #e2e8f0' }}>
+                                        <Table size="small" sx={{ minWidth: 580 }}>
+                                            <TableHead sx={{ bgcolor: '#f8fafc' }}>
+                                                <TableRow>
+                                                    <TableCell sx={{ fontWeight: 800, py: 1.5, color: '#1e293b', fontSize: '0.82rem' }}>Meal Date</TableCell>
+                                                    <TableCell sx={{ fontWeight: 800, py: 1.5, color: '#0b5299', fontSize: '0.82rem', textAlign: 'center' }}>Total Issued</TableCell>
+                                                    <TableCell sx={{ fontWeight: 800, py: 1.5, color: '#b45309', fontSize: '0.82rem', textAlign: 'center' }}>Breakfast</TableCell>
+                                                    <TableCell sx={{ fontWeight: 800, py: 1.5, color: '#047857', fontSize: '0.82rem', textAlign: 'center' }}>Lunch</TableCell>
+                                                    <TableCell sx={{ fontWeight: 800, py: 1.5, color: '#1d4ed8', fontSize: '0.82rem', textAlign: 'center' }}>Dinner</TableCell>
+                                                    <TableCell sx={{ fontWeight: 800, py: 1.5, color: '#15803d', fontSize: '0.82rem', textAlign: 'center' }}>Total Redeemed</TableCell>
+                                                </TableRow>
+                                                {/* Sub-header: total / redeemed label */}
+                                                <TableRow sx={{ bgcolor: '#f1f5f9' }}>
+                                                    <TableCell sx={{ py: 0.5, fontSize: '0.72rem', color: '#94a3b8' }} />
+                                                    <TableCell sx={{ py: 0.5, fontSize: '0.72rem', color: '#94a3b8', textAlign: 'center' }}>count</TableCell>
+                                                    <TableCell sx={{ py: 0.5, fontSize: '0.72rem', color: '#94a3b8', textAlign: 'center' }}>total / redeemed</TableCell>
+                                                    <TableCell sx={{ py: 0.5, fontSize: '0.72rem', color: '#94a3b8', textAlign: 'center' }}>total / redeemed</TableCell>
+                                                    <TableCell sx={{ py: 0.5, fontSize: '0.72rem', color: '#94a3b8', textAlign: 'center' }}>total / redeemed</TableCell>
+                                                    <TableCell sx={{ py: 0.5, fontSize: '0.72rem', color: '#94a3b8', textAlign: 'center' }}>count</TableCell>
+                                                </TableRow>
+                                            </TableHead>
+                                            <TableBody>
+                                                {stats.byDate.map((row) => (
+                                                    <TableRow key={row.date} hover sx={{ '&:last-child td': { borderBottom: 0 } }}>
+                                                        <TableCell sx={{ fontWeight: 700, fontSize: '0.88rem', color: '#0f172a', py: 1.2 }}>
+                                                            {formatDateDDMMYYYY(row.date)}
+                                                        </TableCell>
+                                                        <TableCell sx={{ textAlign: 'center', py: 1.2 }}>
+                                                            <Typography sx={{ fontWeight: 800, color: '#0b5299', fontSize: '1rem' }}>
+                                                                {row.totalTokens}
+                                                            </Typography>
+                                                        </TableCell>
+                                                        <TableCell sx={{ textAlign: 'center', py: 1.2 }}>
+                                                            <Typography sx={{ fontWeight: 700, color: '#b45309', fontSize: '0.95rem' }}>
+                                                                {row.breakfast.total}
+                                                                <Box component="span" sx={{ color: '#15803d', fontWeight: 800, ml: 0.4 }}>
+                                                                    / {row.breakfast.redeemed}
+                                                                </Box>
+                                                            </Typography>
+                                                        </TableCell>
+                                                        <TableCell sx={{ textAlign: 'center', py: 1.2 }}>
+                                                            <Typography sx={{ fontWeight: 700, color: '#047857', fontSize: '0.95rem' }}>
+                                                                {row.lunch.total}
+                                                                <Box component="span" sx={{ color: '#15803d', fontWeight: 800, ml: 0.4 }}>
+                                                                    / {row.lunch.redeemed}
+                                                                </Box>
+                                                            </Typography>
+                                                        </TableCell>
+                                                        <TableCell sx={{ textAlign: 'center', py: 1.2 }}>
+                                                            <Typography sx={{ fontWeight: 700, color: '#1d4ed8', fontSize: '0.95rem' }}>
+                                                                {row.dinner.total}
+                                                                <Box component="span" sx={{ color: '#15803d', fontWeight: 800, ml: 0.4 }}>
+                                                                    / {row.dinner.redeemed}
+                                                                </Box>
+                                                            </Typography>
+                                                        </TableCell>
+                                                        <TableCell sx={{ textAlign: 'center', py: 1.2 }}>
+                                                            <Typography sx={{ fontWeight: 800, color: '#15803d', fontSize: '1rem' }}>
+                                                                {row.totalRedeemed}
+                                                            </Typography>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </TableContainer>
+                                ) : (
+                                    <Box sx={{ py: 4, textAlign: 'center', color: '#94a3b8' }}>
+                                        <Typography sx={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                                            {summaryDateMode === 'today' ? 'No tokens issued for today.' : 'No tokens found for the selected date range.'}
+                                        </Typography>
+                                    </Box>
+                                )}
+                            </Paper>
+                        )}
+
+                        {/* 4. Filter Bar & Actions */}
+                        <Paper sx={{ p: 2.5, borderRadius: 3, mb: 3 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' }, mb: 2, flexWrap: 'wrap', gap: 2 }}>
+                                <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', flex: 1, width: '100%' }}>
+                                    <TextField
+                                        size="small"
+                                        placeholder="Search code, name, team, phone..."
+                                        value={filterSearch}
+                                        onChange={(e) => setFilterSearch(e.target.value)}
+                                        sx={{ minWidth: { xs: '100%', sm: 180, md: 220 }, flex: { xs: '1 1 100%', sm: '1 1 auto' } }}
+                                    />
+
+                                    <TextField
+                                        type="date"
+                                        size="small"
+                                        label="Filter Date"
+                                        value={filterMealDate || ''}
+                                        onChange={(e) => handleDateFilterChange(e.target.value)}
+                                        slotProps={{
+                                            inputLabel: { shrink: true },
+                                            input: {
+                                                endAdornment: filterMealDate ? (
+                                                    <InputAdornment position="end">
+                                                        <IconButton size="small" onClick={() => handleDateFilterChange('')} edge="end" sx={{ p: 0.2 }}>
+                                                            <CloseIcon sx={{ fontSize: 15, color: '#64748b' }} />
+                                                        </IconButton>
+                                                    </InputAdornment>
+                                                ) : null
+                                            }
+                                        }}
+                                        sx={{ minWidth: { xs: '100%', sm: 155 }, flex: { xs: '1 1 100%', sm: '1 1 auto' } }}
+                                    />
+
+                                    <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 120 }, flex: { xs: '1 1 100%', sm: '1 1 auto' } }}>
+                                        <InputLabel>Meal Type</InputLabel>
+                                        <Select value={filterMeal} label="Meal Type" onChange={(e) => { setFilterMeal(e.target.value); setIssuedPage(0); setRedeemedPage(0); setAllPage(0); }}>
+                                            <MenuItem value="">All Meals</MenuItem>
+                                            {MEAL_TYPES.map(m => <MenuItem key={m} value={m}>{m}</MenuItem>)}
+                                        </Select>
+                                    </FormControl>
+
+                                    {tokenReportSubTab === 'ALL' && (
+                                        <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 120 }, flex: { xs: '1 1 100%', sm: '1 1 auto' } }}>
+                                            <InputLabel>Status</InputLabel>
+                                            <Select value={filterStatus} label="Status" onChange={(e) => { setFilterStatus(e.target.value); setAllPage(0); }}>
+                                                <MenuItem value="">All Statuses</MenuItem>
+                                                <MenuItem value="ISSUED">Issued</MenuItem>
+                                                <MenuItem value="REDEEMED">Redeemed</MenuItem>
+                                                <MenuItem value="CANCELLED">Cancelled</MenuItem>
+                                            </Select>
+                                        </FormControl>
+                                    )}
+
+                                    <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 120 }, flex: { xs: '1 1 100%', sm: '1 1 auto' } }}>
+                                        <InputLabel>Role / Type</InputLabel>
+                                        <Select value={filterPersonType} label="Role / Type" onChange={(e) => { setFilterPersonType(e.target.value); setIssuedPage(0); setRedeemedPage(0); setAllPage(0); }}>
+                                            <MenuItem value="">All Roles</MenuItem>
+                                            <MenuItem value="PLAYER">Player</MenuItem>
+                                            <MenuItem value="COACH">Coach</MenuItem>
+                                            <MenuItem value="MANAGER">Manager</MenuItem>
+                                        </Select>
+                                    </FormControl>
+                                </Box>
+
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: { xs: '100%', sm: 'auto' }, justifyContent: { xs: 'space-between', sm: 'flex-end' } }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, bgcolor: '#ffffff', p: 0.4, borderRadius: 2, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                                        <Tooltip title="Cards View">
+                                            <IconButton
+                                                size="small"
+                                                onClick={() => setTokensViewMode('cards')}
+                                                sx={{
+                                                    p: 0.6,
+                                                    borderRadius: 1.5,
+                                                    bgcolor: tokensViewMode === 'cards' ? '#0b5299' : 'transparent',
+                                                    color: tokensViewMode === 'cards' ? '#ffffff' : '#64748b',
+                                                    boxShadow: tokensViewMode === 'cards' ? '0 1px 3px rgba(11,82,153,0.3)' : 'none',
+                                                    '&:hover': {
+                                                        bgcolor: tokensViewMode === 'cards' ? '#0b5299' : 'rgba(0,0,0,0.06)',
+                                                        color: tokensViewMode === 'cards' ? '#ffffff' : '#0b5299'
+                                                    }
+                                                }}
+                                            >
+                                                <GridViewRoundedIcon sx={{ fontSize: 18 }} />
+                                            </IconButton>
+                                        </Tooltip>
+                                        <Tooltip title="Table View">
+                                            <IconButton
+                                                size="small"
+                                                onClick={() => setTokensViewMode('table')}
+                                                sx={{
+                                                    p: 0.6,
+                                                    borderRadius: 1.5,
+                                                    bgcolor: tokensViewMode === 'table' ? '#0b5299' : 'transparent',
+                                                    color: tokensViewMode === 'table' ? '#ffffff' : '#64748b',
+                                                    boxShadow: tokensViewMode === 'table' ? '0 1px 3px rgba(11,82,153,0.3)' : 'none',
+                                                    '&:hover': {
+                                                        bgcolor: tokensViewMode === 'table' ? '#0b5299' : 'rgba(0,0,0,0.06)',
+                                                        color: tokensViewMode === 'table' ? '#ffffff' : '#0b5299'
+                                                    }
+                                                }}
+                                            >
+                                                <TableRowsRoundedIcon sx={{ fontSize: 18 }} />
+                                            </IconButton>
+                                        </Tooltip>
+                                    </Box>
+
+                                    <Button
+                                        variant="outlined"
+                                        disabled={exportingCsv}
+                                        startIcon={exportingCsv ? <CircularProgress size={16} sx={{ color: '#0b5299' }} /> : <DownloadIcon />}
+                                        onClick={handleExportCSV}
+                                        sx={{ color: '#0b5299', borderColor: '#0b5299', flex: { xs: 1, sm: 'none' }, whiteSpace: 'nowrap' }}
+                                    >
+                                        {exportingCsv ? 'Exporting...' : 'Export CSV'}
+                                    </Button>
+                                </Box>
+                            </Box>
+
+                            {/* 4. Display Redeemed Tokens Only */}
+                            <Box sx={{ mt: 2 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2, pb: 1.5, borderBottom: '1px solid #e2e8f0' }}>
+                                    <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a' }}>
+                                        <RestaurantIcon sx={{ fontSize: 20 }} />
+                                    </Box>
+                                    <Box>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <Typography sx={{ fontWeight: 800, color: '#16a34a', fontSize: '1.05rem' }}>
+                                                Redeemed Food Tokens (Meals Served)
+                                            </Typography>
+                                            <Chip size="small" label={`${totalRedeemedTokens} Served`} sx={{ bgcolor: '#dcfce7', color: '#15803d', fontWeight: 700, height: 22 }} />
+                                        </Box>
+                                        <Typography variant="caption" sx={{ color: '#64748b' }}>
+                                            Food tokens verified and redeemed at the dining hall counter
+                                        </Typography>
+                                    </Box>
+                                </Box>
+                                {tokensViewMode === 'cards'
+                                    ? renderCards(redeemedList, loadingRedeemed, true)
+                                    : renderTable(redeemedList, loadingRedeemed, totalRedeemedTokens, redeemedPage, setRedeemedPage, redeemedRowsPerPage, setRedeemedRowsPerPage, true, false)}
+                            </Box>
+                        </Paper>
+                    </Box>
+                );
+            })()}
 
             {/* Issue Team Food Tokens Dialog */}
             <Dialog

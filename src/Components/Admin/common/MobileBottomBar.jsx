@@ -5,8 +5,8 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import HomeRoundedIcon from '@mui/icons-material/HomeRounded';
 import HotelOutlinedIcon from '@mui/icons-material/HotelOutlined';
+import QrCodeScannerRoundedIcon from '@mui/icons-material/QrCodeScannerRounded';
 import RestaurantRoundedIcon from '@mui/icons-material/RestaurantRounded';
-import PaymentsOutlinedIcon from '@mui/icons-material/PaymentsOutlined';
 import GridViewOutlinedIcon from '@mui/icons-material/GridViewOutlined';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 
@@ -28,47 +28,33 @@ const MobileBottomBar = () => {
 
     const menus = getMenusByRole(user.role, user.allowedModules);
 
-    // Filter out the modules already placed on the bottom bar (Accommodation, Food Tokens, Caution Deposit, Dashboard)
+    // Modules placed outside on the bottom bar: Home, Accommodation, QR Scanner, Food Tokens
     const bottomBarPaths = [
         '/admin/dashboard',
         '/admin/hostel-provision',
-        '/admin/food-tokens',
-        '/admin/caution-deposite'
+        '/admin/qr-scanner',
+        '/admin/food-tokens'
     ];
+    // Remaining modules are placed inside the 'More' (All Modules) drawer
     const drawerMenus = menus.filter(item => !bottomBarPaths.includes(item.path));
 
     const [modulesSheetOpen, setModulesSheetOpen] = useState(false);
 
     const currentPath = location.pathname;
 
-    const isAccommodationActive = currentPath === '/admin/hostel-provision';
-    const isFoodTokensActive = currentPath === '/admin/food-tokens';
     const isHomeActive = currentPath === '/admin/dashboard' || currentPath === '/admin' || currentPath === '/admin/';
-    const isCautionDepositActive = currentPath === '/admin/caution-deposite';
-    const isOtherModuleActive = !isHomeActive && !isAccommodationActive && !isFoodTokensActive && !isCautionDepositActive;
+    const isAccommodationActive = currentPath === '/admin/hostel-provision';
+    const isQRScannerActive = currentPath === '/admin/qr-scanner';
+    const isFoodTokensActive = currentPath === '/admin/food-tokens';
+    const isOtherModuleActive = !isHomeActive && !isAccommodationActive && !isQRScannerActive && !isFoodTokensActive;
 
     const handleNavigate = (path) => {
         setModulesSheetOpen(false);
         navigate(path);
     };
 
+    // User-requested menu order: Home, Accommodation, QR Scanner, Food Tokens, More
     const allPotentialNavItems = [
-        {
-            id: 'accommodation',
-            label: 'Accommodation',
-            path: '/admin/hostel-provision',
-            icon: HotelOutlinedIcon,
-            isActive: isAccommodationActive,
-            onClick: () => handleNavigate('/admin/hostel-provision')
-        },
-        {
-            id: 'food',
-            label: 'Food Tokens',
-            path: '/admin/food-tokens',
-            icon: RestaurantRoundedIcon,
-            isActive: isFoodTokensActive,
-            onClick: () => handleNavigate('/admin/food-tokens')
-        },
         {
             id: 'home',
             label: 'Home',
@@ -78,12 +64,28 @@ const MobileBottomBar = () => {
             onClick: () => handleNavigate('/admin/dashboard')
         },
         {
-            id: 'caution',
-            label: 'Caution Deposit',
-            path: '/admin/caution-deposite',
-            icon: PaymentsOutlinedIcon,
-            isActive: isCautionDepositActive,
-            onClick: () => handleNavigate('/admin/caution-deposite')
+            id: 'accommodation',
+            label: 'Accommodation',
+            path: '/admin/hostel-provision',
+            icon: HotelOutlinedIcon,
+            isActive: isAccommodationActive,
+            onClick: () => handleNavigate('/admin/hostel-provision')
+        },
+        {
+            id: 'qr-scanner',
+            label: 'QR Scanner',
+            path: '/admin/qr-scanner',
+            icon: QrCodeScannerRoundedIcon,
+            isActive: isQRScannerActive,
+            onClick: () => handleNavigate('/admin/qr-scanner')
+        },
+        {
+            id: 'food',
+            label: 'Food Tokens',
+            path: '/admin/food-tokens',
+            icon: RestaurantRoundedIcon,
+            isActive: isFoodTokensActive,
+            onClick: () => handleNavigate('/admin/food-tokens')
         },
         {
             id: 'modules',

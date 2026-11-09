@@ -394,6 +394,9 @@ const QRScanner = () => {
             setIsCameraActive(true);
             localStorage.setItem('qr_scanner_camera_permission_saved', 'true');
 
+            // Automatically unlock audio engine with camera permission activation
+            unlockAudioEngine();
+
             // Refresh device list now that permission is active
             loadVideoDevices(deviceId);
 
@@ -493,20 +496,22 @@ const QRScanner = () => {
         }
     };
 
-    // Global interaction listener: any screen touch or click activates mobile audio
+    // Global interaction listener: any screen touch, tap, or click activates mobile audio silently
     useEffect(() => {
         const handleInteraction = () => {
-            if (!isAudioUnlocked) {
-                unlockAudioEngine();
-            }
+            unlockAudioEngine();
         };
         window.addEventListener('touchstart', handleInteraction, { passive: true });
+        window.addEventListener('touchend', handleInteraction, { passive: true });
+        window.addEventListener('pointerdown', handleInteraction, { passive: true });
         window.addEventListener('click', handleInteraction, { passive: true });
         return () => {
             window.removeEventListener('touchstart', handleInteraction);
+            window.removeEventListener('touchend', handleInteraction);
+            window.removeEventListener('pointerdown', handleInteraction);
             window.removeEventListener('click', handleInteraction);
         };
-    }, [isAudioUnlocked, unlockAudioEngine]);
+    }, [unlockAudioEngine]);
 
     // Initialize ZXing code reader & auto-start camera on mount
     useEffect(() => {
@@ -837,52 +842,23 @@ const QRScanner = () => {
                             </Box>
                         </Box>
 
-                        {/* Mobile Tap-to-Enable Beep Sound prompt */}
-                        {!isAudioUnlocked && (
-                            <Box
-                                onClick={async () => {
-                                    await unlockAudioEngine();
-                                    playAudioFeedback('scan', true);
-                                    toast.success('Beep sound activated!');
-                                }}
-                                sx={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: 1.2,
-                                    py: 1.1,
-                                    px: 2,
-                                    mb: 1.5,
-                                    backgroundColor: '#f0fdf4',
-                                    border: '1.5px dashed #16a34a',
-                                    borderRadius: 2,
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s ease',
-                                    '&:hover': {
-                                        backgroundColor: '#dcfce7'
-                                    }
-                                }}
-                            >
-                                <VolumeUpIcon sx={{ color: '#16a34a', fontSize: 22 }} />
-                                <Typography variant="body2" sx={{ color: '#15803d', fontWeight: 700, fontSize: '0.875rem' }}>
-                                    Tap to Enable Beep Sound 🔊
-                                </Typography>
-                            </Box>
-                        )}
-
                         {/* Scanner Video Viewport */}
-                        <Box sx={{
-                            position: 'relative',
-                            width: '100%',
-                            height: { xs: '260px', sm: '320px', md: '360px' },
-                            backgroundColor: '#050c14',
-                            borderRadius: 2,
-                            overflow: 'hidden',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            border: '2px solid #0b5299'
-                        }}>
+                        <Box
+                            onClick={unlockAudioEngine}
+                            onTouchStart={unlockAudioEngine}
+                            sx={{
+                                position: 'relative',
+                                width: '100%',
+                                height: { xs: '260px', sm: '320px', md: '360px' },
+                                backgroundColor: '#050c14',
+                                borderRadius: 2,
+                                overflow: 'hidden',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                border: '2px solid #0b5299'
+                            }}
+                        >
                             {/* Video Element */}
                             <video
                                 ref={videoRef}
@@ -1135,99 +1111,6 @@ const QRScanner = () => {
                                     </Box>
                                 )}
 
-                                {/* Token Details Card */}
-                                {lastScanResult.token && (
-                                    <Box sx={{
-                                        backgroundColor: '#fbfbfd',
-                                        borderRadius: 2,
-                                        p: 2,
-                                        border: '1px solid #eef0f3',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: 1.5
-                                    }}>
-                                        {/* Code & Meal Badge */}
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <Typography variant="caption" sx={{ color: '#777', fontWeight: 600 }}>TOKEN CODE</Typography>
-                                            <Chip
-                                                label={lastScanResult.token.code}
-                                                size="small"
-                                                sx={{
-                                                    fontFamily: 'monospace',
-                                                    fontWeight: 900,
-                                                    fontSize: '0.9rem',
-                                                    letterSpacing: 1.5,
-                                                    backgroundColor: '#0b5299',
-                                                    color: '#fff'
-                                                }}
-                                            />
-                                        </Box>
-
-                                        <Divider />
-
-                                        {/* Participant Name & Role */}
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                            <PersonIcon sx={{ color: '#d06c38' }} />
-                                            <Box>
-                                                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#222' }}>
-                                                    {lastScanResult.token.name}
-                                                </Typography>
-                                                <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>
-                                                    {lastScanResult.token.personType} {lastScanResult.token.identifier ? `• ${lastScanResult.token.identifier}` : ''}
-                                                </Typography>
-                                            </Box>
-                                        </Box>
-
-                                        {/* University / College */}
-                                        {lastScanResult.token.teamOrSport && (
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                                <SchoolIcon sx={{ color: '#0b5299' }} />
-                                                <Typography variant="body2" sx={{ fontWeight: 600, color: '#444' }}>
-                                                    {lastScanResult.token.teamOrSport}
-                                                </Typography>
-                                            </Box>
-                                        )}
-
-                                        {/* Meal & Date */}
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                            <RestaurantIcon sx={{ color: '#d06c38' }} />
-                                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#0b5299' }}>
-                                                {lastScanResult.token.mealType} • {lastScanResult.token.mealDate}
-                                            </Typography>
-                                        </Box>
-
-                                        {/* Hostel Accommodation */}
-                                        {(lastScanResult.token.block || lastScanResult.token.room) && (
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                                <MeetingRoomIcon sx={{ color: '#666' }} />
-                                                <Typography variant="caption" sx={{ color: '#555', fontWeight: 600 }}>
-                                                    Hostel: {lastScanResult.token.block || 'N/A'} - Room: {lastScanResult.token.room || 'N/A'}
-                                                </Typography>
-                                            </Box>
-                                        )}
-
-                                        {/* Redemption Info if already redeemed */}
-                                        {lastScanResult.token.redeemedAt && (
-                                            <Box sx={{
-                                                mt: 0.5,
-                                                p: 1,
-                                                borderRadius: 1,
-                                                backgroundColor: '#fff3e0',
-                                                border: '1px solid #ffe0b2'
-                                            }}>
-                                                <Typography variant="caption" sx={{ color: '#e65100', fontWeight: 600, display: 'block' }}>
-                                                    Redeemed at: {new Date(lastScanResult.token.redeemedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
-                                                </Typography>
-                                                {lastScanResult.token.redeemedBy && (
-                                                    <Typography variant="caption" sx={{ color: '#bf360c' }}>
-                                                        Redeemed by: {lastScanResult.token.redeemedBy}
-                                                    </Typography>
-                                                )}
-                                            </Box>
-                                        )}
-                                    </Box>
-                                )}
-
                                 {/* Clear / Scan Next Button */}
                                 <Button
                                     variant="outlined"
@@ -1241,73 +1124,6 @@ const QRScanner = () => {
                             </Box>
                         )}
                     </CardContent>
-            </Card>
-
-            {/* Session Scans History Table */}
-            <Card sx={{
-                borderRadius: '16px',
-                border: '1px solid #e2e8f0',
-                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)'
-            }}>
-                <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                        <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#0b5299' }}>
-                            Recent Scans in This Session ({sessionHistory.length})
-                        </Typography>
-                        {sessionHistory.length > 0 && (
-                            <Button
-                                size="small"
-                                color="inherit"
-                                onClick={() => setSessionHistory([])}
-                            >
-                                Clear History
-                            </Button>
-                        )}
-                    </Box>
-
-                    {sessionHistory.length === 0 ? (
-                        <Typography variant="body2" sx={{ color: '#999', py: 2, textAlign: 'center' }}>
-                            No scans in this session yet. Scanned tokens will appear here.
-                        </Typography>
-                    ) : (
-                        <TableContainer component={Paper} elevation={0} sx={{ maxHeight: 300 }}>
-                            <Table size="small" stickyHeader>
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell sx={{ fontWeight: 700 }}>Time</TableCell>
-                                        <TableCell sx={{ fontWeight: 700 }}>Token Code</TableCell>
-                                        <TableCell sx={{ fontWeight: 700 }}>Participant Name</TableCell>
-                                        <TableCell sx={{ fontWeight: 700 }}>Meal</TableCell>
-                                        <TableCell sx={{ fontWeight: 700 }}>Date</TableCell>
-                                        <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {sessionHistory.map((item) => (
-                                        <TableRow key={item.id} hover>
-                                            <TableCell sx={{ fontSize: '0.8rem', color: '#666' }}>{item.time}</TableCell>
-                                            <TableCell sx={{ fontFamily: 'monospace', fontWeight: 800 }}>{item.code}</TableCell>
-                                            <TableCell sx={{ fontWeight: 600 }}>{item.name}</TableCell>
-                                            <TableCell>{item.mealType}</TableCell>
-                                            <TableCell sx={{ fontSize: '0.8rem' }}>{item.mealDate}</TableCell>
-                                            <TableCell>
-                                                {item.status === 'REDEEMED_NOW' || item.status === 'REDEEMED' ? (
-                                                    <Chip label="Redeemed" size="small" color="success" sx={{ fontWeight: 700 }} />
-                                                ) : item.status === 'ALREADY_REDEEMED' ? (
-                                                    <Chip label="Already Used" size="small" color="error" sx={{ fontWeight: 700 }} />
-                                                ) : item.status === 'CANCELLED' ? (
-                                                    <Chip label="Cancelled" size="small" color="warning" sx={{ fontWeight: 700 }} />
-                                                ) : (
-                                                    <Chip label={item.status} size="small" color="default" sx={{ fontWeight: 700 }} />
-                                                )}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    )}
-                </CardContent>
             </Card>
         </Box>
     );

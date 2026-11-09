@@ -249,9 +249,22 @@ export const foodTokenAPI = {
         });
         return apiFetch(`/food-tokens?${cleanParams.toString()}`, {}, true);
     },
-    getStats: () => {
-        return apiFetch('/food-tokens/stats', {}, true);
+    getStats: (params = {}) => {
+        const cleanParams = new URLSearchParams();
+        Object.entries(params).forEach(([k, v]) => {
+            if (v !== undefined && v !== null && v !== '') {
+                cleanParams.append(k, v);
+            }
+        });
+        const query = cleanParams.toString();
+        return apiFetch(`/food-tokens/stats${query ? `?${query}` : ''}`, {}, true);
     },
+    getMissingDeparture: () => apiFetch('/food-tokens/missing-departure', {}, true),
+    updateDeparture: (payload) =>
+        apiFetch('/food-tokens/update-departure', {
+            method: 'PUT',
+            body: JSON.stringify(payload)
+        }, true),
 };
 
 // Route Map APIs
