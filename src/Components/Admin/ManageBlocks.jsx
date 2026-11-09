@@ -224,8 +224,8 @@ const ManageBlocks = () => {
 
     const handleDownloadTemplate = () => {
         const csvContent = "data:text/csv;charset=utf-8,"
-            + "Category,Block Name,Warden Name,Warden Contact,Office Hours,Address,Capacity Per Room,Floor Name,Rooms Count,Room Numbers (Use space after comma e.g. 101, 102)\n"
-            + "Boys Hostel,Boys Hostel Block A,Vishnu,9143143143,06:00 AM - 10:00 PM,Surampalem,4,Ground Floor,5,\"101, 102, 103, 104, 105\"";
+            + "Category,Block Name,Incharge Name,Incharge Contact,Capacity Per Room,Floor Name,Rooms Count,Room Numbers (Use space after comma e.g. 101, 102)\n"
+            + "Boys Hostel,Boys Hostel Block A,Vishnu,9143143143,4,Ground Floor,5,\"101, 102, 103, 104, 105\"";
 
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
@@ -293,10 +293,8 @@ const ManageBlocks = () => {
                     blocksMap[blockName] = {
                         name: blockName,
                         block: getVal('Category') || 'Boys Hostel',
-                        warden: getVal('Warden Name'),
-                        wardenContact: getVal('Warden Contact'),
-                        officeHours: getVal('Office Hours'),
-                        address: getVal('Address'),
+                        warden: getVal('Incharge Name') || getVal('Warden Name'),
+                        wardenContact: getVal('Incharge Contact') || getVal('Warden Contact'),
                         capacityPerRoom: parseInt(getVal('Capacity Per Room'), 10) || 4,
                         floors: []
                     };
@@ -550,10 +548,10 @@ const ManageBlocks = () => {
 
                                                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.6, fontSize: '0.85rem', pt: 0.5, borderTop: '1px solid #f1f5f9' }}>
                                                         <Typography variant="body2" sx={{ color: '#475569', display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                            <strong style={{ color: '#1e293b' }}>Warden:</strong> {b.warden || 'N/A'}
+                                                            <strong style={{ color: '#1e293b' }}>Incharge:</strong> {b.incharge || b.warden || 'N/A'}
                                                         </Typography>
                                                         <Typography variant="body2" sx={{ color: '#475569', display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                            <strong style={{ color: '#1e293b' }}>Contact:</strong> {b.wardenContact || 'N/A'}
+                                                            <strong style={{ color: '#1e293b' }}>Contact:</strong> {b.inchargeContact || b.wardenContact || 'N/A'}
                                                         </Typography>
                                                     </Box>
                                                 </CardContent>
@@ -571,7 +569,7 @@ const ManageBlocks = () => {
                             <TableRow>
                                 <TableCell><b>Category</b></TableCell>
                                 <TableCell><b>Block Name</b></TableCell>
-                                <TableCell><b>Warden</b></TableCell>
+                                <TableCell><b>Incharge</b></TableCell>
                                 <TableCell><b>Contact</b></TableCell>
                                 <TableCell><b>Floors</b></TableCell>
                                 <TableCell><b>Rooms</b></TableCell>
@@ -583,8 +581,8 @@ const ManageBlocks = () => {
                                 <TableRow key={b._id}>
                                     <TableCell>{b.block}</TableCell>
                                     <TableCell>{b.name}</TableCell>
-                                    <TableCell>{b.warden || 'N/A'}</TableCell>
-                                    <TableCell>{b.wardenContact || 'N/A'}</TableCell>
+                                    <TableCell>{b.incharge || b.warden || 'N/A'}</TableCell>
+                                    <TableCell>{b.inchargeContact || b.wardenContact || 'N/A'}</TableCell>
                                     <TableCell>{b.floors ? b.floors.length : 0}</TableCell>
                                     <TableCell>
                                         {b.floors ? b.floors.reduce((acc, f) => acc + f.roomCount, 0) : b.totalRooms || 0}
@@ -693,10 +691,8 @@ const ManageBlocks = () => {
 
                         <Box sx={{ borderTop: '1px solid #e2e8f0', my: 1, pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
                             <Typography variant="subtitle2" sx={{ color: '#0f172a', fontWeight: 'bold' }}>Additional Details</Typography>
-                            <TextField label="Warden Name" name="warden" value={formData.warden} onChange={handleChange} fullWidth />
-                            <TextField label="Warden Contact" name="wardenContact" value={formData.wardenContact} onChange={handleChange} fullWidth />
-                            <TextField label="Office Hours" name="officeHours" value={formData.officeHours} onChange={handleChange} fullWidth />
-                            <TextField label="Address" name="address" value={formData.address} onChange={handleChange} fullWidth multiline rows={2} />
+                            <TextField label="Incharge Name" name="warden" value={formData.warden} onChange={handleChange} fullWidth />
+                            <TextField label="Incharge Contact" name="wardenContact" value={formData.wardenContact} onChange={handleChange} fullWidth />
                             <TextField label="Capacity Per Room" name="capacityPerRoom" type="number" value={formData.capacityPerRoom} onChange={handleChange} fullWidth />
                         </Box>
                     </DialogContent>

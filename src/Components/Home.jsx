@@ -1044,24 +1044,24 @@ const Home = () => {
                                                             }}
                                                             sx={{
                                                                 position: 'relative',
-                                                                borderRadius: 3,
+                                                                borderRadius: 2,
                                                                 overflow: 'hidden',
-                                                                bgcolor: '#f8fafc',
-                                                                border: '1.5px solid #e2e8f0',
-                                                                boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+                                                                bgcolor: 'transparent',
+                                                                border: 'none',
+                                                                boxShadow: 'none',
                                                                 cursor: 'pointer',
                                                                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                                                height: { xs: 260, sm: 300, md: mapImagesList.length === 1 ? 460 : 320 },
+                                                                height: 'auto',
                                                                 display: 'flex',
                                                                 alignItems: 'center',
                                                                 justifyContent: 'center',
-                                                                p: 1.5,
+                                                                p: 0,
+                                                                width: '100%',
                                                                 '&:hover': {
-                                                                    transform: 'translateY(-4px)',
-                                                                    boxShadow: '0 12px 28px rgba(11,82,153,0.18)',
-                                                                    borderColor: '#0b5299',
+                                                                    transform: 'translateY(-2px)',
+                                                                    boxShadow: 'none',
                                                                     '& .gallery-hover-overlay': { opacity: 1 },
-                                                                    '& .gallery-image': { transform: 'scale(1.025)' }
+                                                                    '& .gallery-image': { transform: 'scale(1.015)' }
                                                                 }
                                                             }}
                                                         >
@@ -1121,12 +1121,13 @@ const Home = () => {
                                                                 alt={`Campus Route Map ${idx + 1}`}
                                                                 className="gallery-image"
                                                                 sx={{
+                                                                    width: '100%',
                                                                     maxWidth: '100%',
-                                                                    maxHeight: '100%',
-                                                                    width: 'auto',
                                                                     height: 'auto',
+                                                                    maxHeight: { xs: 340, sm: 480, md: 560 },
                                                                     objectFit: 'contain',
-                                                                    borderRadius: 1.5,
+                                                                    borderRadius: 2,
+                                                                    display: 'block',
                                                                     transition: 'transform 0.3s ease'
                                                                 }}
                                                             />
@@ -1137,13 +1138,14 @@ const Home = () => {
                                                                 sx={{
                                                                     position: 'absolute',
                                                                     inset: 0,
-                                                                    bgcolor: 'rgba(11, 82, 153, 0.08)',
+                                                                    bgcolor: 'rgba(11, 82, 153, 0.05)',
                                                                     display: 'flex',
                                                                     alignItems: 'center',
                                                                     justifyContent: 'center',
                                                                     opacity: 0,
                                                                     transition: 'opacity 0.2s ease',
-                                                                    pointerEvents: 'none'
+                                                                    pointerEvents: 'none',
+                                                                    borderRadius: 2
                                                                 }}
                                                             >
                                                                 <Box
@@ -1251,9 +1253,13 @@ const Home = () => {
                 slotProps={{
                     paper: {
                         sx: {
-                            borderRadius: 3,
-                            p: { xs: 1, sm: 2 },
-                            bgcolor: '#ffffff'
+                            borderRadius: { xs: 2.5, sm: 3 },
+                            p: { xs: 1, sm: 1.5 },
+                            m: { xs: 1, sm: 2 },
+                            width: { xs: 'calc(100% - 16px)', sm: 'auto' },
+                            maxHeight: '92vh',
+                            bgcolor: '#ffffff',
+                            overflow: 'hidden'
                         }
                     }
                 }}
@@ -1264,36 +1270,51 @@ const Home = () => {
 
                     return (
                         <>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', px: 2, py: 1.2, borderBottom: '1px solid #f1f5f9', gap: 1.5 }}>
-                                {/* Left Side Top Corner: Download Button */}
-                                <Button
-                                    variant="contained"
-                                    size="small"
-                                    startIcon={<DownloadIcon />}
-                                    onClick={() => handleDownloadMap(currentMapImg, `campus-route-map-${selectedMapIndex + 1}`)}
-                                    sx={{
-                                        bgcolor: '#0b5299',
-                                        color: '#ffffff',
-                                        borderRadius: 2,
-                                        textTransform: 'none',
-                                        fontWeight: 700,
-                                        fontSize: '13px',
-                                        px: 2,
-                                        py: 0.6,
-                                        boxShadow: '0 2px 8px rgba(11,82,153,0.25)',
-                                        '&:hover': {
-                                            bgcolor: '#083d73'
-                                        }
-                                    }}
-                                >
-                                    Download Map
-                                </Button>
-
-                                {/* Center: Title & Map Index */}
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                    <Typography variant="h6" fontWeight="bold" sx={{ color: '#0b5299', fontSize: { xs: '1rem', sm: '1.15rem' } }}>
-                                        {routeMap?.title || 'Campus Route Map'}
+                            <Box sx={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                px: { xs: 1.5, sm: 2 },
+                                py: { xs: 1, sm: 1.2 },
+                                borderBottom: '1px solid #f1f5f9',
+                                gap: 1.5
+                            }}>
+                                {/* Title & Map Index */}
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
+                                    <Typography
+                                        variant="h6"
+                                        fontWeight="bold"
+                                        sx={{
+                                            color: '#0b5299',
+                                            fontSize: { xs: '0.95rem', sm: '1.15rem' },
+                                            lineHeight: 1.3
+                                        }}
+                                    >
+                                        {routeMap?.title || 'Aditya University Campus Route Map'}
                                     </Typography>
+
+                                    {/* Mobile view only: Download button right next to title */}
+                                    <Tooltip title="Download High-Res Map">
+                                        <IconButton
+                                            onClick={() => handleDownloadMap(currentMapImg, `campus-route-map-${selectedMapIndex + 1}`)}
+                                            size="small"
+                                            aria-label="Download Map"
+                                            sx={{
+                                                display: { xs: 'inline-flex', sm: 'none' },
+                                                color: '#0b5299',
+                                                bgcolor: '#eff6ff',
+                                                border: '1.5px solid #bfdbfe',
+                                                width: 32,
+                                                height: 32,
+                                                flexShrink: 0,
+                                                boxShadow: '0 1px 4px rgba(11,82,153,0.15)',
+                                                '&:hover': { bgcolor: '#dbeafe', color: '#1d4ed8' }
+                                            }}
+                                        >
+                                            <DownloadIcon sx={{ fontSize: 18 }} />
+                                        </IconButton>
+                                    </Tooltip>
+
                                     {mapImagesList.length > 1 && (
                                         <Chip
                                             label={`Map ${selectedMapIndex + 1} of ${mapImagesList.length}`}
@@ -1304,16 +1325,27 @@ const Home = () => {
                                 </Box>
 
                                 {/* Right Side: Close Button */}
-                                <IconButton onClick={() => setIsMapModalOpen(false)} size="small" sx={{ color: '#64748b' }}>
-                                    <CloseIcon />
+                                <IconButton
+                                    onClick={() => setIsMapModalOpen(false)}
+                                    size="small"
+                                    sx={{
+                                        color: '#64748b',
+                                        bgcolor: '#f1f5f9',
+                                        flexShrink: 0,
+                                        '&:hover': { bgcolor: '#e2e8f0', color: '#0f172a' }
+                                    }}
+                                >
+                                    <CloseIcon fontSize="small" />
                                 </IconButton>
                             </Box>
-                            <DialogContent sx={{ p: 1, textAlign: 'center', position: 'relative' }}>
-                                {/* Floating Top-Left Download Shortcut over Image */}
+
+                            <DialogContent sx={{ p: { xs: 0.5, sm: 1 }, textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+                                {/* Floating Top-Left Download Shortcut over Image (Desktop Only) */}
                                 <Tooltip title="Download High-Res Map">
                                     <IconButton
                                         onClick={() => handleDownloadMap(currentMapImg, `campus-route-map-${selectedMapIndex + 1}`)}
                                         sx={{
+                                            display: { xs: 'none', sm: 'flex' },
                                             position: 'absolute',
                                             left: 20,
                                             top: 20,
@@ -1322,13 +1354,15 @@ const Home = () => {
                                             backdropFilter: 'blur(4px)',
                                             color: '#0b5299',
                                             boxShadow: '0 2px 10px rgba(0,0,0,0.18)',
+                                            width: 44,
+                                            height: 44,
                                             '&:hover': {
                                                 bgcolor: '#0b5299',
                                                 color: '#ffffff'
                                             }
                                         }}
                                     >
-                                        <DownloadIcon />
+                                        <DownloadIcon sx={{ fontSize: 24 }} />
                                     </IconButton>
                                 </Tooltip>
 
@@ -1339,9 +1373,10 @@ const Home = () => {
                                     sx={{
                                         width: '100%',
                                         height: 'auto',
-                                        maxHeight: '82vh',
+                                        maxHeight: { xs: '76vh', sm: '82vh' },
                                         objectFit: 'contain',
-                                        borderRadius: 2
+                                        borderRadius: 2,
+                                        display: 'block'
                                     }}
                                 />
 

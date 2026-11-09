@@ -158,6 +158,12 @@ export const registrationAPI = {
             body: JSON.stringify(data),
         }, true),
 
+    sendCautionDepositRefundOtp: (data) =>
+        apiFetch('/registration/caution-deposit/send-refund-otp', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }, true),
+
     refundCautionDeposit: (data) =>
         apiFetch('/registration/caution-deposit/refund', {
             method: 'PUT',
@@ -223,6 +229,16 @@ export const foodTokenAPI = {
         apiFetch(`/food-tokens/${id}/cancel`, {
             method: 'POST',
             body: JSON.stringify({ reason }),
+        }, true),
+    verify: (code) =>
+        apiFetch('/food-tokens/verify', {
+            method: 'POST',
+            body: JSON.stringify({ code }),
+        }, true),
+    redeem: (code) =>
+        apiFetch('/food-tokens/redeem', {
+            method: 'POST',
+            body: JSON.stringify({ code }),
         }, true),
     getAll: (params = {}) => {
         const cleanParams = new URLSearchParams();

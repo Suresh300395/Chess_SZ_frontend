@@ -45,17 +45,35 @@ import FilterListIcon from '@mui/icons-material/FilterList';
 import SchoolIcon from '@mui/icons-material/School';
 import CreditCardIcon from '@mui/icons-material/CreditCard';
 import CalendarTodayOutlinedIcon from '@mui/icons-material/CalendarTodayOutlined';
+import SecurityIcon from '@mui/icons-material/Security';
 import io from 'socket.io-client';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { registrationAPI, SOCKET_URL } from '../../utils/api';
+import CautionDepositReceiptModal from '../Common/CautionDepositReceiptModal';
 import { AnimatedCard, AnimatedText } from '../animations';
 
 const CautionDeposite = () => {
+    const [searchParams] = useSearchParams();
+    const urlSearch = searchParams.get('search') || '';
+    const urlTab = searchParams.get('tab') || 'team';
+
     const [registrations, setRegistrations] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [searchQuery, setSearchQuery] = useState('');
+    const [searchQuery, setSearchQuery] = useState(urlSearch);
     const [filterStatus, setFilterStatus] = useState('all'); // all, paid, pending, refunded
-    const [activeTab, setActiveTab] = useState('team'); // 'team' | 'coach'
+    const [activeTab, setActiveTab] = useState(urlTab === 'coach' ? 'coach' : 'team'); // 'team' | 'coach'
+
+    useEffect(() => {
+        const s = searchParams.get('search');
+        if (s !== null) {
+            setSearchQuery(s);
+        }
+        const t = searchParams.get('tab');
+        if (t === 'coach' || t === 'team') {
+            setActiveTab(t);
+        }
+    }, [searchParams]);
 
     // Modal state for manual payment collection
     const [payModalOpen, setPayModalOpen] = useState(false);
@@ -70,10 +88,22 @@ const CautionDeposite = () => {
     const [receiptModalOpen, setReceiptModalOpen] = useState(false);
     const [receiptData, setReceiptData] = useState(null);
 
-    // Refund confirmation dialog
+    // Refund confirmation dialog & OTP states
     const [refundDialogOpen, setRefundDialogOpen] = useState(false);
     const [itemToRefund, setItemToRefund] = useState(null);
     const [refunding, setRefunding] = useState(false);
+    const [sendingOtp, setSendingOtp] = useState(false);
+    const [refundOtp, setRefundOtp] = useState('');
+    const [otpInfo, setOtpInfo] = useState(null);
+    const [otpCooldown, setOtpCooldown] = useState(0);
+
+    // Resend OTP cooldown timer
+    useEffect(() => {
+        if (otpCooldown > 0) {
+            const timer = setTimeout(() => setOtpCooldown(prev => prev - 1), 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [otpCooldown]);
 
     const fetchRegistrations = async () => {
         try {
@@ -378,10 +408,53 @@ const CautionDeposite = () => {
         }
     };
 
-    // Refund Confirmation
-    const handleProcessRefund = async () => {
-        if (!itemToRefund) return;
-        setRefunding(true);
+    // Initiate Refund: Sends OTP to the payer before opening verification dialog
+    const handleInitiateRefund = async (item, isCoach = false) => {
+        const stillOccupied = isCoach
+            ? item.hasRoom
+            : (item.allottedMembers && item.allottedMembers.length > 0);
+        if (stillOccupied) {
+            toast.error('Cannot refund: All rooms must be vacated before initiating caution deposit refund.');
+            return;
+        }
+
+        const itemData = { ...item, isCoach };
+        setItemToRefund(itemData);
+        setRefundOtp('');
+        setOtpInfo(null);
+        setRefundDialogOpen(true);
+        setSendingOtp(true);
+
+        try {
+            const payload = {
+                registrationId: item.registrationId,
+                universityName: item.universityName
+            };
+            if (isCoach) {
+                payload.coachId = item.coachId;
+            }
+
+            const res = await registrationAPI.sendCautionDepositRefundOtp(payload);
+            const data = await res.json();
+            if (res.ok && data.ok) {
+                setOtpInfo(data);
+                setOtpCooldown(30);
+                toast.success(`Verification OTP sent to ${data.recipientName} (${data.maskedPhone})`);
+            } else {
+                toast.error(data.message || 'Failed to send OTP to payer');
+            }
+        } catch (err) {
+            console.error('Error sending refund OTP:', err);
+            toast.error('Error sending verification OTP. Please try again.');
+        } finally {
+            setSendingOtp(false);
+        }
+    };
+
+    // Resend Refund OTP
+    const handleResendOtp = async () => {
+        if (!itemToRefund || otpCooldown > 0 || sendingOtp) return;
+        setSendingOtp(true);
         try {
             const payload = {
                 registrationId: itemToRefund.registrationId,
@@ -391,18 +464,67 @@ const CautionDeposite = () => {
                 payload.coachId = itemToRefund.coachId;
             }
 
+            const res = await registrationAPI.sendCautionDepositRefundOtp(payload);
+            const data = await res.json();
+            if (res.ok && data.ok) {
+                setOtpInfo(data);
+                setOtpCooldown(30);
+                setRefundOtp('');
+                toast.success(`New OTP resent to ${data.recipientName} (${data.maskedPhone})`);
+            } else {
+                toast.error(data.message || 'Failed to resend OTP');
+            }
+        } catch (err) {
+            console.error('Error resending refund OTP:', err);
+            toast.error('Error resending OTP');
+        } finally {
+            setSendingOtp(false);
+        }
+    };
+
+    // Verify OTP & Process Refund
+    const handleProcessRefund = async () => {
+        if (!itemToRefund) return;
+        const stillOccupied = itemToRefund.isCoach
+            ? itemToRefund.hasRoom
+            : (itemToRefund.allottedMembers && itemToRefund.allottedMembers.length > 0);
+        if (stillOccupied) {
+            toast.error('Cannot refund: All rooms must be vacated before processing refund.');
+            setRefundDialogOpen(false);
+            return;
+        }
+
+        if (!refundOtp || refundOtp.trim().length !== 6) {
+            toast.error('Please enter the 6-digit OTP sent to the payer');
+            return;
+        }
+
+        setRefunding(true);
+        try {
+            const payload = {
+                registrationId: itemToRefund.registrationId,
+                universityName: itemToRefund.universityName,
+                otp: refundOtp.trim()
+            };
+            if (itemToRefund.isCoach) {
+                payload.coachId = itemToRefund.coachId;
+            }
+
             const res = await registrationAPI.refundCautionDeposit(payload);
+            const data = await res.json();
             if (res.ok) {
                 toast.success(
                     itemToRefund.isCoach
-                        ? `Caution deposit refunded for Coach ${itemToRefund.coachName}`
-                        : `Caution deposit refunded for ${itemToRefund.universityName}`
+                        ? `Caution deposit refunded for Coach ${itemToRefund.coachName}!`
+                        : `Caution deposit refunded for ${itemToRefund.universityName}!`
                 );
                 setRefundDialogOpen(false);
                 setItemToRefund(null);
+                setRefundOtp('');
+                setOtpInfo(null);
                 await fetchRegistrations();
             } else {
-                toast.error('Failed to process refund');
+                toast.error(data.message || 'Invalid OTP or failed to process refund');
             }
         } catch (err) {
             console.error(err);
@@ -870,6 +992,7 @@ const CautionDeposite = () => {
                                 filteredTeamList.map((item, index) => {
                                     const isPaid = item.deposit.paid;
                                     const isRefunded = item.deposit.refundStatus === 'Refunded';
+                                    const isAllVacated = !item.allottedMembers || item.allottedMembers.length === 0;
 
                                     return (
                                         <TableRow key={item.registrationId} sx={{ '&:hover': { bgcolor: '#f8fafc' } }}>
@@ -896,8 +1019,8 @@ const CautionDeposite = () => {
                                                         ))}
                                                     </Box>
                                                 ) : (
-                                                    <Typography variant="caption" sx={{ color: '#94a3b8', fontStyle: 'italic' }}>
-                                                        No rooms allotted yet
+                                                    <Typography variant="caption" sx={{ color: item.deposit?.paid ? '#059669' : '#94a3b8', fontStyle: 'italic', fontWeight: item.deposit?.paid ? 600 : 400 }}>
+                                                        {item.deposit?.paid ? 'Vacated' : 'No rooms allotted yet'}
                                                     </Typography>
                                                 )}
                                             </TableCell>
@@ -924,13 +1047,9 @@ const CautionDeposite = () => {
                                                 </Typography>
                                             </TableCell>
                                             <TableCell>
-                                                {isPaid ? (
-                                                    <Typography sx={{ fontWeight: 600, fontSize: '0.85rem', color: '#0f172a' }}>
-                                                        {item.deposit.receiptNo || 'CD-MANUAL'}
-                                                    </Typography>
-                                                ) : (
-                                                    <Typography variant="caption" sx={{ color: '#94a3b8' }}>-</Typography>
-                                                )}
+                                                <Typography sx={{ fontWeight: 600, fontSize: '0.85rem', color: '#0f172a' }}>
+                                                    {item.deposit.receiptNo || 'CD-MANUAL'}
+                                                </Typography>
                                             </TableCell>
                                             <TableCell>
                                                 {isRefunded ? (
@@ -962,18 +1081,42 @@ const CautionDeposite = () => {
                                                         </Tooltip>
 
                                                         {!isRefunded && (
-                                                            <Tooltip title="Process Refund on Checkout">
-                                                                <Button
-                                                                    size="small"
-                                                                    variant="outlined"
-                                                                    onClick={() => {
-                                                                        setItemToRefund({ ...item, isCoach: false });
-                                                                        setRefundDialogOpen(true);
-                                                                    }}
-                                                                    sx={{ textTransform: 'none', fontSize: '11px', py: 0.2, px: 1, borderRadius: 1.5, borderColor: '#cbd5e1', color: '#475569' }}
-                                                                >
-                                                                    Refund
-                                                                </Button>
+                                                            <Tooltip 
+                                                                title={
+                                                                    !isAllVacated 
+                                                                        ? `Cannot refund: ${item.allottedMembers.length} player(s) still occupying room(s). All players must vacate before caution deposit can be refunded.`
+                                                                        : "Process Refund on Checkout"
+                                                                }
+                                                                arrow
+                                                            >
+                                                                <span>
+                                                                    <Button
+                                                                        size="small"
+                                                                        variant={isAllVacated ? "contained" : "outlined"}
+                                                                        disabled={!isAllVacated}
+                                                                        onClick={() => handleInitiateRefund(item, false)}
+                                                                        sx={{
+                                                                            textTransform: 'none',
+                                                                            fontSize: '11px',
+                                                                            py: 0.2,
+                                                                            px: 1,
+                                                                            borderRadius: 1.5,
+                                                                            borderColor: isAllVacated ? '#0b5299' : '#cbd5e1',
+                                                                            bgcolor: isAllVacated ? '#0b5299' : undefined,
+                                                                            color: isAllVacated ? '#ffffff' : '#94a3b8',
+                                                                            '&.Mui-disabled': {
+                                                                                color: '#94a3b8',
+                                                                                borderColor: '#e2e8f0',
+                                                                                bgcolor: '#f8fafc'
+                                                                            },
+                                                                            '&:hover': {
+                                                                                bgcolor: isAllVacated ? '#09427d' : undefined
+                                                                            }
+                                                                        }}
+                                                                    >
+                                                                        Refund
+                                                                    </Button>
+                                                                </span>
                                                             </Tooltip>
                                                         )}
 
@@ -1039,6 +1182,7 @@ const CautionDeposite = () => {
                                 filteredCoachList.map((item, index) => {
                                     const isPaid = item.deposit.paid;
                                     const isRefunded = item.deposit.refundStatus === 'Refunded';
+                                    const isAllVacated = !item.hasRoom;
 
                                     return (
                                         <TableRow key={item.coachId} sx={{ '&:hover': { bgcolor: '#f8fafc' } }}>
@@ -1071,8 +1215,8 @@ const CautionDeposite = () => {
                                                         sx={{ height: 22, fontSize: '11px', width: 'fit-content', bgcolor: '#eff6ff', color: '#1d4ed8', fontWeight: 600 }}
                                                     />
                                                 ) : (
-                                                    <Typography variant="caption" sx={{ color: '#94a3b8', fontStyle: 'italic' }}>
-                                                        No room allotted yet
+                                                    <Typography variant="caption" sx={{ color: item.deposit?.paid ? '#059669' : '#94a3b8', fontStyle: 'italic', fontWeight: item.deposit?.paid ? 600 : 400 }}>
+                                                        {item.deposit?.paid ? 'Vacated' : 'No room allotted yet'}
                                                     </Typography>
                                                 )}
                                             </TableCell>
@@ -1128,18 +1272,42 @@ const CautionDeposite = () => {
                                                         </Tooltip>
 
                                                         {!isRefunded && (
-                                                            <Tooltip title="Process Refund on Checkout">
-                                                                <Button
-                                                                    size="small"
-                                                                    variant="outlined"
-                                                                    onClick={() => {
-                                                                        setItemToRefund({ ...item, isCoach: true });
-                                                                        setRefundDialogOpen(true);
-                                                                    }}
-                                                                    sx={{ textTransform: 'none', fontSize: '11px', py: 0.2, px: 1, borderRadius: 1.5, borderColor: '#cbd5e1', color: '#475569' }}
-                                                                >
-                                                                    Refund
-                                                                </Button>
+                                                            <Tooltip 
+                                                                title={
+                                                                    !isAllVacated 
+                                                                        ? `Cannot refund: Coach is still occupying Room ${item.roomNumber || ''}${item.building ? ` (${item.building})` : ''}. Room must be vacated before caution deposit can be refunded.`
+                                                                        : "Process Refund on Checkout"
+                                                                }
+                                                                arrow
+                                                            >
+                                                                <span>
+                                                                    <Button
+                                                                        size="small"
+                                                                        variant={isAllVacated ? "contained" : "outlined"}
+                                                                        disabled={!isAllVacated}
+                                                                        onClick={() => handleInitiateRefund(item, true)}
+                                                                        sx={{
+                                                                            textTransform: 'none',
+                                                                            fontSize: '11px',
+                                                                            py: 0.2,
+                                                                            px: 1,
+                                                                            borderRadius: 1.5,
+                                                                            borderColor: isAllVacated ? '#0b5299' : '#cbd5e1',
+                                                                            bgcolor: isAllVacated ? '#0b5299' : undefined,
+                                                                            color: isAllVacated ? '#ffffff' : '#94a3b8',
+                                                                            '&.Mui-disabled': {
+                                                                                color: '#94a3b8',
+                                                                                borderColor: '#e2e8f0',
+                                                                                bgcolor: '#f8fafc'
+                                                                            },
+                                                                            '&:hover': {
+                                                                                bgcolor: isAllVacated ? '#09427d' : undefined
+                                                                            }
+                                                                        }}
+                                                                    >
+                                                                        Refund
+                                                                    </Button>
+                                                                </span>
                                                             </Tooltip>
                                                         )}
 
@@ -1299,297 +1467,219 @@ const CautionDeposite = () => {
                 </DialogActions>
             </Dialog>
 
-            {/* Modern Official Receipt Modal (Matching Image 2) */}
-            <Dialog
+            {/* Reusable Official Receipt Modal */}
+            <CautionDepositReceiptModal
                 open={receiptModalOpen}
                 onClose={() => setReceiptModalOpen(false)}
-                maxWidth="md"
+                receiptData={receiptData}
+            />
+
+            {/* Refund OTP Authorization Dialog */}
+            <Dialog
+                open={refundDialogOpen}
+                onClose={() => {
+                    if (!refunding) {
+                        setRefundDialogOpen(false);
+                        setItemToRefund(null);
+                        setRefundOtp('');
+                        setOtpInfo(null);
+                    }
+                }}
+                maxWidth="sm"
                 fullWidth
-                slotProps={{ paper: { sx: { borderRadius: 3, maxWidth: 860, overflow: 'hidden' } } }}
+                PaperProps={{
+                    sx: { borderRadius: 3, p: 0.5 }
+                }}
             >
-                <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: '#f8fafc', py: 1.5, px: 3, borderBottom: '1px solid #e2e8f0' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <ReceiptIcon sx={{ color: '#059669' }} />
-                        <Typography sx={{ fontWeight: 700, color: '#0f172a' }}>Hostel Caution Deposit Receipt</Typography>
+                <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1.5, pb: 1, pt: 2.5 }}>
+                    <Box sx={{
+                        width: 42,
+                        height: 42,
+                        borderRadius: '50%',
+                        bgcolor: '#ecfdf5',
+                        color: '#059669',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                    }}>
+                        <SecurityIcon fontSize="medium" />
                     </Box>
-                    <IconButton size="small" onClick={() => setReceiptModalOpen(false)}>
-                        <ClearIcon fontSize="small" />
-                    </IconButton>
+                    <Box>
+                        <Typography variant="h6" sx={{ fontWeight: 800, color: '#0f172a', fontSize: '1.15rem' }}>
+                            Verify Caution Deposit Refund
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#64748b' }}>
+                            OTP authorization sent to the payer is required to initiate refund
+                        </Typography>
+                    </Box>
                 </DialogTitle>
 
-                <DialogContent sx={{ p: { xs: 2, sm: 3.5 }, bgcolor: '#ffffff' }}>
-                    {receiptData && (() => {
-                        const amount = Number(receiptData.deposit?.amount || 2000);
-                        const payerName = receiptData.isCoach
-                            ? `${receiptData.coachName || 'Coach'} (${receiptData.coachRole || 'Coach'})`
-                            : `${receiptData.deposit?.paidBy?.name || 'Representative'} (${receiptData.deposit?.paidBy?.role || 'Player'})`;
-                        const payerPhone = receiptData.isCoach
-                            ? (receiptData.coachPhone || 'N/A')
-                            : (receiptData.deposit?.paidBy?.phone || 'N/A');
-                        const rawRoom = receiptData.roomNumber || (receiptData.rooms && receiptData.rooms.length > 0 ? (receiptData.rooms[0]?.roomNumber || receiptData.rooms[0]) : null);
-                        const roomDisplay = rawRoom ? (String(rawRoom).toLowerCase().startsWith('room') ? rawRoom : `Room ${rawRoom}`) : 'Room 205';
-                        const receiptDate = receiptData.deposit?.paidAt
-                            ? new Date(receiptData.deposit.paidAt).toLocaleDateString('en-US')
-                            : new Date().toLocaleDateString('en-US');
-
-                        return (
-                            <Box sx={{ width: '100%' }}>
-                                <Box id="caution-deposit-printable-receipt" sx={{ bgcolor: '#ffffff', color: '#0f172a', p: { xs: 2, sm: 2.5 } }}>
-                                    {/* Top Header Section */}
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1.5, sm: 2.5 }, mb: 1, flexWrap: { xs: 'wrap', sm: 'nowrap' } }}>
-                                        {/* University Logo */}
-                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', pr: { xs: 0, sm: 2.5 }, borderRight: { xs: 'none', sm: '1.5px solid #e2e8f0' }, minWidth: { sm: 145 } }}>
-                                            <Box
-                                                component="img"
-                                                src="/ADITYA LOGO2.png"
-                                                alt="Aditya University"
-                                                sx={{ height: { xs: 46, sm: 58 }, width: 'auto', objectFit: 'contain' }}
-                                            />
-                                        </Box>
-
-                                        {/* Header Text */}
-                                        <Box sx={{ flex: 1, textAlign: { xs: 'left', sm: 'center' } }}>
-                                            <Typography sx={{ fontWeight: 900, color: '#0b3b80', fontSize: { xs: '1rem', sm: '1.2rem' }, letterSpacing: '0.4px', textTransform: 'uppercase', lineHeight: 1.2 }}>
-                                                SOUTH ZONE INTER-UNIVERSITY TOURNAMENT
-                                            </Typography>
-                                            <Typography sx={{ fontWeight: 800, color: '#334155', fontSize: { xs: '0.8rem', sm: '0.9rem' }, letterSpacing: '0.2px', textTransform: 'uppercase', mt: 0.35 }}>
-                                                HOSTEL ACCOMMODATION - {receiptData.isCoach ? 'COACH' : 'TEAM'} CAUTION DEPOSIT RECEIPT
-                                            </Typography>
-                                            <Typography sx={{ color: '#64748b', fontSize: '0.78rem', mt: 0.2 }}>
-                                                (Official Cash / Manual Payment Voucher)
-                                            </Typography>
-                                        </Box>
-                                    </Box>
-
-                                    {/* 2-Tone Accent Line */}
-                                    <Box sx={{ display: 'flex', height: '3.5px', width: '130px', mx: 'auto', borderRadius: 2, overflow: 'hidden', mt: 0.8, mb: 1.25 }}>
-                                        <Box sx={{ flex: 1, bgcolor: '#ea580c' }} />
-                                        <Box sx={{ flex: 1, bgcolor: '#0284c7' }} />
-                                    </Box>
-                                    <Divider sx={{ borderColor: '#e2e8f0', mb: 1.5 }} />
-
-                                    {/* Receipt No & Date Banner */}
-                                    <Box sx={{
-                                        display: 'grid',
-                                        gridTemplateColumns: '1fr 1px 1fr',
-                                        alignItems: 'center',
-                                        bgcolor: '#f8fafc',
-                                        border: '1px solid #e2e8f0',
-                                        borderRadius: 2,
-                                        py: 1,
-                                        px: { xs: 2, sm: 3 },
-                                        mb: 1.75
-                                    }}>
-                                        <Box>
-                                            <Typography sx={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>Receipt No.</Typography>
-                                            <Typography sx={{ fontWeight: 900, color: '#0f172a', fontSize: { xs: '1rem', sm: '1.12rem' }, letterSpacing: '0.5px' }}>
-                                                {receiptData.deposit?.receiptNo || 'CD-MANUAL'}
-                                            </Typography>
-                                        </Box>
-                                        <Box sx={{ height: 32, bgcolor: '#cbd5e1' }} />
-                                        <Box sx={{ pl: { xs: 2, sm: 3 } }}>
-                                            <Typography sx={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>Date & Time</Typography>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                                                <CalendarTodayOutlinedIcon sx={{ color: '#0284c7', fontSize: 18 }} />
-                                                <Typography sx={{ fontWeight: 900, color: '#0f172a', fontSize: { xs: '1rem', sm: '1.12rem' } }}>
-                                                    {receiptDate}
-                                                </Typography>
-                                            </Box>
-                                        </Box>
-                                    </Box>
-
-                                    {/* Main Details: 2 Columns - 6*6 (50% / 50%) Alignment */}
-                                    <Box sx={{
-                                        display: 'grid',
-                                        gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
-                                        gap: { xs: 2, sm: 2.5 },
-                                        alignItems: 'start',
-                                        mb: 1.75
-                                    }}>
-                                        {/* Left Column (6 of 12): University, Paid By, Payment Mode */}
-                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.6 }}>
-                                            {/* University / Institution */}
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                                <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                                    <SchoolIcon sx={{ color: '#0284c7', fontSize: 22 }} />
-                                                </Box>
-                                                <Box>
-                                                    <Typography sx={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>University / Institution</Typography>
-                                                    <Typography sx={{ fontWeight: 800, color: '#0b5299', fontSize: '1.02rem', lineHeight: 1.25 }}>
-                                                        {receiptData.universityName}
-                                                    </Typography>
-                                                </Box>
-                                            </Box>
-
-                                            {/* Received From (Paid By) */}
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                                <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                                    <PersonIcon sx={{ color: '#0284c7', fontSize: 22 }} />
-                                                </Box>
-                                                <Box>
-                                                    <Typography sx={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>Received From (Paid By)</Typography>
-                                                    <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.98rem', lineHeight: 1.25 }}>
-                                                        {payerName}
-                                                    </Typography>
-                                                    <Typography sx={{ fontSize: '11.5px', color: '#64748b', mt: 0.15 }}>
-                                                        Phone: {payerPhone}
-                                                    </Typography>
-                                                </Box>
-                                            </Box>
-
-                                            {/* Payment Mode */}
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                                <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                                    <CreditCardIcon sx={{ color: '#0284c7', fontSize: 22 }} />
-                                                </Box>
-                                                <Box>
-                                                    <Typography sx={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>Payment Mode</Typography>
-                                                    <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.98rem', lineHeight: 1.25 }}>
-                                                        {receiptData.deposit?.paymentMode || 'Cash'} (Manual Receipt)
-                                                    </Typography>
-                                                </Box>
-                                            </Box>
-                                        </Box>
-
-                                        {/* Right Column (6 of 12): Amount Received & Room */}
-                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                                            {/* Mint Green Card */}
-                                            <Box sx={{ bgcolor: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 2.5, p: 1.6, px: 2, width: '100%', boxSizing: 'border-box' }}>
-                                                <Typography sx={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>Amount Received</Typography>
-                                                <Typography sx={{ fontSize: { xs: '1.9rem', sm: '2.25rem' }, fontWeight: 900, color: '#059669', lineHeight: 1.15, my: 0.35 }}>
-                                                    ₹{amount.toLocaleString('en-IN')}
-                                                </Typography>
-                                                <Divider sx={{ my: 0.8, borderColor: '#bbf7d0' }} />
-                                                <Typography sx={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>Amount in Words</Typography>
-                                                <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '12.5px' }}>
-                                                    {getAmountInWords(amount)}
-                                                </Typography>
-                                            </Box>
-
-                                            {/* Allotted Hostel Room */}
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                                <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                                    <HotelIcon sx={{ color: '#0284c7', fontSize: 22 }} />
-                                                </Box>
-                                                <Box>
-                                                    <Typography sx={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>Allotted Hostel Room</Typography>
-                                                    <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '1.02rem', lineHeight: 1.25 }}>
-                                                        {roomDisplay}
-                                                    </Typography>
-                                                </Box>
-                                            </Box>
-                                        </Box>
-                                    </Box>
-
-                                    <Divider sx={{ borderColor: '#e2e8f0', my: 1.25 }} />
-
-                                    {/* Note Banner */}
-                                    <Box sx={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: 1.25,
-                                        bgcolor: '#fffbeb',
-                                        border: '1px solid #fde68a',
-                                        borderRadius: 1.75,
-                                        p: 1.1,
-                                        px: 1.75,
-                                        mb: 1.75
-                                    }}>
-                                        <Box sx={{ width: 22, height: 22, borderRadius: '50%', bgcolor: '#ea580c', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#ffffff', fontWeight: 900, fontSize: '12px' }}>
-                                            !
-                                        </Box>
-                                        <Typography sx={{ fontSize: '12px', color: '#334155' }}>
-                                            <strong style={{ color: '#c2410c' }}>Note:</strong> Refundable at checkout upon hostel room clearance and key return.
-                                        </Typography>
-                                    </Box>
-
-                                    {/* Footer: University Address & Signature */}
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', pb: 1, flexWrap: 'wrap', gap: 2 }}>
-                                        <Box>
-                                            <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '13px' }}>Aditya University</Typography>
-                                            <Typography sx={{ color: '#64748b', fontSize: '11px', mt: 0.2 }}>
-                                                Surampalem, Kakinada District, Andhra Pradesh - 533437
-                                            </Typography>
-                                        </Box>
-                                        <Box sx={{ textAlign: 'center', minWidth: 170 }}>
-                                            <Box sx={{ borderBottom: '1.5px dotted #94a3b8', width: '100%', mb: 0.5 }} />
-                                            <Typography sx={{ color: '#64748b', fontSize: '11px', fontWeight: 600 }}>
-                                                Authorised Signature
-                                            </Typography>
-                                        </Box>
-                                    </Box>
-
-                                    {/* Bottom Decorative Bar */}
-                                    <Box sx={{ display: 'flex', height: '3.5px', width: '100%', borderRadius: 1, overflow: 'hidden' }}>
-                                        <Box sx={{ flex: 1, bgcolor: '#ea580c' }} />
-                                        <Box sx={{ flex: 1, bgcolor: '#0284c7' }} />
-                                    </Box>
-                                </Box>
-
-                                {/* Half Page Cut Indicator (Only in Print, below the receipt box) */}
-                                <Box sx={{
-                                    display: 'none',
-                                    '@media print': {
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        gap: 1.5,
-                                        mt: 1.5,
-                                        color: '#64748b',
-                                        fontSize: '11px',
-                                        fontWeight: 600
-                                    }
-                                }}>
-                                    <Box sx={{ flex: 1, borderTop: '1px dashed #94a3b8' }} />
-                                    <span>✂ Cut or Fold Here (A4 Half-Page / A5 Official Receipt)</span>
-                                    <Box sx={{ flex: 1, borderTop: '1px dashed #94a3b8' }} />
-                                </Box>
+                <DialogContent sx={{ pt: 1.5 }}>
+                    {/* Payer Summary Card */}
+                    <Box sx={{
+                        p: 2,
+                        mb: 2.5,
+                        borderRadius: 2,
+                        bgcolor: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 1.2
+                    }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <Box>
+                                <Typography variant="caption" sx={{ color: '#64748b', textTransform: 'uppercase', fontWeight: 700, letterSpacing: 0.5 }}>
+                                    Authorized Payer
+                                </Typography>
+                                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#0f172a', lineHeight: 1.2, mt: 0.3 }}>
+                                    {itemToRefund?.deposit?.paidBy?.name || (itemToRefund?.isCoach ? itemToRefund?.coachName : 'Team Representative')}
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: '#475569' }}>
+                                    {itemToRefund?.deposit?.paidBy?.role || (itemToRefund?.isCoach ? 'Coach' : 'Player')} • {itemToRefund?.universityName}
+                                </Typography>
                             </Box>
-                        );
-                    })()}
-                </DialogContent>
+                            <Box sx={{ textAlign: 'right' }}>
+                                <Typography variant="caption" sx={{ color: '#64748b', textTransform: 'uppercase', fontWeight: 700, letterSpacing: 0.5 }}>
+                                    Refund Amount
+                                </Typography>
+                                <Typography variant="h6" sx={{ fontWeight: 800, color: '#059669', lineHeight: 1.2, mt: 0.3 }}>
+                                    ₹{Number(itemToRefund?.deposit?.amount || 2000).toLocaleString('en-IN')}
+                                </Typography>
+                                <Chip label="Cash Refund" size="small" sx={{ height: 20, fontSize: '10.5px', bgcolor: '#ecfdf5', color: '#065f46', fontWeight: 700, mt: 0.3 }} />
+                            </Box>
+                        </Box>
 
-                <DialogActions sx={{ p: 2, px: 3, display: 'flex', justifyContent: 'space-between', bgcolor: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
-                    <Button onClick={() => setReceiptModalOpen(false)} variant="outlined" sx={{ textTransform: 'none', borderRadius: 2 }}>
-                        Close
-                    </Button>
-                    <Button
-                        variant="contained"
-                        startIcon={<PrintIcon />}
-                        onClick={handlePrintReceipt}
-                        sx={{ textTransform: 'none', bgcolor: '#059669', borderRadius: 2, fontWeight: 700, px: 2.5, '&:hover': { bgcolor: '#047857' } }}
-                    >
-                        Print Receipt
-                    </Button>
-                </DialogActions>
-            </Dialog>
+                        <Divider sx={{ my: 0.5 }} />
 
-            {/* Refund Confirm Dialog */}
-            <Dialog open={refundDialogOpen} onClose={() => setRefundDialogOpen(false)} maxWidth="xs" fullWidth>
-                <DialogTitle sx={{ fontWeight: 700 }}>Confirm Caution Deposit Refund</DialogTitle>
-                <DialogContent>
-                    <Typography variant="body2" sx={{ color: '#334155' }}>
-                        {itemToRefund?.isCoach ? (
-                            <>Are you sure you want to mark the ₹{Number(itemToRefund?.deposit?.amount || 0).toLocaleString('en-IN')} caution deposit for Coach <strong>{itemToRefund?.coachName}</strong> ({itemToRefund?.universityName}) as refunded?</>
+                        {/* OTP Status banner */}
+                        {sendingOtp ? (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, py: 0.5, color: '#0b5299' }}>
+                                <CircularProgress size={18} color="inherit" />
+                                <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.88rem' }}>
+                                    Sending 6-digit verification OTP to payer's registered mobile...
+                                </Typography>
+                            </Box>
+                        ) : otpInfo ? (
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <CheckCircleIcon sx={{ fontSize: 18, color: '#059669' }} />
+                                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.88rem' }}>
+                                        OTP sent to <strong>{otpInfo.recipientName}</strong> at <strong>{otpInfo.maskedPhone}</strong>
+                                    </Typography>
+                                </Box>
+                                <Typography variant="caption" sx={{ color: '#64748b', pl: 3.2 }}>
+                                    Please ask the payer for the 6-digit code received on their phone to complete the checkout refund.
+                                </Typography>
+                                {otpInfo.devOtp && (
+                                    <Box sx={{ mt: 0.5, pl: 3.2 }}>
+                                        <Chip
+                                            label={`Dev Quick Fill OTP: ${otpInfo.devOtp}`}
+                                            size="small"
+                                            color="warning"
+                                            variant="outlined"
+                                            onClick={() => setRefundOtp(otpInfo.devOtp)}
+                                            sx={{ cursor: 'pointer', fontWeight: 700 }}
+                                        />
+                                    </Box>
+                                )}
+                            </Box>
                         ) : (
-                            <>Are you sure you want to mark the ₹{Number(itemToRefund?.deposit?.amount || 0).toLocaleString('en-IN')} caution deposit for <strong>{itemToRefund?.universityName}</strong> as refunded?</>
+                            <Alert severity="warning" sx={{ py: 0.5 }}>
+                                Could not send OTP automatically. Click Resend OTP below.
+                            </Alert>
                         )}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: '#64748b', mt: 1, display: 'block' }}>
-                        Ensure keys have been returned and room clearance inspection has been verified.
-                    </Typography>
+                    </Box>
+
+                    {/* 6-Digit OTP Field */}
+                    <Box sx={{ mb: 2 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#0f172a', mb: 1 }}>
+                            Enter 6-Digit Verification OTP
+                        </Typography>
+                        <TextField
+                            fullWidth
+                            autoFocus
+                            placeholder="• • • • • •"
+                            value={refundOtp}
+                            onChange={(e) => {
+                                const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                                setRefundOtp(val);
+                            }}
+                            disabled={refunding || sendingOtp}
+                            slotProps={{
+                                htmlInput: {
+                                    maxLength: 6,
+                                    inputMode: 'numeric',
+                                    style: {
+                                        textAlign: 'center',
+                                        fontSize: '1.6rem',
+                                        fontWeight: 800,
+                                        letterSpacing: '14px',
+                                        fontFamily: 'monospace',
+                                        color: '#0b5299'
+                                    }
+                                }
+                            }}
+                            sx={{
+                                '& .MuiOutlinedInput-root': {
+                                    borderRadius: 2.5,
+                                    bgcolor: '#f8fafc',
+                                    '&.Mui-focused fieldset': {
+                                        borderColor: '#0b5299',
+                                        borderWidth: 2
+                                    }
+                                }
+                            }}
+                        />
+                    </Box>
+
+                    {/* Resend & Timer */}
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
+                        <Typography variant="caption" sx={{ color: '#64748b' }}>
+                            Didn't receive the OTP on phone?
+                        </Typography>
+                        <Button
+                            size="small"
+                            variant="text"
+                            startIcon={<RefreshIcon sx={{ fontSize: 16 }} />}
+                            disabled={otpCooldown > 0 || sendingOtp || refunding}
+                            onClick={handleResendOtp}
+                            sx={{ textTransform: 'none', fontWeight: 600, fontSize: '0.82rem' }}
+                        >
+                            {otpCooldown > 0 ? `Resend OTP in ${otpCooldown}s` : 'Resend OTP'}
+                        </Button>
+                    </Box>
                 </DialogContent>
-                <DialogActions sx={{ p: 2 }}>
-                    <Button onClick={() => setRefundDialogOpen(false)} disabled={refunding} sx={{ textTransform: 'none' }}>
+
+                <DialogActions sx={{ p: 2, px: 3, bgcolor: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between' }}>
+                    <Button
+                        onClick={() => {
+                            setRefundDialogOpen(false);
+                            setItemToRefund(null);
+                            setRefundOtp('');
+                            setOtpInfo(null);
+                        }}
+                        disabled={refunding}
+                        variant="outlined"
+                        sx={{ textTransform: 'none', borderRadius: 2 }}
+                    >
                         Cancel
                     </Button>
                     <Button
                         variant="contained"
                         onClick={handleProcessRefund}
-                        disabled={refunding}
-                        sx={{ textTransform: 'none', bgcolor: '#0b5299' }}
+                        disabled={refunding || sendingOtp || !refundOtp || refundOtp.length !== 6}
+                        startIcon={refunding ? <CircularProgress size={16} color="inherit" /> : <CheckCircleIcon />}
+                        sx={{
+                            textTransform: 'none',
+                            fontWeight: 700,
+                            borderRadius: 2,
+                            px: 2.5,
+                            bgcolor: '#059669',
+                            '&:hover': { bgcolor: '#047857' },
+                            '&.Mui-disabled': { bgcolor: '#e2e8f0', color: '#94a3b8' }
+                        }}
                     >
-                        {refunding ? 'Processing...' : 'Confirm Refund'}
+                        {refunding ? 'Verifying & Refunding...' : 'Verify OTP & Complete Refund'}
                     </Button>
                 </DialogActions>
             </Dialog>

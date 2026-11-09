@@ -967,6 +967,11 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
   }
 
   /* 4. Format the printable receipt into full-width top-half of A4 Portrait (Border-free) */
+  #caution-deposit-printable-receipt,
+  #caution-deposit-printable-receipt * {
+    font-family: 'Montserrat', system-ui, -apple-system, sans-serif !important;
+  }
+
   #caution-deposit-printable-receipt {
     display: flex !important;
     flex-direction: column !important;

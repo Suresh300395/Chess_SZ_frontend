@@ -500,10 +500,8 @@ const AccommodationDetails = ({ onBack }) => {
                                 {[
                                     { label: 'Hostel Name', value: details.hostelInfo?.name || details.building || 'Not Assigned', icon: <BusinessIcon fontSize="small" sx={{ color: '#0b5299' }} /> },
                                     { label: 'Hostel Block', value: details.hostelInfo?.block || details.building || 'Not Assigned', icon: <BusinessIcon fontSize="small" sx={{ color: '#0b5299' }} /> },
-                                    { label: 'Warden', value: details.hostelInfo?.warden || 'Not Assigned', icon: <PersonIcon fontSize="small" sx={{ color: '#0b5299' }} /> },
-                                    { label: 'Warden Contact', value: details.hostelInfo?.wardenContact || 'Not Assigned', icon: <PhoneIcon fontSize="small" sx={{ color: '#0b5299' }} /> },
-                                    { label: 'Office Hours', value: details.hostelInfo?.officeHours || 'Not Assigned', icon: <AccessTimeIcon fontSize="small" sx={{ color: '#0b5299' }} /> },
-                                    { label: 'Address', value: details.hostelInfo?.address || 'Not Assigned', icon: <LocationOnIcon fontSize="small" sx={{ color: '#0b5299' }} /> },
+                                    { label: 'Incharge Name', value: details.hostelInfo?.incharge || details.hostelInfo?.warden || 'Not Assigned', icon: <PersonIcon fontSize="small" sx={{ color: '#0b5299' }} /> },
+                                    { label: 'Incharge Contact', value: details.hostelInfo?.inchargeContact || details.hostelInfo?.wardenContact || 'Not Assigned', icon: <PhoneIcon fontSize="small" sx={{ color: '#0b5299' }} /> },
                                 ].map((item, idx) => (
                                     <React.Fragment key={idx}>
                                         <Box sx={{
@@ -526,7 +524,7 @@ const AccommodationDetails = ({ onBack }) => {
                                                 {item.value}
                                             </Typography>
                                         </Box>
-                                        {idx < 5 && <Divider sx={{ borderColor: '#f8fafc' }} />}
+                                        {idx < 3 && <Divider sx={{ borderColor: '#f8fafc' }} />}
                                     </React.Fragment>
                                 ))}
                             </Box>

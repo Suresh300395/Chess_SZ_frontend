@@ -1,4 +1,6 @@
 import { formatDateDDMMYYYY } from './dateUtils';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 
 /**
  * Format date safely
@@ -807,3 +809,629 @@ function escapeXml(unsafe) {
     }
   });
 }
+
+/**
+ * Convert numbers to English currency words
+ */
+export const getAmountInWords = (num) => {
+  const n = Number(num);
+  if (!n) return 'Rupees Zero Only';
+  if (n === 2000) return 'Rupees Two Thousand Only';
+  if (n === 1000) return 'Rupees One Thousand Only';
+  if (n === 3000) return 'Rupees Three Thousand Only';
+  if (n === 4000) return 'Rupees Four Thousand Only';
+  if (n === 5000) return 'Rupees Five Thousand Only';
+  const a = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+  const toWords = (val) => {
+    if (val === 0) return '';
+    if (val < 20) return a[val] + ' ';
+    if (val < 100) return b[Math.floor(val / 10)] + (val % 10 !== 0 ? ' ' + a[val % 10] : '') + ' ';
+    if (val < 1000) return toWords(Math.floor(val / 100)) + 'Hundred ' + toWords(val % 100);
+    if (val < 100000) return toWords(Math.floor(val / 1000)) + 'Thousand ' + toWords(val % 1000);
+    if (val < 10000000) return toWords(Math.floor(val / 100000)) + 'Lakh ' + toWords(val % 100000);
+    return toWords(Math.floor(val / 10000000)) + 'Crore ' + toWords(val % 10000000);
+  };
+  return `Rupees ${toWords(n).trim()} Only`;
+};
+
+/**
+ * Convert an image URL to Base64 data URL
+ */
+const convertImageToBase64 = (url) => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || img.width;
+        canvas.height = img.naturalHeight || img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      } catch (e) {
+        resolve(url);
+      }
+    };
+    img.onerror = () => resolve(url);
+    img.src = url;
+  });
+};
+
+/**
+ * Direct PDF File Downloader using jsPDF & html2canvas
+ * Creates a pixel-perfect, official caution deposit receipt matching the official template.
+ */
+export const downloadCautionDepositPDF = async (data) => {
+  if (!data) return;
+
+  const isCoach = Boolean(
+    data.isCoach ||
+    data.role === 'Coach' ||
+    data.paidByRole === 'Coach' ||
+    data.userType === 'coach'
+  );
+
+  const amount = Number(data.amount || 2000);
+  const receiptNo = data.receiptNo || 'CD-MANUAL';
+  const universityName = data.universityName || 'Aditya University';
+
+  let payerName = '';
+  if (isCoach) {
+    payerName = data.coachName || data.paidBy || data.name || 'Coach';
+    if (data.coachRole && !payerName.includes('(')) {
+      payerName += ` (${data.coachRole})`;
+    } else if (!payerName.includes('(')) {
+      payerName += ' (Coach)';
+    }
+  } else {
+    payerName = data.paidBy || data.name || 'Representative';
+    const role = data.paidByRole || data.role || 'Player';
+    if (role && !payerName.includes('(')) {
+      payerName += ` (${role})`;
+    }
+  }
+
+  const payerPhone = data.paidByPhone || data.phone || data.mobileNo || 'N/A';
+  const rawRoom = data.roomNumber || (data.rooms && data.rooms.length > 0 ? (data.rooms[0]?.roomNumber || data.rooms[0]) : null);
+  const roomDisplay = rawRoom
+    ? (String(rawRoom).toLowerCase().startsWith('room') ? rawRoom : `Room ${rawRoom}`)
+    : 'Room 02';
+  const paymentMode = data.paymentMode || 'Cash';
+  const receiptDate = data.paidAt ? new Date(data.paidAt).toLocaleDateString('en-US') : new Date().toLocaleDateString('en-US');
+  const amountWords = getAmountInWords(amount);
+
+  // Load logo as base64 for seamless canvas rendering
+  let logoBase64 = '/ADITYA LOGO2.png';
+  try {
+    logoBase64 = await convertImageToBase64('/ADITYA LOGO2.png');
+  } catch (err) {
+    console.warn('Could not convert logo to base64, using direct url', err);
+  }
+
+  // Create temporary offscreen container
+  const container = document.createElement('div');
+  container.style.position = 'fixed';
+  container.style.left = '-9999px';
+  container.style.top = '0';
+  container.style.width = '780px';
+  container.style.background = '#ffffff';
+  container.style.boxSizing = 'border-box';
+  container.style.padding = '0';
+  container.style.margin = '0';
+  container.style.zIndex = '-9999';
+
+  container.innerHTML = `
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap');
+      .cd-pdf-card, .cd-pdf-card * {
+        font-family: 'Montserrat', system-ui, -apple-system, sans-serif !important;
+      }
+    </style>
+    <div class="cd-pdf-card" style="width: 780px; background: #ffffff; color: #0f172a; padding: 14px 18px; font-family: 'Montserrat', system-ui, -apple-system, sans-serif; box-sizing: border-box; border: 1.5px solid #cbd5e1; border-radius: 10px;">
+      <!-- Header -->
+      <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 8px;">
+        <div style="display: flex; align-items: center; justify-content: center; padding-right: 16px; border-right: 1.5px solid #e2e8f0; min-width: 135px;">
+          <img src="${logoBase64}" alt="Aditya University" style="height: 50px; width: auto; object-fit: contain; display: block;" />
+        </div>
+        <div style="flex: 1; text-align: center;">
+          <div style="font-weight: 900; color: #0b3b80; font-size: 15.5px; letter-spacing: 0.3px; text-transform: uppercase; line-height: 1.25;">
+            SOUTH ZONE INTER-UNIVERSITY TOURNAMENT
+          </div>
+          <div style="font-weight: 800; color: #334155; font-size: 12px; letter-spacing: 0.2px; text-transform: uppercase; margin-top: 3px;">
+            HOSTEL ACCOMMODATION - ${isCoach ? 'COACH' : 'TEAM'} CAUTION DEPOSIT RECEIPT
+          </div>
+          <div style="color: #64748b; font-size: 10.5px; margin-top: 2px;">
+            (Official Cash / Manual Payment Voucher)
+          </div>
+        </div>
+      </div>
+
+      <!-- 2-Tone Accent Line -->
+      <div style="display: flex; height: 3.5px; width: 130px; margin: 6px auto 10px; border-radius: 2px; overflow: hidden;">
+        <div style="flex: 1; background: #ea580c;"></div>
+        <div style="flex: 1; background: #0284c7;"></div>
+      </div>
+      <div style="border-top: 1px solid #e2e8f0; margin-bottom: 10px;"></div>
+
+      <!-- Receipt No & Date Banner -->
+      <div style="display: flex; align-items: center; justify-content: space-between; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 16px; margin-bottom: 12px;">
+        <div>
+          <div style="font-size: 10.5px; color: #64748b; font-weight: 600;">Receipt No.</div>
+          <div style="font-weight: 900; color: #0f172a; font-size: 15.5px; letter-spacing: 0.5px; margin-top: 2px;">
+            ${receiptNo}
+          </div>
+        </div>
+        <div style="width: 1px; height: 28px; background: #cbd5e1;"></div>
+        <div style="text-align: right;">
+          <div style="font-size: 10.5px; color: #64748b; font-weight: 600;">Date &amp; Time</div>
+          <div style="font-weight: 900; color: #0f172a; font-size: 15.5px; margin-top: 2px; display: flex; align-items: center; justify-content: flex-end; gap: 6px;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="#0284c7"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/></svg>
+            <span>${receiptDate}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Details Grid (2 columns: 50% / 50%) -->
+      <div style="display: flex; gap: 16px; margin-bottom: 12px;">
+        <!-- Left Column -->
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 12px;">
+          <!-- University -->
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 36px; height: 36px; border-radius: 50%; background: #e0f2fe; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="#0284c7"><path d="M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82zM12 3L1 9l11 6 9-4.91V17h2V9L12 3z"/></svg>
+            </div>
+            <div>
+              <div style="font-size: 10.5px; color: #64748b; font-weight: 600;">University / Institution</div>
+              <div style="font-weight: 800; color: #0b5299; font-size: 14px; line-height: 1.25; margin-top: 1px;">
+                ${universityName}
+              </div>
+            </div>
+          </div>
+
+          <!-- Received From (Paid By) -->
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 36px; height: 36px; border-radius: 50%; background: #e0f2fe; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="#0284c7"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+            </div>
+            <div>
+              <div style="font-size: 10.5px; color: #64748b; font-weight: 600;">Received From (Paid By)</div>
+              <div style="font-weight: 800; color: #0f172a; font-size: 14px; line-height: 1.25; margin-top: 1px;">
+                ${payerName}
+              </div>
+              <div style="font-size: 10.5px; color: #64748b; margin-top: 1px;">
+                Phone: ${payerPhone}
+              </div>
+            </div>
+          </div>
+
+          <!-- Payment Mode -->
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 36px; height: 36px; border-radius: 50%; background: #e0f2fe; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="#0284c7"><path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>
+            </div>
+            <div>
+              <div style="font-size: 10.5px; color: #64748b; font-weight: 600;">Payment Mode</div>
+              <div style="font-weight: 800; color: #0f172a; font-size: 14px; line-height: 1.25; margin-top: 1px;">
+                ${paymentMode} (Manual Receipt)
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column -->
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 12px;">
+          <!-- Mint Green Amount Card -->
+          <div style="background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 9px; padding: 11px 15px; box-sizing: border-box;">
+            <div style="font-size: 10.5px; color: #64748b; font-weight: 600;">Amount Received</div>
+            <div style="font-size: 30px; font-weight: 900; color: #059669; line-height: 1.15; margin: 3px 0 5px;">
+              ₹${amount.toLocaleString('en-IN')}
+            </div>
+            <div style="border-top: 1px solid #bbf7d0; margin: 5px 0;"></div>
+            <div style="font-size: 10px; color: #64748b; font-weight: 600;">Amount in Words</div>
+            <div style="font-weight: 800; color: #0f172a; font-size: 11.5px; margin-top: 2px;">
+              ${amountWords}
+            </div>
+          </div>
+
+          <!-- Allotted Room -->
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 36px; height: 36px; border-radius: 50%; background: #e0f2fe; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="#0284c7"><path d="M7 13c1.66 0 3-1.34 3-3S8.66 7 7 7s-3 1.34-3 3 1.34 3 3 3zm12-6h-8v7H3V5H1v15h2v-3h18v3h2v-9c0-2.21-1.79-4-4-4z"/></svg>
+            </div>
+            <div>
+              <div style="font-size: 10.5px; color: #64748b; font-weight: 600;">Allotted Hostel Room</div>
+              <div style="font-weight: 800; color: #0f172a; font-size: 14px; line-height: 1.25; margin-top: 1px;">
+                ${roomDisplay}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="border-top: 1px solid #e2e8f0; margin: 10px 0;"></div>
+
+      <!-- Note Banner -->
+      <div style="display: flex; align-items: center; gap: 8px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 7px 12px; margin-bottom: 12px;">
+        <div style="width: 18px; height: 18px; border-radius: 50%; background: #ea580c; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #ffffff; font-weight: 900; font-size: 10.5px;">
+          !
+        </div>
+        <div style="font-size: 11px; color: #334155;">
+          <strong style="color: #c2410c;">Note:</strong> Refundable at checkout upon hostel room clearance and key return.
+        </div>
+      </div>
+
+      <!-- Footer: University Address & Signature -->
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; padding-bottom: 4px;">
+        <div>
+          <div style="font-weight: 800; color: #0f172a; font-size: 12px;">Aditya University</div>
+          <div style="color: #64748b; font-size: 10px; margin-top: 1px;">
+            Surampalem, Kakinada District, Andhra Pradesh - 533437
+          </div>
+        </div>
+        <div style="text-align: center; min-width: 160px;">
+          <div style="border-bottom: 1.5px dotted #94a3b8; width: 100%; margin-bottom: 3px;"></div>
+          <div style="color: #64748b; font-size: 10px; font-weight: 600;">
+            Authorised Signature
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Decorative Bar -->
+      <div style="display: flex; height: 3.5px; width: 100%; border-radius: 1px; overflow: hidden; margin-top: 5px;">
+        <div style="flex: 1; background: #ea580c;"></div>
+        <div style="flex: 1; background: #0284c7;"></div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(container);
+
+  try {
+    if (document.fonts && document.fonts.ready) {
+      await document.fonts.ready;
+    }
+    await new Promise((r) => setTimeout(r, 80));
+
+    const canvas = await html2canvas(container, {
+      scale: 2, // 2x high resolution
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      logging: false
+    });
+
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const pageWidth = 210;
+    const pageMargin = 4;
+    const topMargin = 4;
+    const printWidth = pageWidth - (pageMargin * 2); // 202mm (tight margins on left & right)
+    const printHeight = (canvas.height * printWidth) / canvas.width;
+
+    const imgData = canvas.toDataURL('image/png');
+    pdf.addImage(imgData, 'PNG', pageMargin, topMargin, printWidth, printHeight);
+    pdf.save(`Caution_Deposit_Receipt_${receiptNo}.pdf`);
+  } finally {
+    if (document.body.contains(container)) {
+      document.body.removeChild(container);
+    }
+  }
+};
+
+/**
+ * Export Caution Deposit Receipt as Direct Printable PDF
+ */
+export const exportCautionDepositReceiptPDF = (data) => {
+  if (!data) return;
+
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    alert('Please allow popups to download/print your caution deposit receipt.');
+    return;
+  }
+
+  const amount = Number(data.amount || 2000);
+  const receiptNo = escapeXml(data.receiptNo || 'CD-MANUAL');
+  const universityName = escapeXml(data.universityName || 'Institution / University');
+  const payerName = escapeXml(data.paidBy || 'Representative');
+  const payerRole = escapeXml(data.paidByRole || (data.isCoach ? 'Coach' : 'Player'));
+  const payerPhone = escapeXml(data.paidByPhone || 'N/A');
+  const paymentMode = escapeXml(data.paymentMode || 'Cash');
+  const roomNumber = data.roomNumber ? `Room ${escapeXml(data.roomNumber)}` : 'Room Allocated';
+  const building = escapeXml(data.building || 'Hostel Campus');
+  const paidDate = data.paidAt ? new Date(data.paidAt).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB');
+  const amountWords = getAmountInWords(amount);
+
+  const html = `
+    <!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <title>Caution Deposit Receipt - ${receiptNo}</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+        <style>
+          @page { size: A4 portrait; margin: 15mm 15mm; }
+          * { box-sizing: border-box; font-family: 'Montserrat', system-ui, -apple-system, sans-serif !important; }
+          body {
+            font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
+            color: #0f172a;
+            margin: 0;
+            padding: 24px;
+            background: #ffffff;
+          }
+          .receipt-container {
+            max-width: 780px;
+            margin: 0 auto;
+            border: 1.5px solid #cbd5e1;
+            border-radius: 12px;
+            padding: 28px 32px;
+            background: #ffffff;
+            position: relative;
+          }
+          .header-row {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid #e2e8f0;
+          }
+          .logo-box img {
+            height: 60px;
+            width: auto;
+            object-fit: contain;
+          }
+          .header-text {
+            flex: 1;
+            text-align: center;
+          }
+          .header-text h1 {
+            margin: 0;
+            font-size: 19px;
+            font-weight: 900;
+            color: #0b3b80;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+          }
+          .header-text h2 {
+            margin: 5px 0 0;
+            font-size: 13px;
+            font-weight: 800;
+            color: #334155;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+          }
+          .header-text p {
+            margin: 3px 0 0;
+            font-size: 11px;
+            color: #64748b;
+          }
+          .accent-bar {
+            display: flex;
+            height: 4px;
+            width: 140px;
+            margin: 12px auto 16px;
+            border-radius: 2px;
+            overflow: hidden;
+          }
+          .bar-orange { flex: 1; background: #ea580c; }
+          .bar-blue { flex: 1; background: #0284c7; }
+
+          .meta-box {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px 20px;
+            margin-bottom: 22px;
+          }
+          .meta-item { display: flex; flex-direction: column; }
+          .meta-lbl { font-size: 10.5px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+          .meta-val { font-size: 15px; color: #0f172a; font-weight: 900; }
+          .meta-val.green { color: #059669; }
+
+          .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 22px;
+          }
+          .field-group {
+            margin-bottom: 14px;
+          }
+          .field-label {
+            font-size: 11px;
+            color: #64748b;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            margin-bottom: 3px;
+          }
+          .field-value {
+            font-size: 14.5px;
+            color: #0f172a;
+            font-weight: 800;
+          }
+          .field-sub {
+            font-size: 11.5px;
+            color: #64748b;
+            margin-top: 2px;
+          }
+
+          .amount-card {
+            background: #f0fdf4;
+            border: 2px solid #86efac;
+            border-radius: 10px;
+            padding: 16px 20px;
+          }
+          .amount-card .amt-num {
+            font-size: 32px;
+            font-weight: 900;
+            color: #059669;
+            margin: 4px 0 8px;
+            line-height: 1;
+          }
+          .amount-card .amt-words {
+            font-size: 12px;
+            font-weight: 800;
+            color: #166534;
+          }
+
+          .notice-box {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-left: 4px solid #2563eb;
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin-bottom: 28px;
+          }
+          .notice-title {
+            font-size: 11.5px;
+            font-weight: 800;
+            color: #1e40af;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+          }
+          .notice-text {
+            font-size: 11.5px;
+            color: #1e3a8a;
+            line-height: 1.5;
+            margin: 0;
+          }
+
+          .signatures-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 40px;
+            padding-top: 14px;
+          }
+          .sig-box {
+            text-align: center;
+            width: 200px;
+          }
+          .sig-line {
+            border-top: 1px solid #94a3b8;
+            margin-bottom: 6px;
+          }
+          .sig-text {
+            font-size: 11px;
+            color: #475569;
+            font-weight: 700;
+          }
+
+          @media print {
+            body { padding: 0; background: transparent; }
+            .receipt-container { border: 1.5px solid #000; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="receipt-container">
+          <div class="header-row">
+            <div class="logo-box">
+              <img src="/ADITYA LOGO2.png" alt="Aditya University" />
+            </div>
+            <div class="header-text">
+              <h1>SOUTH ZONE INTER-UNIVERSITY TOURNAMENT</h1>
+              <h2>HOSTEL ACCOMMODATION - CAUTION DEPOSIT RECEIPT</h2>
+              <p>Aditya University Campus, Surampalem, Kakinada Dist, Andhra Pradesh - 533437</p>
+            </div>
+          </div>
+
+          <div class="accent-bar">
+            <div class="bar-orange"></div>
+            <div class="bar-blue"></div>
+          </div>
+
+          <div class="meta-box">
+            <div class="meta-item">
+              <span class="meta-lbl">Receipt No.</span>
+              <span class="meta-val">${receiptNo}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-lbl">Payment Date</span>
+              <span class="meta-val">${paidDate}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-lbl">Status</span>
+              <span class="meta-val green">✓ Active Deposit Paid</span>
+            </div>
+          </div>
+
+          <div class="content-grid">
+            <div>
+              <div class="field-group">
+                <div class="field-label">University / Institution</div>
+                <div class="field-value" style="color: #0b5299;">${universityName}</div>
+              </div>
+
+              <div class="field-group">
+                <div class="field-label">Received From (Payer)</div>
+                <div class="field-value">${payerName}</div>
+                <div class="field-sub">Role: ${payerRole} &bull; Phone: ${payerPhone}</div>
+              </div>
+
+              <div class="field-group">
+                <div class="field-label">Payment Mode</div>
+                <div class="field-value">${paymentMode} (Counter Collection)</div>
+              </div>
+            </div>
+
+            <div>
+              <div class="amount-card">
+                <div class="field-label" style="color: #166534;">Caution Deposit Amount</div>
+                <div class="amt-num">₹${amount.toLocaleString('en-IN')}</div>
+                <div class="field-label" style="color: #166534; margin-top: 6px;">Amount in Words</div>
+                <div class="amt-words">${amountWords}</div>
+              </div>
+
+              <div class="field-group" style="margin-top: 14px;">
+                <div class="field-label">Allotted Accommodation</div>
+                <div class="field-value">${roomNumber}</div>
+                <div class="field-sub">${building}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="notice-box">
+            <div class="notice-title">Security &amp; Refund Policy Note</div>
+            <p class="notice-text">
+              This Caution Deposit is <strong>100% refundable</strong> upon checkout, hostel room vacancy clearance, and key return. An OTP will be sent to the payer's mobile phone to authorize the cash refund at checkout counter.
+            </p>
+          </div>
+
+          <div class="signatures-row">
+            <div class="sig-box">
+              <div class="sig-line"></div>
+              <div class="sig-text">Payer Signature / Handover</div>
+            </div>
+            <div class="sig-box">
+              <div class="sig-line"></div>
+              <div class="sig-text">Hostel Desk Officer &bull; Stamp</div>
+            </div>
+          </div>
+        </div>
+
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+            }, 350);
+          };
+        </script>
+      </body>
+    </html>
+  `;
+
+  printWindow.document.open();
+  printWindow.document.write(html);
+  printWindow.document.close();
+};

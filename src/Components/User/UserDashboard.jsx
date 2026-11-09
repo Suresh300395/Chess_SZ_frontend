@@ -23,11 +23,13 @@ import CloseIcon from '@mui/icons-material/Close';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
 import InfoIcon from '@mui/icons-material/Info';
+import ReceiptIcon from '@mui/icons-material/Receipt';
 import AccommodationDetails from './AccommodationDetails';
 import FoodTokenDetails from './FoodTokenDetails';
 import { getCurrentUser, updateUserSession } from '../../utils/auth';
 import { formatDateDDMMYYYY } from '../../utils/dateUtils';
 import { isMealTokenExpired } from '../../config/foodTokenConfig';
+import { downloadCautionDepositPDF } from '../../utils/exportUtils';
 import PublicBottomBar from '../Common/PublicBottomBar';
 import { AnimatedCard, AnimatedText } from '../animations';
 
@@ -39,6 +41,7 @@ const UserDashboard = () => {
     const [error, setError] = useState('');
     const [activeView, setActiveView] = useState('dashboard');
     const [openPhotoModal, setOpenPhotoModal] = useState(false);
+    const [downloadingReceipt, setDownloadingReceipt] = useState(false);
     const [previewUrl, setPreviewUrl] = useState(null);
     const [savingPhoto, setSavingPhoto] = useState(false);
     const fileInputRef = useRef(null);
@@ -83,6 +86,33 @@ const UserDashboard = () => {
 
     const formatDate = (dateStr) => {
         return formatDateDDMMYYYY(dateStr);
+    };
+
+    const handleDownloadReceipt = async () => {
+        if (!cd.paid || downloadingReceipt) return;
+        try {
+            setDownloadingReceipt(true);
+            toast.info('Generating official receipt PDF...', { id: 'cd-receipt-toast' });
+            await downloadCautionDepositPDF({
+                amount: cd.amount,
+                receiptNo: cd.receiptNo,
+                paidBy: cd.paidBy,
+                paidByRole: cd.paidByRole || (dashData?.userType === 'coach' || user?.role === 'coach' ? 'Coach' : 'Player'),
+                paidByPhone: cd.paidByPhone || playerDetails?.mobileNo || user?.mobile || '',
+                paymentMode: cd.paymentMode || 'Cash',
+                roomNumber: cd.roomNumber || acc?.roomNumber || playerDetails?.roomNumber || '',
+                building: cd.building || acc?.hostelName || acc?.building || '',
+                universityName: cd.universityName || playerDetails?.university || user?.university || '',
+                paidAt: cd.paidAt,
+                isCoach: dashData?.userType === 'coach' || user?.role === 'coach'
+            });
+            toast.success('Receipt PDF downloaded successfully!', { id: 'cd-receipt-toast' });
+        } catch (err) {
+            console.error('Error generating receipt PDF:', err);
+            toast.error('Failed to generate receipt PDF. Please try again.', { id: 'cd-receipt-toast' });
+        } finally {
+            setDownloadingReceipt(false);
+        }
     };
 
     const resolvePhotoUrl = (photoPath) => {
@@ -606,21 +636,53 @@ const UserDashboard = () => {
                                                         </>
                                                     )}
                                                 </Box>
-                                                {cd.paid && cd.paidBy && (
-                                                    <Typography variant="body2" color="#64748b" sx={{ mb: 0.5 }}>
-                                                        Paid by <span style={{ fontWeight: 600, color: '#1e293b', marginLeft: '4px' }}>{cd.paidBy}</span>
-                                                    </Typography>
-                                                )}
-                                                {cd.paid && cd.receiptNo && (
-                                                    <Typography variant="caption" color="#64748b" sx={{ display: 'block', mb: 1 }}>
-                                                        Receipt No: <span style={{ fontWeight: 600, color: '#0b5299' }}>{cd.receiptNo}</span>
-                                                    </Typography>
-                                                )}
-                                                <Typography variant="body2" color="#64748b" sx={{ mb: 2 }}>
-                                                    Total Deposit <span style={{ fontWeight: 600, color: (cd.paid && cd.amount > 0) ? '#1e293b' : '#64748b', marginLeft: '4px' }}>
-                                                        {(cd.paid && cd.amount > 0) ? `₹${Number(cd.amount).toLocaleString('en-IN')}` : 'Not Paid'}
-                                                    </span>
-                                                </Typography>
+                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', mb: 1 }}>
+                                                    <Box>
+                                                        {cd.paid && cd.paidBy && (
+                                                            <Typography variant="body2" color="#64748b" sx={{ mb: 0.5 }}>
+                                                                Paid by <span style={{ fontWeight: 600, color: '#1e293b', marginLeft: '4px' }}>{cd.paidBy}</span>
+                                                            </Typography>
+                                                        )}
+                                                        {cd.paid && cd.receiptNo && (
+                                                            <Typography variant="caption" color="#64748b" sx={{ display: 'block', mb: 0.5 }}>
+                                                                Receipt No: <span style={{ fontWeight: 600, color: '#0b5299' }}>{cd.receiptNo}</span>
+                                                            </Typography>
+                                                        )}
+                                                        <Typography variant="body2" color="#64748b">
+                                                            Total Deposit <span style={{ fontWeight: 600, color: (cd.paid && cd.amount > 0) ? '#1e293b' : '#64748b', marginLeft: '4px' }}>
+                                                                {(cd.paid && cd.amount > 0) ? `₹${Number(cd.amount).toLocaleString('en-IN')}` : 'Not Paid'}
+                                                            </span>
+                                                        </Typography>
+                                                    </Box>
+
+                                                    {/* Receipt PDF Download Button - Visible when Paid, disappears when Refunded */}
+                                                    {(cd.paid && cd.amount > 0 && cd.refundStatus !== 'Refunded' && cd.refundStatus !== 'Refund Completed') && (
+                                                        <Button
+                                                            variant="contained"
+                                                            size="small"
+                                                            disabled={downloadingReceipt}
+                                                            startIcon={downloadingReceipt ? <CircularProgress size={14} sx={{ color: '#fff' }} /> : <ReceiptIcon sx={{ fontSize: 16 }} />}
+                                                            onClick={handleDownloadReceipt}
+                                                            sx={{
+                                                                textTransform: 'none',
+                                                                fontWeight: 700,
+                                                                fontSize: '12px',
+                                                                borderRadius: 2,
+                                                                px: 2,
+                                                                py: 0.6,
+                                                                bgcolor: '#059669',
+                                                                color: '#ffffff',
+                                                                boxShadow: '0 2px 6px rgba(5, 150, 105, 0.25)',
+                                                                '&:hover': {
+                                                                    bgcolor: '#047857',
+                                                                    boxShadow: '0 4px 10px rgba(5, 150, 105, 0.35)'
+                                                                }
+                                                            }}
+                                                        >
+                                                            {downloadingReceipt ? 'Downloading...' : 'Receipt'}
+                                                        </Button>
+                                                    )}
+                                                </Box>
                                                 <Divider sx={{ my: 2 }} />
 
                                                 {/* Refund Information below the line */}

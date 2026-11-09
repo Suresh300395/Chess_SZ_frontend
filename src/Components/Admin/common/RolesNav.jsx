@@ -4,6 +4,7 @@ import GroupsIcon from '@mui/icons-material/Groups';
 import AssignmentIndIcon from '@mui/icons-material/AssignmentInd';
 import HotelIcon from '@mui/icons-material/Hotel';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
+import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import LiveTvIcon from '@mui/icons-material/LiveTv';
@@ -16,6 +17,7 @@ export const ALL_ADMIN_MODULES = [
     { id: 'players-mapping', name: 'Players Mapping', path: '/admin/players-mapping', icon: <AssignmentIndIcon />, description: 'Map players & university rosters' },
     { id: 'hostel-provision', name: 'Accommodation', path: '/admin/hostel-provision', icon: <HotelIcon />, description: 'Hostel room allocation & management' },
     { id: 'food-tokens', name: 'Food Tokens', path: '/admin/food-tokens', icon: <RestaurantIcon />, description: 'Food tokens issuance & redemption' },
+    { id: 'qr-scanner', name: 'QR Scanner', path: '/admin/qr-scanner', icon: <QrCodeScannerIcon />, description: 'Scan & redeem food tokens' },
     { id: 'caution-deposite', name: 'Caution Deposit', path: '/admin/caution-deposite', icon: <PaymentsIcon />, description: 'Collect & refund caution deposits' },
     { id: 'manage-live-board', name: 'Manage Live Board', path: '/admin/manage-live-board', icon: <LiveTvIcon />, description: 'Update live match rounds & scores' },
     { id: 'manage-blocks', name: 'Manage Blocks', path: '/admin/manage-blocks', icon: <ApartmentIcon />, description: 'Configure hostel blocks & rooms' },
@@ -42,6 +44,7 @@ export const getMenusByRole = (role, allowedModules = undefined) => {
         'players-mapping',
         'hostel-provision',
         'food-tokens',
+        'qr-scanner',
         'caution-deposite',
         'manage-live-board'
     ];

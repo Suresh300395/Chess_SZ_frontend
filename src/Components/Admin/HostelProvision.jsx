@@ -52,6 +52,8 @@ import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import GridViewRoundedIcon from '@mui/icons-material/GridViewRounded';
 import TableRowsRoundedIcon from '@mui/icons-material/TableRowsRounded';
 import SchoolIcon from '@mui/icons-material/School';
+import CloseIcon from '@mui/icons-material/Close';
+import TuneIcon from '@mui/icons-material/Tune';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import PrintIcon from '@mui/icons-material/Print';
 import LocalAtmIcon from '@mui/icons-material/LocalAtm';
@@ -60,12 +62,15 @@ import PersonIcon from '@mui/icons-material/Person';
 import CreditCardIcon from '@mui/icons-material/CreditCard';
 import CalendarTodayOutlinedIcon from '@mui/icons-material/CalendarTodayOutlined';
 import io from 'socket.io-client';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import CustomTabs from '../Common/Tabs';
+import CautionDepositReceiptModal from '../Common/CautionDepositReceiptModal';
 import { registrationAPI, blocksAPI, SOCKET_URL } from '../../utils/api';
 import { AnimatedText, AnimatedCard } from '../animations';
 
 const HostelProvision = () => {
+    const navigate = useNavigate();
     const [mappedViewMode, setMappedViewMode] = useState('table');
     const [searchViewMode, setSearchViewMode] = useState('table');
     const [accommodationList, setAccommodationList] = useState([]);
@@ -338,6 +343,124 @@ const HostelProvision = () => {
     const mappedList = useMemo(() => {
         return tabFilteredList.filter(person => Boolean(person.roomAllocation));
     }, [tabFilteredList]);
+
+    // Group mapped participants by university
+    const mappedByUniversity = useMemo(() => {
+        const groups = {};
+        mappedList.forEach(person => {
+            const uniName = person.university?.trim() || 'Unknown University';
+            if (!groups[uniName]) {
+                groups[uniName] = {
+                    university: uniName,
+                    members: []
+                };
+            }
+            groups[uniName].members.push(person);
+        });
+        return Object.values(groups).sort((a, b) => a.university.localeCompare(b.university));
+    }, [mappedList]);
+
+    // State for Managing University Mapped Participants Modal
+    const [manageUniModalOpen, setManageUniModalOpen] = useState(false);
+    const [selectedUniName, setSelectedUniName] = useState('');
+
+    const handleOpenManageUniModal = (uniName) => {
+        setSelectedUniName(uniName);
+        setManageUniModalOpen(true);
+    };
+
+    const handleCloseManageUniModal = () => {
+        setManageUniModalOpen(false);
+        setSelectedUniName('');
+    };
+
+    const currentUniGroup = useMemo(() => {
+        if (!selectedUniName) return null;
+        return mappedByUniversity.find(u => u.university.toLowerCase() === selectedUniName.toLowerCase()) || null;
+    }, [mappedByUniversity, selectedUniName]);
+
+    // State for Vacate Rooms Flow
+    const [vacateDialogOpen, setVacateDialogOpen] = useState(false);
+    const [vacateStep, setVacateStep] = useState(1); // 1: Confirmation ("Are you sure you want to vacate? Yes/No"), 2: Checklist
+    const [vacateSelectedIds, setVacateSelectedIds] = useState([]);
+    const [vacating, setVacating] = useState(false);
+
+    const handleOpenVacateDialog = () => {
+        if (!currentUniGroup || currentUniGroup.members.length === 0) {
+            toast.error('No allocated members to vacate');
+            return;
+        }
+        setVacateStep(1);
+        setVacateSelectedIds(currentUniGroup.members.map(m => m.id));
+        setVacateDialogOpen(true);
+    };
+
+    const handleCloseVacateDialog = () => {
+        if (vacating) return;
+        setVacateDialogOpen(false);
+        setVacateStep(1);
+    };
+
+    const handleConfirmYesVacate = () => {
+        if (!currentUniGroup) return;
+        setVacateSelectedIds(currentUniGroup.members.map(m => m.id));
+        setVacateStep(2);
+    };
+
+    const handleToggleVacateMember = (memberId) => {
+        setVacateSelectedIds(prev =>
+            prev.includes(memberId)
+                ? prev.filter(id => id !== memberId)
+                : [...prev, memberId]
+        );
+    };
+
+    const handleToggleSelectAllVacate = () => {
+        if (!currentUniGroup) return;
+        if (vacateSelectedIds.length === currentUniGroup.members.length) {
+            setVacateSelectedIds([]);
+        } else {
+            setVacateSelectedIds(currentUniGroup.members.map(m => m.id));
+        }
+    };
+
+    const handleExecuteVacateAndRedirect = async () => {
+        if (!currentUniGroup || vacateSelectedIds.length === 0) {
+            toast.error('Please select at least one participant to vacate');
+            return;
+        }
+
+        const selectedMembers = currentUniGroup.members.filter(m => vacateSelectedIds.includes(m.id));
+        if (selectedMembers.length === 0) return;
+
+        setVacating(true);
+        try {
+            await Promise.all(
+                selectedMembers.map(person =>
+                    registrationAPI.unassignRoom({
+                        registrationId: person.registrationId,
+                        personId: person.id,
+                        role: person.role
+                    })
+                )
+            );
+
+            toast.success(`Successfully vacated rooms for ${selectedMembers.length} participant(s) of ${selectedUniName}! Redirecting to Caution Deposit refund...`);
+            
+            await fetchRegistrations();
+
+            setVacateDialogOpen(false);
+            setManageUniModalOpen(false);
+
+            const targetTab = activeTab === 'Players' ? 'team' : 'coach';
+            navigate(`/admin/caution-deposite?search=${encodeURIComponent(selectedUniName)}&tab=${targetTab}`);
+        } catch (err) {
+            console.error('Error vacating rooms:', err);
+            toast.error('Failed to vacate rooms. Please try again.');
+        } finally {
+            setVacating(false);
+        }
+    };
 
     // Statistics for summary badges
     const stats = useMemo(() => {
@@ -1673,7 +1796,7 @@ const HostelProvision = () => {
             <Box sx={{ mt: 4 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, mb: 2, flexWrap: 'wrap', gap: 1.5 }}>
                     <Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                             <HotelIcon sx={{ color: '#0b5299', fontSize: 24 }} />
                             <Typography variant="h6" sx={{ color: '#1e293b', fontWeight: 700, fontSize: { xs: '1.1rem', md: '1.3rem' } }}>
                                 Currently Mapped {activeTab}
@@ -1685,301 +1808,320 @@ const HostelProvision = () => {
                                     bgcolor: '#ecfdf5',
                                     color: '#047857',
                                     fontWeight: 600,
-                                    border: '1px solid #a7f3d0',
-                                    display: { xs: 'none', sm: 'inline-flex' }
+                                    border: '1px solid #a7f3d0'
                                 }}
                             />
+                            {mappedByUniversity.length > 0 && (
+                                <Chip
+                                    icon={<SchoolIcon sx={{ fontSize: '15px !important', color: '#1e40af' }} />}
+                                    label={`${mappedByUniversity.length} ${mappedByUniversity.length === 1 ? 'University' : 'Universities'}`}
+                                    size="small"
+                                    sx={{
+                                        bgcolor: '#eff6ff',
+                                        color: '#1e40af',
+                                        fontWeight: 600,
+                                        border: '1px solid #bfdbfe'
+                                    }}
+                                />
+                            )}
                         </Box>
                         <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.3, fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
-                            Showing all {activeTab.toLowerCase()} with assigned rooms
+                            Showing all {activeTab.toLowerCase()} grouped by university with assigned rooms
                         </Typography>
                     </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, bgcolor: '#ffffff', p: 0.4, borderRadius: 2, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-                        <Tooltip title="Cards View">
-                            <IconButton
-                                size="small"
-                                onClick={() => setMappedViewMode('cards')}
-                                sx={{
-                                    p: 0.6,
-                                    borderRadius: 1.5,
-                                    bgcolor: mappedViewMode === 'cards' ? '#0b5299' : 'transparent',
-                                    color: mappedViewMode === 'cards' ? '#ffffff' : '#64748b',
-                                    boxShadow: mappedViewMode === 'cards' ? '0 1px 3px rgba(11,82,153,0.3)' : 'none',
-                                    '&:hover': {
-                                        bgcolor: mappedViewMode === 'cards' ? '#0b5299' : 'rgba(0,0,0,0.06)',
-                                        color: mappedViewMode === 'cards' ? '#ffffff' : '#0b5299'
-                                    }
-                                }}
-                            >
-                                <GridViewRoundedIcon sx={{ fontSize: 18 }} />
-                            </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Table View">
-                            <IconButton
-                                size="small"
-                                onClick={() => setMappedViewMode('table')}
-                                sx={{
-                                    p: 0.6,
-                                    borderRadius: 1.5,
-                                    bgcolor: mappedViewMode === 'table' ? '#0b5299' : 'transparent',
-                                    color: mappedViewMode === 'table' ? '#ffffff' : '#64748b',
-                                    boxShadow: mappedViewMode === 'table' ? '0 1px 3px rgba(11,82,153,0.3)' : 'none',
-                                    '&:hover': {
-                                        bgcolor: mappedViewMode === 'table' ? '#0b5299' : 'rgba(0,0,0,0.06)',
-                                        color: mappedViewMode === 'table' ? '#ffffff' : '#0b5299'
-                                    }
-                                }}
-                            >
-                                <TableRowsRoundedIcon sx={{ fontSize: 18 }} />
-                            </IconButton>
-                        </Tooltip>
+
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, bgcolor: '#ffffff', p: 0.4, borderRadius: 2, border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                            <Tooltip title="Table View">
+                                <IconButton
+                                    size="small"
+                                    onClick={() => setMappedViewMode('table')}
+                                    sx={{
+                                        p: 0.6,
+                                        borderRadius: 1.5,
+                                        bgcolor: mappedViewMode === 'table' ? '#0b5299' : 'transparent',
+                                        color: mappedViewMode === 'table' ? '#ffffff' : '#64748b',
+                                        boxShadow: mappedViewMode === 'table' ? '0 1px 3px rgba(11,82,153,0.3)' : 'none',
+                                        '&:hover': {
+                                            bgcolor: mappedViewMode === 'table' ? '#0b5299' : 'rgba(0,0,0,0.06)',
+                                            color: mappedViewMode === 'table' ? '#ffffff' : '#0b5299'
+                                        }
+                                    }}
+                                >
+                                    <TableRowsRoundedIcon sx={{ fontSize: 18 }} />
+                                </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Cards View">
+                                <IconButton
+                                    size="small"
+                                    onClick={() => setMappedViewMode('cards')}
+                                    sx={{
+                                        p: 0.6,
+                                        borderRadius: 1.5,
+                                        bgcolor: mappedViewMode === 'cards' ? '#0b5299' : 'transparent',
+                                        color: mappedViewMode === 'cards' ? '#ffffff' : '#64748b',
+                                        boxShadow: mappedViewMode === 'cards' ? '0 1px 3px rgba(11,82,153,0.3)' : 'none',
+                                        '&:hover': {
+                                            bgcolor: mappedViewMode === 'cards' ? '#0b5299' : 'rgba(0,0,0,0.06)',
+                                            color: mappedViewMode === 'cards' ? '#ffffff' : '#0b5299'
+                                        }
+                                    }}
+                                >
+                                    <GridViewRoundedIcon sx={{ fontSize: 18 }} />
+                                </IconButton>
+                            </Tooltip>
+                        </Box>
                     </Box>
                 </Box>
 
-                {mappedViewMode === 'cards' ? (
-                    <Box>
-                        {mappedList.length === 0 ? (
-                            <Paper sx={{ py: 6, textAlign: 'center', color: '#64748b', borderRadius: 2.5, border: '1px solid #e2e8f0', boxShadow: 'none' }}>
-                                <HotelIcon sx={{ fontSize: 44, color: '#cbd5e1', mb: 1 }} />
-                                <Typography sx={{ fontWeight: 600, color: '#475569' }}>
-                                    No {activeTab.toLowerCase()} mapped to rooms yet.
-                                </Typography>
-                            </Paper>
-                        ) : (
-                            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 2 }}>
-                                {mappedList.map((person, index) => (
-                                    <Paper
-                                        key={`${person.id}-${index}`}
-                                        variant="outlined"
-                                        sx={{
-                                            p: 2,
-                                            borderRadius: 2.5,
-                                            bgcolor: '#ffffff',
-                                            borderColor: '#e2e8f0',
-                                            boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            justifyContent: 'space-between',
-                                            gap: 1.5,
-                                            transition: 'all 0.2s ease-in-out',
-                                            '&:hover': {
-                                                borderColor: '#cbd5e1',
-                                                boxShadow: '0 6px 16px rgba(11,82,153,0.08)',
-                                                transform: 'translateY(-2px)'
-                                            }
-                                        }}
-                                    >
-                                        <Box>
-                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                                                <Chip
-                                                    label={`#${index + 1}`}
-                                                    size="small"
-                                                    sx={{ fontWeight: 700, fontSize: '11px', bgcolor: '#f1f5f9', color: '#475569', height: 22 }}
-                                                />
-                                                <Chip
-                                                    label={person.role}
-                                                    size="small"
-                                                    color="primary"
-                                                    variant="outlined"
-                                                    sx={{ height: 22, fontSize: '11px', fontWeight: 600 }}
-                                                />
-                                            </Box>
-                                            <Typography sx={{ fontWeight: 700, color: '#0f172a', fontSize: '1.05rem', wordBreak: 'break-word', mb: 0.5 }}>
-                                                {person.name}
-                                            </Typography>
-                                            <Typography variant="body2" sx={{ color: '#64748b', fontSize: '13px', mb: 1.5 }}>
-                                                {person.university}
-                                            </Typography>
-
-                                            <Box sx={{ p: 1.2, bgcolor: '#eff6ff', borderRadius: 2, border: '1px solid #bfdbfe', mb: 1.5 }}>
-                                                <Typography variant="caption" sx={{ color: '#1e40af', fontWeight: 600, display: 'block', mb: 0.3 }}>
-                                                    ALLOCATED ROOM
-                                                </Typography>
-                                                <Typography sx={{ fontWeight: 700, color: '#1d4ed8', fontSize: '1rem' }}>
-                                                    {person.roomAllocation.roomNumber}
-                                                </Typography>
-                                                <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500 }}>
-                                                    {person.roomAllocation.building} • {person.roomAllocation.floor}
-                                                </Typography>
-                                            </Box>
-
-                                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1 }}>
-                                                <Box>
-                                                    <Typography variant="caption" sx={{ color: '#64748b', display: 'block', fontSize: '11px' }}>Gender</Typography>
-                                                    <Typography sx={{ fontWeight: 600, color: '#334155', fontSize: '12.5px' }}>{person.gender}</Typography>
-                                                </Box>
-                                                <Box>
-                                                    <Typography variant="caption" sx={{ color: '#64748b', display: 'block', fontSize: '11px' }}>Phone</Typography>
-                                                    <Typography sx={{ fontWeight: 600, color: '#334155', fontSize: '12.5px' }}>{person.phone}</Typography>
-                                                </Box>
-                                            </Box>
-                                        </Box>
-
-                                        <Box sx={{ display: 'flex', gap: 1, pt: 1.5, borderTop: '1px solid #f1f5f9' }}>
-                                            <Button
-                                                fullWidth
-                                                size="small"
-                                                variant="outlined"
-                                                startIcon={<EditIcon sx={{ fontSize: 16 }} />}
-                                                onClick={(e) => {
-                                                    e.currentTarget.blur();
-                                                    handleOpenMapDialog(person);
-                                                }}
-                                                sx={{ textTransform: 'none', borderRadius: 1.5, fontWeight: 600, color: '#2563eb', borderColor: '#bfdbfe' }}
-                                            >
-                                                Change
-                                            </Button>
-                                            <Button
-                                                fullWidth
-                                                size="small"
-                                                variant="outlined"
-                                                color="error"
-                                                startIcon={<DeleteIcon sx={{ fontSize: 16 }} />}
-                                                onClick={(e) => {
-                                                    e.currentTarget.blur();
-                                                    handleOpenUnassignDialog(person);
-                                                }}
-                                                sx={{ textTransform: 'none', borderRadius: 1.5, fontWeight: 600, borderColor: '#fecaca' }}
-                                            >
-                                                Unassign
-                                            </Button>
-                                        </Box>
-                                    </Paper>
-                                ))}
-                            </Box>
-                        )}
-                    </Box>
-                ) : (
-                    <TableContainer component={Paper} sx={{ boxShadow: '0 4px 16px rgba(0,0,0,0.05)', borderRadius: 2.5, border: '1px solid #e2e8f0', overflowX: 'auto', width: '100%' }}>
-                        <Table sx={{ minWidth: 700 }} aria-label="mapped accommodations table">
+                {loading ? (
+                    <Paper sx={{ py: 6, textAlign: 'center', borderRadius: 2.5, border: '1px solid #e2e8f0' }}>
+                        <CircularProgress size={32} sx={{ color: '#0b5299', mb: 1 }} />
+                        <Typography sx={{ color: 'text.secondary' }}>Loading allocations...</Typography>
+                    </Paper>
+                ) : mappedList.length === 0 ? (
+                    <Paper sx={{ py: 6, textAlign: 'center', color: '#64748b', borderRadius: 2.5, border: '1px solid #e2e8f0', boxShadow: 'none' }}>
+                        <HotelIcon sx={{ fontSize: 44, color: '#cbd5e1', mb: 1 }} />
+                        <Typography sx={{ fontWeight: 600, color: '#475569' }}>
+                            No {activeTab.toLowerCase()} mapped to rooms yet.
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#94a3b8', mt: 0.5 }}>
+                            Use the search box above to search by name or university and click "Map a Room".
+                        </Typography>
+                    </Paper>
+                ) : mappedViewMode === 'table' ? (
+                    <TableContainer component={Paper} elevation={0} sx={{ borderRadius: 2.5, border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.02)' }}>
+                        <Table sx={{ minWidth: 650 }} aria-label="Universities mapped table">
                             <TableHead sx={{ bgcolor: '#f8fafc' }}>
                                 <TableRow>
-                                    <TableCell sx={{ fontWeight: 700, color: '#334155', width: 60 }}>S.No</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Name</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Role</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: '#334155' }}>University</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Gender</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Phone</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Accommodation</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: '#334155' }}>Allocated Room</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: '#334155', width: 140 }}>Actions</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: '#475569', width: 65, py: 1.5, pl: 2.5 }}>S.No</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: '#1e293b', py: 1.5 }}>University Name</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: '#1e293b', py: 1.5 }}>Total Allocated {activeTab}</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: '#1e293b', py: 1.5 }}>Allocated Rooms</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: '#1e293b', py: 1.5, width: 140, textAlign: 'center', pr: 2.5 }}>Actions</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {loading ? (
-                                    <TableRow>
-                                        <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
-                                            <CircularProgress size={32} sx={{ color: '#0b5299', mb: 1 }} />
-                                            <Typography sx={{ color: 'text.secondary' }}>Loading allocations...</Typography>
-                                        </TableCell>
-                                    </TableRow>
-                                ) : mappedList.length > 0 ? (
-                                    mappedList.map((person, index) => (
+                                {mappedByUniversity.map((uniGroup, index) => {
+                                    const assignedRooms = [...new Set(uniGroup.members.map(m => m.roomAllocation?.roomNumber).filter(Boolean))];
+                                    const count = uniGroup.members.length;
+                                    return (
                                         <TableRow
-                                            key={person.id}
+                                            key={uniGroup.university}
+                                            hover
                                             sx={{
                                                 '&:last-child td, &:last-child th': { border: 0 },
-                                                '&:hover': { bgcolor: '#f8fafc' }
+                                                transition: 'background-color 0.15s ease'
                                             }}
                                         >
-                                            <TableCell>{index + 1}</TableCell>
-                                            <TableCell sx={{ fontWeight: 600, color: '#0f172a' }}>{person.name}</TableCell>
+                                            <TableCell sx={{ color: '#64748b', fontWeight: 600, pl: 2.5 }}>{index + 1}</TableCell>
                                             <TableCell>
-                                                <Chip
-                                                    label={person.role}
-                                                    size="small"
-                                                    color={person.role === 'Coach' ? 'secondary' : 'primary'}
-                                                    variant="outlined"
-                                                />
-                                            </TableCell>
-                                            <TableCell>{person.university}</TableCell>
-                                            <TableCell>{person.gender}</TableCell>
-                                            <TableCell>{person.phone}</TableCell>
-                                            <TableCell>
-                                                {person.accommodation === 'Yes' ? (
-                                                    <Chip
-                                                        icon={<CheckCircleIcon sx={{ fontSize: '15px !important' }} />}
-                                                        label="Yes"
-                                                        size="small"
-                                                        sx={{ bgcolor: '#ecfdf5', color: '#065f46', fontWeight: 600 }}
-                                                    />
-                                                ) : (
-                                                    <Chip
-                                                        icon={<CancelIcon sx={{ fontSize: '15px !important' }} />}
-                                                        label="No"
-                                                        size="small"
-                                                        sx={{ bgcolor: '#f1f5f9', color: '#64748b' }}
-                                                    />
-                                                )}
-                                            </TableCell>
-                                            {/* Allocated Room Column */}
-                                            <TableCell>
-                                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                                                    <Chip
-                                                        icon={<HotelIcon sx={{ fontSize: '15px !important' }} />}
-                                                        label={person.roomAllocation.roomNumber}
-                                                        size="small"
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                    <Box
                                                         sx={{
-                                                            bgcolor: '#dbeafe',
-                                                            color: '#1e40af',
-                                                            fontWeight: 700,
-                                                            width: 'fit-content'
+                                                            width: 36,
+                                                            height: 36,
+                                                            borderRadius: 2,
+                                                            bgcolor: 'rgba(11, 82, 153, 0.08)',
+                                                            color: '#0b5299',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            flexShrink: 0
                                                         }}
-                                                    />
-                                                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500 }}>
-                                                        {person.roomAllocation.building} • {person.roomAllocation.floor}
+                                                    >
+                                                        <SchoolIcon sx={{ fontSize: 20 }} />
+                                                    </Box>
+                                                    <Typography sx={{ fontWeight: 700, color: '#0f172a', fontSize: '0.96rem' }}>
+                                                        {uniGroup.university}
                                                     </Typography>
                                                 </Box>
                                             </TableCell>
-                                            {/* Actions Column */}
                                             <TableCell>
-                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                    <Tooltip title="Change Room">
-                                                        <IconButton
-                                                            size="small"
-                                                            onClick={(e) => {
-                                                                e.currentTarget.blur();
-                                                                handleOpenMapDialog(person);
-                                                            }}
-                                                            sx={{ color: '#2563eb', bgcolor: '#eff6ff', '&:hover': { bgcolor: '#dbeafe' } }}
-                                                        >
-                                                            <EditIcon fontSize="small" />
-                                                        </IconButton>
-                                                    </Tooltip>
-                                                    <Tooltip title="Unassign Room">
-                                                        <IconButton
-                                                            size="small"
-                                                            onClick={(e) => {
-                                                                e.currentTarget.blur();
-                                                                handleOpenUnassignDialog(person);
-                                                            }}
-                                                            sx={{ color: '#dc2626', bgcolor: '#fef2f2', '&:hover': { bgcolor: '#fee2e2' } }}
-                                                        >
-                                                            <DeleteIcon fontSize="small" />
-                                                        </IconButton>
-                                                    </Tooltip>
+                                                <Chip
+                                                    label={`${count} Allocated`}
+                                                    size="small"
+                                                    sx={{
+                                                        bgcolor: '#ecfdf5',
+                                                        color: '#047857',
+                                                        fontWeight: 700,
+                                                        fontSize: '12px',
+                                                        border: '1px solid #a7f3d0'
+                                                    }}
+                                                />
+                                            </TableCell>
+                                            <TableCell>
+                                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8, alignItems: 'center' }}>
+                                                    {assignedRooms.length > 0 ? (
+                                                        assignedRooms.map((room) => (
+                                                            <Chip
+                                                                key={room}
+                                                                icon={<HotelIcon sx={{ fontSize: '13px !important', color: '#1e40af' }} />}
+                                                                label={room}
+                                                                size="small"
+                                                                sx={{
+                                                                    bgcolor: '#eff6ff',
+                                                                    color: '#1e40af',
+                                                                    fontWeight: 600,
+                                                                    fontSize: '11.5px',
+                                                                    border: '1px solid #bfdbfe',
+                                                                    height: 24
+                                                                }}
+                                                            />
+                                                        ))
+                                                    ) : (
+                                                        <Typography variant="caption" sx={{ color: '#94a3b8' }}>None</Typography>
+                                                    )}
                                                 </Box>
                                             </TableCell>
+                                            <TableCell sx={{ textAlign: 'center', pr: 2.5 }}>
+                                                <Button
+                                                    variant="contained"
+                                                    size="small"
+                                                    startIcon={<TuneIcon sx={{ fontSize: 16 }} />}
+                                                    onClick={() => handleOpenManageUniModal(uniGroup.university)}
+                                                    sx={{
+                                                        textTransform: 'none',
+                                                        fontSize: '12.5px',
+                                                        fontWeight: 600,
+                                                        bgcolor: '#0b5299',
+                                                        color: '#ffffff',
+                                                        px: 2,
+                                                        py: 0.6,
+                                                        borderRadius: 2,
+                                                        boxShadow: '0 2px 6px rgba(11,82,153,0.22)',
+                                                        '&:hover': {
+                                                            bgcolor: '#083c70',
+                                                            boxShadow: '0 4px 10px rgba(11,82,153,0.32)'
+                                                        }
+                                                    }}
+                                                >
+                                                    Manage
+                                                </Button>
+                                            </TableCell>
                                         </TableRow>
-                                    ))
-                                ) : (
-                                    <TableRow>
-                                        <TableCell colSpan={9} align="center" sx={{ py: 6, color: 'text.secondary' }}>
-                                            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                                                <HotelIcon sx={{ fontSize: 44, color: '#cbd5e1' }} />
-                                                <Typography sx={{ fontWeight: 600, color: '#475569' }}>
-                                                    No {activeTab.toLowerCase()} mapped to rooms yet.
-                                                </Typography>
-                                                <Typography variant="body2" sx={{ color: '#94a3b8' }}>
-                                                    Use the search box above to search by name or university and click "Map a Room".
-                                                </Typography>
-                                            </Box>
-                                        </TableCell>
-                                    </TableRow>
-                                )}
+                                    );
+                                })}
                             </TableBody>
                         </Table>
                     </TableContainer>
+                ) : (
+                    /* Cards View */
+                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }, gap: 2.5 }}>
+                        {mappedByUniversity.map((uniGroup) => {
+                            const assignedRooms = [...new Set(uniGroup.members.map(m => m.roomAllocation?.roomNumber).filter(Boolean))];
+                            const count = uniGroup.members.length;
+                            return (
+                                <Paper
+                                    key={uniGroup.university}
+                                    variant="outlined"
+                                    sx={{
+                                        p: 2.5,
+                                        borderRadius: 2.5,
+                                        border: '1px solid #e2e8f0',
+                                        boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        justifyContent: 'space-between',
+                                        gap: 2,
+                                        transition: 'all 0.2s ease-in-out',
+                                        '&:hover': {
+                                            borderColor: '#cbd5e1',
+                                            boxShadow: '0 4px 16px rgba(11,82,153,0.08)',
+                                            transform: 'translateY(-2px)'
+                                        }
+                                    }}
+                                >
+                                    <Box>
+                                        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1.5, mb: 1.5 }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                <Box
+                                                    sx={{
+                                                        width: 40,
+                                                        height: 40,
+                                                        borderRadius: 2,
+                                                        bgcolor: 'rgba(11, 82, 153, 0.1)',
+                                                        color: '#0b5299',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        flexShrink: 0
+                                                    }}
+                                                >
+                                                    <SchoolIcon sx={{ fontSize: 22 }} />
+                                                </Box>
+                                                <Typography sx={{ fontWeight: 700, color: '#0f172a', fontSize: '1.05rem', lineHeight: 1.3 }}>
+                                                    {uniGroup.university}
+                                                </Typography>
+                                            </Box>
+                                            <Chip
+                                                label={`${count} Allocated`}
+                                                size="small"
+                                                sx={{
+                                                    bgcolor: '#ecfdf5',
+                                                    color: '#047857',
+                                                    fontWeight: 700,
+                                                    fontSize: '11px',
+                                                    border: '1px solid #a7f3d0'
+                                                }}
+                                            />
+                                        </Box>
+
+                                        <Box sx={{ p: 1.5, bgcolor: '#f8fafc', borderRadius: 2, border: '1px solid #f1f5f9' }}>
+                                            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block', mb: 0.8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                                Allocated Room(s)
+                                            </Typography>
+                                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8 }}>
+                                                {assignedRooms.length > 0 ? (
+                                                    assignedRooms.map((room) => (
+                                                        <Chip
+                                                            key={room}
+                                                            icon={<HotelIcon sx={{ fontSize: '13px !important', color: '#1e40af' }} />}
+                                                            label={room}
+                                                            size="small"
+                                                            sx={{
+                                                                bgcolor: '#eff6ff',
+                                                                color: '#1e40af',
+                                                                fontWeight: 600,
+                                                                fontSize: '11px',
+                                                                border: '1px solid #bfdbfe'
+                                                            }}
+                                                        />
+                                                    ))
+                                                ) : (
+                                                    <Typography variant="caption" sx={{ color: '#94a3b8' }}>None</Typography>
+                                                )}
+                                            </Box>
+                                        </Box>
+                                    </Box>
+
+                                    <Button
+                                        fullWidth
+                                        variant="contained"
+                                        size="small"
+                                        startIcon={<TuneIcon sx={{ fontSize: 16 }} />}
+                                        onClick={() => handleOpenManageUniModal(uniGroup.university)}
+                                        sx={{
+                                            textTransform: 'none',
+                                            fontSize: '13px',
+                                            fontWeight: 600,
+                                            bgcolor: '#0b5299',
+                                            color: '#ffffff',
+                                            py: 0.8,
+                                            borderRadius: 2,
+                                            boxShadow: '0 2px 6px rgba(11,82,153,0.22)',
+                                            '&:hover': {
+                                                bgcolor: '#083c70',
+                                                boxShadow: '0 4px 10px rgba(11,82,153,0.32)'
+                                            }
+                                        }}
+                                    >
+                                        Manage
+                                    </Button>
+                                </Paper>
+                            );
+                        })}
+                    </Box>
                 )}
             </Box>
 
@@ -2247,6 +2389,526 @@ const HostelProvision = () => {
                 )}
             </Paper>
 
+            {/* Modal: Manage University Mapped Participants */}
+            <Dialog
+                open={manageUniModalOpen}
+                onClose={handleCloseManageUniModal}
+                maxWidth="lg"
+                fullWidth
+                disableRestoreFocus
+                slotProps={{
+                    paper: {
+                        sx: {
+                            borderRadius: 3,
+                            boxShadow: '0 20px 45px rgba(0,0,0,0.18)',
+                            overflow: 'hidden'
+                        }
+                    }
+                }}
+            >
+                <DialogTitle
+                    sx={{
+                        m: 0,
+                        p: { xs: 2, sm: 2.5 },
+                        bgcolor: '#0b5299',
+                        color: '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                    }}
+                >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.18)', color: '#ffffff', width: 44, height: 44 }}>
+                            <SchoolIcon />
+                        </Avatar>
+                        <Box>
+                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#ffffff', fontSize: { xs: '1.05rem', sm: '1.25rem' }, lineHeight: 1.2 }}>
+                                {selectedUniName}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.82rem' }}>
+                                Manage Allocated {activeTab} • {currentUniGroup?.members?.length || 0} Total
+                            </Typography>
+                        </Box>
+                    </Box>
+                    <IconButton
+                        onClick={handleCloseManageUniModal}
+                        sx={{
+                            color: '#ffffff',
+                            bgcolor: 'rgba(255,255,255,0.12)',
+                            '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' }
+                        }}
+                    >
+                        <CloseIcon />
+                    </IconButton>
+                </DialogTitle>
+
+                <DialogContent sx={{ p: { xs: 2, sm: 3 }, pt: { xs: '24px !important', sm: '28px !important' }, bgcolor: '#ffffff' }}>
+                    {(!currentUniGroup || currentUniGroup.members.length === 0) ? (
+                        <Box sx={{ py: 6, textAlign: 'center' }}>
+                            <HotelIcon sx={{ fontSize: 48, color: '#cbd5e1', mb: 1 }} />
+                            <Typography sx={{ fontWeight: 600, color: '#475569' }}>
+                                No allocated {activeTab.toLowerCase()} found for this university.
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: '#94a3b8', mt: 0.5 }}>
+                                All participants have been unassigned.
+                            </Typography>
+                        </Box>
+                    ) : (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+                            {/* Summary bar inside modal */}
+                            <Box
+                                sx={{
+                                    mt: 0.5,
+                                    p: 1.8,
+                                    bgcolor: '#f8fafc',
+                                    borderRadius: 2.5,
+                                    border: '1px solid #e2e8f0',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    flexWrap: 'wrap',
+                                    gap: 2
+                                }}
+                            >
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155' }}>
+                                        Allocated Rooms:
+                                    </Typography>
+                                    {[...new Set(currentUniGroup.members.map(m => m.roomAllocation?.roomNumber).filter(Boolean))].map(room => (
+                                        <Chip
+                                            key={room}
+                                            icon={<HotelIcon sx={{ fontSize: '13px !important', color: '#1e40af' }} />}
+                                            label={room}
+                                            size="small"
+                                            sx={{ bgcolor: '#eff6ff', color: '#1e40af', fontWeight: 600, fontSize: '11px', border: '1px solid #bfdbfe' }}
+                                        />
+                                    ))}
+                                </Box>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                    <Chip
+                                        label={`${currentUniGroup.members.length} ${activeTab === 'Players' ? (currentUniGroup.members.length === 1 ? 'Player' : 'Players') : (currentUniGroup.members.length === 1 ? 'Coach' : 'Coaches')}`}
+                                        size="small"
+                                        sx={{ bgcolor: '#ecfdf5', color: '#047857', fontWeight: 700, border: '1px solid #a7f3d0' }}
+                                    />
+                                    <Button
+                                        variant="contained"
+                                        color="error"
+                                        size="small"
+                                        startIcon={<MeetingRoomIcon sx={{ fontSize: 16 }} />}
+                                        onClick={handleOpenVacateDialog}
+                                        sx={{
+                                            textTransform: 'none',
+                                            fontSize: '12px',
+                                            fontWeight: 700,
+                                            bgcolor: '#dc2626',
+                                            color: '#ffffff',
+                                            borderRadius: 2,
+                                            px: 2,
+                                            py: 0.6,
+                                            boxShadow: '0 2px 6px rgba(220, 38, 38, 0.25)',
+                                            '&:hover': {
+                                                bgcolor: '#b91c1c',
+                                                boxShadow: '0 4px 10px rgba(220, 38, 38, 0.35)'
+                                            }
+                                        }}
+                                    >
+                                        Vacate
+                                    </Button>
+                                </Box>
+                            </Box>
+
+                            {/* Table of Members */}
+                            <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                                <Table size="small" aria-label={`Participant details for ${selectedUniName}`}>
+                                    <TableHead sx={{ bgcolor: '#f8fafc' }}>
+                                        <TableRow>
+                                            <TableCell sx={{ fontWeight: 700, color: '#475569', width: 55, py: 1.2 }}>S.No</TableCell>
+                                            <TableCell sx={{ fontWeight: 700, color: '#1e293b', py: 1.2 }}>Name</TableCell>
+                                            <TableCell sx={{ fontWeight: 700, color: '#1e293b', py: 1.2 }}>Role</TableCell>
+                                            <TableCell sx={{ fontWeight: 700, color: '#1e293b', py: 1.2 }}>Gender</TableCell>
+                                            <TableCell sx={{ fontWeight: 700, color: '#1e293b', py: 1.2 }}>Phone</TableCell>
+                                            <TableCell sx={{ fontWeight: 700, color: '#1e293b', py: 1.2 }}>Accommodation</TableCell>
+                                            <TableCell sx={{ fontWeight: 700, color: '#1e293b', py: 1.2 }}>Allocated Room</TableCell>
+                                            <TableCell sx={{ fontWeight: 700, color: '#1e293b', width: 150, py: 1.2, textAlign: 'center' }}>Actions</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {currentUniGroup.members.map((person, index) => (
+                                            <TableRow
+                                                key={person.id}
+                                                hover
+                                                sx={{
+                                                    '&:last-child td, &:last-child th': { border: 0 },
+                                                    transition: 'background-color 0.15s ease'
+                                                }}
+                                            >
+                                                <TableCell sx={{ color: '#64748b', fontWeight: 600 }}>{index + 1}</TableCell>
+                                                <TableCell sx={{ fontWeight: 700, color: '#0f172a' }}>{person.name}</TableCell>
+                                                <TableCell>
+                                                    <Chip
+                                                        label={person.role}
+                                                        size="small"
+                                                        color={person.role === 'Coach' ? 'secondary' : 'primary'}
+                                                        variant="outlined"
+                                                        sx={{ height: 22, fontSize: '11px', fontWeight: 600 }}
+                                                    />
+                                                </TableCell>
+                                                <TableCell>{person.gender}</TableCell>
+                                                <TableCell sx={{ fontFamily: 'monospace', fontSize: '13px', color: '#334155' }}>
+                                                    {person.phone || 'N/A'}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {person.accommodation === 'Yes' ? (
+                                                        <Chip
+                                                            icon={<CheckCircleIcon sx={{ fontSize: '14px !important' }} />}
+                                                            label="Yes"
+                                                            size="small"
+                                                            sx={{ bgcolor: '#ecfdf5', color: '#065f46', fontWeight: 600, height: 22 }}
+                                                        />
+                                                    ) : (
+                                                        <Chip
+                                                            icon={<CancelIcon sx={{ fontSize: '14px !important' }} />}
+                                                            label="No"
+                                                            size="small"
+                                                            sx={{ bgcolor: '#f1f5f9', color: '#64748b', height: 22 }}
+                                                        />
+                                                    )}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.3 }}>
+                                                        <Chip
+                                                            icon={<HotelIcon sx={{ fontSize: '14px !important', color: '#1e40af' }} />}
+                                                            label={`Room ${person.roomAllocation.roomNumber}`}
+                                                            size="small"
+                                                            sx={{
+                                                                bgcolor: '#dbeafe',
+                                                                color: '#1e40af',
+                                                                fontWeight: 700,
+                                                                width: 'fit-content',
+                                                                height: 22
+                                                            }}
+                                                        />
+                                                        <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500, fontSize: '11px' }}>
+                                                            {person.roomAllocation.building} • {person.roomAllocation.floor}
+                                                        </Typography>
+                                                    </Box>
+                                                </TableCell>
+                                                <TableCell sx={{ textAlign: 'center' }}>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.8 }}>
+                                                        <Tooltip title="Change Room">
+                                                            <Button
+                                                                size="small"
+                                                                variant="outlined"
+                                                                startIcon={<EditIcon sx={{ fontSize: 15 }} />}
+                                                                onClick={(e) => {
+                                                                    e.currentTarget.blur();
+                                                                    handleOpenMapDialog(person);
+                                                                }}
+                                                                sx={{
+                                                                    textTransform: 'none',
+                                                                    fontSize: '11.5px',
+                                                                    fontWeight: 600,
+                                                                    py: 0.3,
+                                                                    px: 1,
+                                                                    borderRadius: 1.5,
+                                                                    color: '#2563eb',
+                                                                    borderColor: '#bfdbfe',
+                                                                    bgcolor: '#eff6ff',
+                                                                    '&:hover': { bgcolor: '#dbeafe', borderColor: '#93c5fd' }
+                                                                }}
+                                                            >
+                                                                Change
+                                                            </Button>
+                                                        </Tooltip>
+                                                        <Tooltip title="Unassign Room">
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={(e) => {
+                                                                    e.currentTarget.blur();
+                                                                    handleOpenUnassignDialog(person);
+                                                                }}
+                                                                sx={{
+                                                                    color: '#dc2626',
+                                                                    bgcolor: '#fef2f2',
+                                                                    p: 0.6,
+                                                                    '&:hover': { bgcolor: '#fee2e2' }
+                                                                }}
+                                                            >
+                                                                <DeleteIcon sx={{ fontSize: 16 }} />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    </Box>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        </Box>
+                    )}
+                </DialogContent>
+
+                <DialogActions sx={{ px: 3, py: 2, bgcolor: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography variant="body2" sx={{ color: '#64748b' }}>
+                        Showing <b>{currentUniGroup?.members?.length || 0}</b> mapped {activeTab.toLowerCase()}
+                    </Typography>
+                    <Button
+                        onClick={handleCloseManageUniModal}
+                        variant="contained"
+                        sx={{
+                            textTransform: 'none',
+                            bgcolor: '#0b5299',
+                            color: '#ffffff',
+                            fontWeight: 600,
+                            borderRadius: 2,
+                            px: 3,
+                            '&:hover': { bgcolor: '#083c70' }
+                        }}
+                    >
+                        Done
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Modal: Vacate Rooms & Proceed to Refund */}
+            <Dialog
+                open={vacateDialogOpen}
+                onClose={handleCloseVacateDialog}
+                maxWidth={vacateStep === 1 ? "xs" : "md"}
+                fullWidth
+                disableRestoreFocus
+                sx={{ zIndex: 1450 }}
+                slotProps={{
+                    paper: {
+                        sx: {
+                            borderRadius: 3,
+                            boxShadow: '0 20px 45px rgba(0,0,0,0.22)',
+                            overflow: 'hidden'
+                        }
+                    }
+                }}
+            >
+                {vacateStep === 1 ? (
+                    /* Step 1: Confirmation Popup (Are you sure you want to vacate? Yes / No) */
+                    <>
+                        <DialogTitle sx={{ m: 0, p: 2.5, bgcolor: '#fef2f2', borderBottom: '1px solid #fee2e2', display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                            <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: '#fee2e2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <MeetingRoomIcon />
+                            </Box>
+                            <Box>
+                                <Typography variant="h6" sx={{ fontWeight: 700, color: '#991b1b', fontSize: '1.1rem' }}>
+                                    Vacate Rooms?
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: '#b91c1c' }}>
+                                    {selectedUniName}
+                                </Typography>
+                            </Box>
+                        </DialogTitle>
+
+                        <DialogContent sx={{ p: 3, bgcolor: '#ffffff' }}>
+                            <Typography sx={{ color: '#1e293b', fontSize: '1rem', fontWeight: 600, mb: 1 }}>
+                                Are you sure you want to vacate rooms for <b>{selectedUniName}</b>?
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: '#64748b', lineHeight: 1.5 }}>
+                                When you proceed, you will review the list of participants to vacate their allocated rooms and then be redirected to the Caution Deposit refund section.
+                            </Typography>
+                        </DialogContent>
+
+                        <DialogActions sx={{ p: 2, px: 3, bgcolor: '#f8fafc', borderTop: '1px solid #e2e8f0', gap: 1 }}>
+                            <Button
+                                variant="outlined"
+                                onClick={handleCloseVacateDialog}
+                                sx={{ textTransform: 'none', borderRadius: 2, color: '#64748b', borderColor: '#cbd5e1', fontWeight: 600 }}
+                            >
+                                No
+                            </Button>
+                            <Button
+                                variant="contained"
+                                color="error"
+                                onClick={handleConfirmYesVacate}
+                                sx={{
+                                    textTransform: 'none',
+                                    borderRadius: 2,
+                                    px: 3,
+                                    fontWeight: 700,
+                                    bgcolor: '#dc2626',
+                                    boxShadow: '0 2px 6px rgba(220,38,38,0.25)',
+                                    '&:hover': { bgcolor: '#b91c1c' }
+                                }}
+                            >
+                                Yes
+                            </Button>
+                        </DialogActions>
+                    </>
+                ) : (
+                    /* Step 2: Checked list of all players in university with bottom Vacate button */
+                    <>
+                        <DialogTitle sx={{ m: 0, p: 2, bgcolor: '#0b5299', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                <Avatar sx={{ bgcolor: 'rgba(255,255,255,0.18)', color: '#ffffff', width: 40, height: 40 }}>
+                                    <MeetingRoomIcon />
+                                </Avatar>
+                                <Box>
+                                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#ffffff', lineHeight: 1.2 }}>
+                                        Vacate Participants - {selectedUniName}
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.85)' }}>
+                                        Check / uncheck participants to vacate before refunding caution deposit
+                                    </Typography>
+                                </Box>
+                            </Box>
+                            <IconButton
+                                size="small"
+                                onClick={handleCloseVacateDialog}
+                                disabled={vacating}
+                                sx={{ color: '#ffffff', bgcolor: 'rgba(255,255,255,0.12)', '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' } }}
+                            >
+                                <CloseIcon fontSize="small" />
+                            </IconButton>
+                        </DialogTitle>
+
+                        <DialogContent sx={{ p: { xs: 2, sm: 2.5 }, bgcolor: '#ffffff' }}>
+                            {/* Select All Checkbox bar */}
+                            <Box
+                                sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    p: 1.2,
+                                    px: 2,
+                                    mb: 2,
+                                    bgcolor: '#f8fafc',
+                                    borderRadius: 2,
+                                    border: '1px solid #e2e8f0'
+                                }}
+                            >
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Checkbox
+                                        checked={Boolean(currentUniGroup && vacateSelectedIds.length === currentUniGroup.members.length && currentUniGroup.members.length > 0)}
+                                        indeterminate={Boolean(vacateSelectedIds.length > 0 && currentUniGroup && vacateSelectedIds.length < currentUniGroup.members.length)}
+                                        onChange={handleToggleSelectAllVacate}
+                                        disabled={vacating}
+                                        size="small"
+                                    />
+                                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#1e293b' }}>
+                                        Select All Participants
+                                    </Typography>
+                                </Box>
+                                <Chip
+                                    label={`${vacateSelectedIds.length} of ${currentUniGroup?.members?.length || 0} Selected`}
+                                    size="small"
+                                    color={vacateSelectedIds.length > 0 ? "primary" : "default"}
+                                    sx={{ fontWeight: 700, fontSize: '11px' }}
+                                />
+                            </Box>
+
+                            {/* Players Checked List */}
+                            <Stack spacing={1.2} sx={{ maxHeight: '50vh', overflowY: 'auto', pr: 0.5 }}>
+                                {currentUniGroup?.members?.map((person) => {
+                                    const isChecked = vacateSelectedIds.includes(person.id);
+                                    return (
+                                        <Paper
+                                            key={person.id}
+                                            variant="outlined"
+                                            onClick={() => !vacating && handleToggleVacateMember(person.id)}
+                                            sx={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                p: 1.5,
+                                                borderRadius: 2,
+                                                border: isChecked ? '1.5px solid #2563eb' : '1px solid #e2e8f0',
+                                                bgcolor: isChecked ? '#eff6ff' : '#ffffff',
+                                                cursor: vacating ? 'default' : 'pointer',
+                                                transition: 'all 0.15s ease',
+                                                '&:hover': {
+                                                    bgcolor: isChecked ? '#dbeafe' : '#f8fafc',
+                                                    borderColor: isChecked ? '#1d4ed8' : '#cbd5e1'
+                                                }
+                                            }}
+                                        >
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                <Checkbox
+                                                    checked={isChecked}
+                                                    onChange={() => handleToggleVacateMember(person.id)}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    disabled={vacating}
+                                                    size="small"
+                                                />
+                                                <Box>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                        <Typography sx={{ fontWeight: 700, color: '#0f172a', fontSize: '0.95rem' }}>
+                                                            {person.name}
+                                                        </Typography>
+                                                        <Chip
+                                                            label={person.role}
+                                                            size="small"
+                                                            color={person.role === 'Coach' ? 'secondary' : 'primary'}
+                                                            variant="outlined"
+                                                            sx={{ height: 20, fontSize: '10.5px', fontWeight: 600 }}
+                                                        />
+                                                    </Box>
+                                                    <Typography variant="caption" sx={{ color: '#64748b' }}>
+                                                        {person.gender} • Phone: {person.phone || 'N/A'}
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+
+                                            <Box sx={{ textAlign: 'right' }}>
+                                                <Chip
+                                                    icon={<HotelIcon sx={{ fontSize: '13px !important', color: '#1e40af' }} />}
+                                                    label={`Room ${person.roomAllocation.roomNumber}`}
+                                                    size="small"
+                                                    sx={{ bgcolor: '#dbeafe', color: '#1e40af', fontWeight: 700, fontSize: '11px', height: 24 }}
+                                                />
+                                                <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.3, fontSize: '11px' }}>
+                                                    {person.roomAllocation.building} • {person.roomAllocation.floor}
+                                                </Typography>
+                                            </Box>
+                                        </Paper>
+                                    );
+                                })}
+                            </Stack>
+                        </DialogContent>
+
+                        <DialogActions sx={{ p: 2, px: 3, bgcolor: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Button
+                                variant="outlined"
+                                onClick={() => setVacateStep(1)}
+                                disabled={vacating}
+                                sx={{ textTransform: 'none', borderRadius: 2, color: '#64748b', borderColor: '#cbd5e1' }}
+                            >
+                                Back
+                            </Button>
+                            <Button
+                                variant="contained"
+                                color="error"
+                                disabled={vacateSelectedIds.length === 0 || vacating}
+                                onClick={handleExecuteVacateAndRedirect}
+                                startIcon={vacating ? null : <MeetingRoomIcon sx={{ fontSize: 18 }} />}
+                                sx={{
+                                    textTransform: 'none',
+                                    borderRadius: 2,
+                                    px: 3,
+                                    py: 1,
+                                    fontWeight: 700,
+                                    fontSize: '13px',
+                                    bgcolor: '#dc2626',
+                                    boxShadow: '0 4px 12px rgba(220, 38, 38, 0.3)',
+                                    '&:hover': { bgcolor: '#b91c1c' }
+                                }}
+                            >
+                                {vacating ? (
+                                    <CircularProgress size={22} color="inherit" />
+                                ) : (
+                                    `Vacate (${vacateSelectedIds.length})`
+                                )}
+                            </Button>
+                        </DialogActions>
+                    </>
+                )}
+            </Dialog>
+
             {/* Modal: Map a Room Form */}
             <Dialog
                 open={mapDialogOpen}
@@ -2254,6 +2916,7 @@ const HostelProvision = () => {
                 maxWidth="sm"
                 fullWidth
                 disableRestoreFocus
+                sx={{ zIndex: 1400 }}
                 slotProps={{
                     paper: {
                         sx: { borderRadius: 3, p: 1 }
@@ -2490,6 +3153,7 @@ const HostelProvision = () => {
                 maxWidth="xs"
                 fullWidth
                 disableRestoreFocus
+                sx={{ zIndex: 1400 }}
                 slotProps={{ paper: { sx: { borderRadius: 3, p: 1 } } }}
             >
                 <DialogTitle sx={{ color: '#dc2626', fontWeight: 700, pb: 1 }}>
@@ -3451,294 +4115,37 @@ const HostelProvision = () => {
                 </DialogActions>
             </Dialog>
 
-            {/* Modern Official Receipt Modal (Matching Image 2) */}
-            <Dialog
+            {/* Caution Deposit Reusable Receipt Modal */}
+            <CautionDepositReceiptModal
                 open={cautionReceiptModalOpen}
                 onClose={() => {
                     setCautionReceiptModalOpen(false);
                     setSelectedCoachReceipt(null);
                 }}
-                maxWidth="md"
-                fullWidth
-                slotProps={{ paper: { sx: { borderRadius: 3, maxWidth: 860, overflow: 'hidden' } } }}
-            >
-                <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', bgcolor: '#f8fafc', py: 1.5, px: 3, borderBottom: '1px solid #e2e8f0' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <ReceiptIcon sx={{ color: '#059669', fontSize: 24 }} />
-                        <Typography sx={{ fontWeight: 700, fontSize: '1.05rem', color: '#0f172a' }}>
-                            {selectedCoachReceipt ? 'Coach Caution Deposit Receipt' : 'Hostel Caution Deposit Receipt'}
-                        </Typography>
-                    </Box>
-                    <IconButton size="small" onClick={() => {
-                        setCautionReceiptModalOpen(false);
-                        setSelectedCoachReceipt(null);
-                    }}>
-                        <ClearIcon fontSize="small" />
-                    </IconButton>
-                </DialogTitle>
-                <DialogContent sx={{ p: { xs: 2, sm: 3.5 }, bgcolor: '#ffffff' }}>
-                    {(() => {
-                        const amount = Number(selectedCoachReceipt ? (selectedCoachReceipt.cautionDeposit?.amount || 2000) : (cautionDepositData.amount || 2000));
-                        const payerName = selectedCoachReceipt
-                            ? `${selectedCoachReceipt.name} (${selectedCoachReceipt.role || 'Coach'})`
-                            : `${cautionDepositData.paidBy?.name || 'Representative'} (${cautionDepositData.paidBy?.role || 'Player'})`;
-                        const payerPhone = selectedCoachReceipt
-                            ? (selectedCoachReceipt.mobileNo || selectedCoachReceipt.phone || 'N/A')
-                            : (cautionDepositData.paidBy?.phone || 'N/A');
-                        const rawRoom = selectedCoachReceipt
-                            ? (selectedCoachReceipt.roomAllocation?.roomNumber || 'Allotted')
-                            : (cautionDepositData.paidBy?.roomNumber || 'Allotted');
-                        const roomDisplay = rawRoom ? (String(rawRoom).toLowerCase().startsWith('room') ? rawRoom : `Room ${rawRoom}`) : 'Room 205';
-                        const paymentMode = selectedCoachReceipt
-                            ? (selectedCoachReceipt.cautionDeposit?.paymentMode || 'Cash')
-                            : (cautionDepositData.paymentMode || 'Cash');
-                        const receiptNo = selectedCoachReceipt
-                            ? (selectedCoachReceipt.cautionDeposit?.receiptNo || 'CD-COACH')
-                            : (cautionDepositData.receiptNo || 'CD-MANUAL');
-                        const receiptDate = selectedCoachReceipt
-                            ? (selectedCoachReceipt.cautionDeposit?.paidAt ? new Date(selectedCoachReceipt.cautionDeposit.paidAt).toLocaleDateString('en-US') : new Date().toLocaleDateString('en-US'))
-                            : (cautionDepositData.paidAt ? new Date(cautionDepositData.paidAt).toLocaleDateString('en-US') : new Date().toLocaleDateString('en-US'));
-
-                        const getAmountWords = (num) => {
-                            if (num === 2000) return 'Rupees Two Thousand Only';
-                            if (num === 1000) return 'Rupees One Thousand Only';
-                            if (num === 3000) return 'Rupees Three Thousand Only';
-                            return `Rupees ${num} Only`;
-                        };
-
-                        return (
-                            <Box sx={{ width: '100%' }}>
-                                <Box id="caution-deposit-printable-receipt" sx={{ bgcolor: '#ffffff', color: '#0f172a', p: { xs: 2, sm: 2.5 } }}>
-                                    {/* Top Header Section */}
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1.5, sm: 2.5 }, mb: 1, flexWrap: { xs: 'wrap', sm: 'nowrap' } }}>
-                                        {/* University Logo */}
-                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', pr: { xs: 0, sm: 2.5 }, borderRight: { xs: 'none', sm: '1.5px solid #e2e8f0' }, minWidth: { sm: 145 } }}>
-                                            <Box
-                                                component="img"
-                                                src="/ADITYA LOGO2.png"
-                                                alt="Aditya University"
-                                                sx={{ height: { xs: 46, sm: 58 }, width: 'auto', objectFit: 'contain' }}
-                                            />
-                                        </Box>
-
-                                        {/* Header Text */}
-                                        <Box sx={{ flex: 1, textAlign: { xs: 'left', sm: 'center' } }}>
-                                            <Typography sx={{ fontWeight: 900, color: '#0b3b80', fontSize: { xs: '1rem', sm: '1.2rem' }, letterSpacing: '0.4px', textTransform: 'uppercase', lineHeight: 1.2 }}>
-                                                SOUTH ZONE INTER-UNIVERSITY TOURNAMENT
-                                            </Typography>
-                                            <Typography sx={{ fontWeight: 800, color: '#334155', fontSize: { xs: '0.8rem', sm: '0.9rem' }, letterSpacing: '0.2px', textTransform: 'uppercase', mt: 0.35 }}>
-                                                HOSTEL ACCOMMODATION - {selectedCoachReceipt ? 'COACH' : 'TEAM'} CAUTION DEPOSIT RECEIPT
-                                            </Typography>
-                                            <Typography sx={{ color: '#64748b', fontSize: '0.78rem', mt: 0.2 }}>
-                                                (Official Cash / Manual Payment Voucher)
-                                            </Typography>
-                                        </Box>
-                                    </Box>
-
-                                    {/* 2-Tone Accent Line */}
-                                    <Box sx={{ display: 'flex', height: '3.5px', width: '130px', mx: 'auto', borderRadius: 2, overflow: 'hidden', mt: 0.8, mb: 1.25 }}>
-                                        <Box sx={{ flex: 1, bgcolor: '#ea580c' }} />
-                                        <Box sx={{ flex: 1, bgcolor: '#0284c7' }} />
-                                    </Box>
-                                    <Divider sx={{ borderColor: '#e2e8f0', mb: 1.5 }} />
-
-                                    {/* Receipt No & Date Banner */}
-                                    <Box sx={{
-                                        display: 'grid',
-                                        gridTemplateColumns: '1fr 1px 1fr',
-                                        alignItems: 'center',
-                                        bgcolor: '#f8fafc',
-                                        border: '1px solid #e2e8f0',
-                                        borderRadius: 2,
-                                        py: 1,
-                                        px: { xs: 2, sm: 3 },
-                                        mb: 1.75
-                                    }}>
-                                        <Box>
-                                            <Typography sx={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>Receipt No.</Typography>
-                                            <Typography sx={{ fontWeight: 900, color: '#0f172a', fontSize: { xs: '1rem', sm: '1.12rem' }, letterSpacing: '0.5px' }}>
-                                                {receiptNo}
-                                            </Typography>
-                                        </Box>
-                                        <Box sx={{ height: 32, bgcolor: '#cbd5e1' }} />
-                                        <Box sx={{ pl: { xs: 2, sm: 3 } }}>
-                                            <Typography sx={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>Date & Time</Typography>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                                                <CalendarTodayOutlinedIcon sx={{ color: '#0284c7', fontSize: 18 }} />
-                                                <Typography sx={{ fontWeight: 900, color: '#0f172a', fontSize: { xs: '1rem', sm: '1.12rem' } }}>
-                                                    {receiptDate}
-                                                </Typography>
-                                            </Box>
-                                        </Box>
-                                    </Box>
-
-                                    {/* Main Details: 2 Columns - 6*6 (50% / 50%) Alignment */}
-                                    <Box sx={{
-                                        display: 'grid',
-                                        gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
-                                        gap: { xs: 2, sm: 2.5 },
-                                        alignItems: 'start',
-                                        mb: 1.75
-                                    }}>
-                                        {/* Left Column (6 of 12): University, Paid By, Payment Mode */}
-                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.6 }}>
-                                            {/* University / Institution */}
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                                <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                                    <SchoolIcon sx={{ color: '#0284c7', fontSize: 22 }} />
-                                                </Box>
-                                                <Box>
-                                                    <Typography sx={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>University / Institution</Typography>
-                                                    <Typography sx={{ fontWeight: 800, color: '#0b5299', fontSize: '1.02rem', lineHeight: 1.25 }}>
-                                                        {bulkSelectedUniversity || (selectedCoachReceipt?.universityName || 'University')}
-                                                    </Typography>
-                                                </Box>
-                                            </Box>
-
-                                            {/* Received From (Paid By) */}
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                                <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                                    <PersonIcon sx={{ color: '#0284c7', fontSize: 22 }} />
-                                                </Box>
-                                                <Box>
-                                                    <Typography sx={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>Received From (Paid By)</Typography>
-                                                    <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.98rem', lineHeight: 1.25 }}>
-                                                        {payerName}
-                                                    </Typography>
-                                                    <Typography sx={{ fontSize: '11.5px', color: '#64748b', mt: 0.15 }}>
-                                                        Phone: {payerPhone}
-                                                    </Typography>
-                                                </Box>
-                                            </Box>
-
-                                            {/* Payment Mode */}
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                                <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                                    <CreditCardIcon sx={{ color: '#0284c7', fontSize: 22 }} />
-                                                </Box>
-                                                <Box>
-                                                    <Typography sx={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>Payment Mode</Typography>
-                                                    <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '0.98rem', lineHeight: 1.25 }}>
-                                                        {paymentMode} (Manual Receipt)
-                                                    </Typography>
-                                                </Box>
-                                            </Box>
-                                        </Box>
-
-                                        {/* Right Column (6 of 12): Amount Received & Room */}
-                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                                            {/* Mint Green Card */}
-                                            <Box sx={{ bgcolor: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 2.5, p: 1.6, px: 2, width: '100%', boxSizing: 'border-box' }}>
-                                                <Typography sx={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>Amount Received</Typography>
-                                                <Typography sx={{ fontSize: { xs: '1.9rem', sm: '2.25rem' }, fontWeight: 900, color: '#059669', lineHeight: 1.15, my: 0.35 }}>
-                                                    ₹{amount.toLocaleString('en-IN')}
-                                                </Typography>
-                                                <Divider sx={{ my: 0.8, borderColor: '#bbf7d0' }} />
-                                                <Typography sx={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>Amount in Words</Typography>
-                                                <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '12.5px' }}>
-                                                    {getAmountWords(amount)}
-                                                </Typography>
-                                            </Box>
-
-                                            {/* Allotted Hostel Room */}
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                                <Box sx={{ width: 40, height: 40, borderRadius: '50%', bgcolor: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                                    <HotelIcon sx={{ color: '#0284c7', fontSize: 22 }} />
-                                                </Box>
-                                                <Box>
-                                                    <Typography sx={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>Allotted Hostel Room</Typography>
-                                                    <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '1.02rem', lineHeight: 1.25 }}>
-                                                        {roomDisplay}
-                                                    </Typography>
-                                                </Box>
-                                            </Box>
-                                        </Box>
-                                    </Box>
-
-                                    <Divider sx={{ borderColor: '#e2e8f0', my: 1.25 }} />
-
-                                    {/* Note Banner */}
-                                    <Box sx={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: 1.25,
-                                        bgcolor: '#fffbeb',
-                                        border: '1px solid #fde68a',
-                                        borderRadius: 1.75,
-                                        p: 1.1,
-                                        px: 1.75,
-                                        mb: 1.75
-                                    }}>
-                                        <Box sx={{ width: 22, height: 22, borderRadius: '50%', bgcolor: '#ea580c', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#ffffff', fontWeight: 900, fontSize: '12px' }}>
-                                            !
-                                        </Box>
-                                        <Typography sx={{ fontSize: '12px', color: '#334155' }}>
-                                            <strong style={{ color: '#c2410c' }}>Note:</strong> Refundable at checkout upon hostel room clearance and key return.
-                                        </Typography>
-                                    </Box>
-
-                                    {/* Footer: University Address & Signature */}
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', pb: 1, flexWrap: 'wrap', gap: 2 }}>
-                                        <Box>
-                                            <Typography sx={{ fontWeight: 800, color: '#0f172a', fontSize: '13px' }}>Aditya University</Typography>
-                                            <Typography sx={{ color: '#64748b', fontSize: '11px', mt: 0.2 }}>
-                                                Surampalem, Kakinada District, Andhra Pradesh - 533437
-                                            </Typography>
-                                        </Box>
-                                        <Box sx={{ textAlign: 'center', minWidth: 170 }}>
-                                            <Box sx={{ borderBottom: '1.5px dotted #94a3b8', width: '100%', mb: 0.5 }} />
-                                            <Typography sx={{ color: '#64748b', fontSize: '11px', fontWeight: 600 }}>
-                                                Authorised Signature
-                                            </Typography>
-                                        </Box>
-                                    </Box>
-
-                                    {/* Bottom Decorative Bar */}
-                                    <Box sx={{ display: 'flex', height: '3.5px', width: '100%', borderRadius: 1, overflow: 'hidden' }}>
-                                        <Box sx={{ flex: 1, bgcolor: '#ea580c' }} />
-                                        <Box sx={{ flex: 1, bgcolor: '#0284c7' }} />
-                                    </Box>
-                                </Box>
-
-                                {/* Half Page Cut Indicator (Only in Print, below the receipt box) */}
-                                <Box sx={{
-                                    display: 'none',
-                                    '@media print': {
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        gap: 1.5,
-                                        mt: 1.5,
-                                        color: '#64748b',
-                                        fontSize: '11px',
-                                        fontWeight: 600
-                                    }
-                                }}>
-                                    <Box sx={{ flex: 1, borderTop: '1px dashed #94a3b8' }} />
-                                    <span>✂ Cut or Fold Here (A4 Half-Page / A5 Official Receipt)</span>
-                                    <Box sx={{ flex: 1, borderTop: '1px dashed #94a3b8' }} />
-                                </Box>
-                            </Box>
-                        );
-                    })()}
-                </DialogContent>
-                <DialogActions sx={{ p: 2, px: 3, display: 'flex', justifyContent: 'space-between', bgcolor: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
-                    <Button onClick={() => {
-                        setCautionReceiptModalOpen(false);
-                        setSelectedCoachReceipt(null);
-                    }} variant="outlined" sx={{ textTransform: 'none', borderRadius: 2 }}>
-                        Close
-                    </Button>
-                    <Button
-                        variant="contained"
-                        startIcon={<PrintIcon />}
-                        onClick={() => window.print()}
-                        sx={{ textTransform: 'none', bgcolor: '#059669', borderRadius: 2, fontWeight: 700, px: 2.5, '&:hover': { bgcolor: '#047857' } }}
-                    >
-                        Print Receipt
-                    </Button>
-                </DialogActions>
-            </Dialog>
+                receiptData={selectedCoachReceipt ? {
+                    isCoach: true,
+                    amount: selectedCoachReceipt.cautionDeposit?.amount || 2000,
+                    paidBy: selectedCoachReceipt.name,
+                    paidByRole: selectedCoachReceipt.role || 'Coach',
+                    paidByPhone: selectedCoachReceipt.mobileNo || selectedCoachReceipt.phone || 'N/A',
+                    roomNumber: selectedCoachReceipt.roomAllocation?.roomNumber || 'Allotted',
+                    paymentMode: selectedCoachReceipt.cautionDeposit?.paymentMode || 'Cash',
+                    receiptNo: selectedCoachReceipt.cautionDeposit?.receiptNo || 'CD-COACH',
+                    paidAt: selectedCoachReceipt.cautionDeposit?.paidAt,
+                    universityName: selectedCoachReceipt.university || selectedCoachReceipt.universityName || bulkSelectedUniversity || 'Aditya University'
+                } : {
+                    isCoach: false,
+                    amount: cautionDepositData?.amount || 2000,
+                    paidBy: cautionDepositData?.paidBy?.name || 'Representative',
+                    paidByRole: cautionDepositData?.paidBy?.role || 'Player',
+                    paidByPhone: cautionDepositData?.paidBy?.phone || 'N/A',
+                    roomNumber: cautionDepositData?.paidBy?.roomNumber || 'Allotted',
+                    paymentMode: cautionDepositData?.paymentMode || 'Cash',
+                    receiptNo: cautionDepositData?.receiptNo || 'CD-MANUAL',
+                    paidAt: cautionDepositData?.paidAt,
+                    universityName: cautionDepositData?.universityName || bulkSelectedUniversity || 'Aditya University'
+                }}
+            />
         </Box>
     );
 };
