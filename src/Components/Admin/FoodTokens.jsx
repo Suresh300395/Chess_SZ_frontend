@@ -2150,28 +2150,31 @@ const FoodTokens = () => {
                                 <TableRow>
                                     <TableCell sx={{ fontWeight: 700, py: 1.5 }}>Token Code</TableCell>
                                     <TableCell sx={{ fontWeight: 700, py: 1.5 }}>Participant Name</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, py: 1.5 }}>Role & Contact</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, py: 1.5 }}>Role</TableCell>
                                     <TableCell sx={{ fontWeight: 700, py: 1.5 }}>University / Team</TableCell>
                                     <TableCell sx={{ fontWeight: 700, py: 1.5 }}>Meal & Date</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, py: 1.5 }}>Hostel</TableCell>
                                     <TableCell sx={{ fontWeight: 700, py: 1.5 }}>Status</TableCell>
                                     {(isRedeemed || isAll) && (
                                         <TableCell sx={{ fontWeight: 700, py: 1.5 }}>Redemption Details</TableCell>
                                     )}
-                                    <TableCell sx={{ fontWeight: 700, py: 1.5, textAlign: 'center' }}>Prints</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, py: 1.5, textAlign: 'right' }}>Actions</TableCell>
+                                    {!isRedeemed && (
+                                        <>
+                                            <TableCell sx={{ fontWeight: 700, py: 1.5, textAlign: 'center' }}>Prints</TableCell>
+                                            <TableCell sx={{ fontWeight: 700, py: 1.5, textAlign: 'right' }}>Actions</TableCell>
+                                        </>
+                                    )}
                                 </TableRow>
                             </TableHead>
                             <TableBody>
                                 {loading ? (
                                     <TableRow>
-                                        <TableCell colSpan={isRedeemed || isAll ? 10 : 9} sx={{ textAlign: 'center', py: 5 }}>
+                                        <TableCell colSpan={isRedeemed ? 7 : (isAll ? 9 : 8)} sx={{ textAlign: 'center', py: 5 }}>
                                             <CircularProgress size={28} sx={{ color: isRedeemed ? '#16a34a' : '#0b5299' }} />
                                         </TableCell>
                                     </TableRow>
                                 ) : list.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={isRedeemed || isAll ? 10 : 9} sx={{ textAlign: 'center', py: 5, color: 'text.secondary' }}>
+                                        <TableCell colSpan={isRedeemed ? 7 : (isAll ? 9 : 8)} sx={{ textAlign: 'center', py: 5, color: 'text.secondary' }}>
                                             {isRedeemed
                                                 ? 'No redeemed food tokens found for the selected criteria.'
                                                 : 'No issued food tokens found for the selected criteria.'}
@@ -2184,17 +2187,8 @@ const FoodTokens = () => {
                                                 {token.code}
                                             </TableCell>
                                             <TableCell sx={{ fontWeight: 600 }}>{token.name}</TableCell>
-                                            <TableCell>
-                                                <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                                                    <Typography variant="caption" sx={{ fontWeight: 700, color: '#334155' }}>
-                                                        {token.personType}
-                                                    </Typography>
-                                                    {token.identifier && (
-                                                        <Typography variant="caption" sx={{ color: '#64748b' }}>
-                                                            {token.identifier}
-                                                        </Typography>
-                                                    )}
-                                                </Box>
+                                            <TableCell sx={{ fontWeight: 700, color: '#334155' }}>
+                                                {token.personType}
                                             </TableCell>
                                             <TableCell sx={{ color: '#475569' }}>{token.teamOrSport || '-'}</TableCell>
                                             <TableCell>
@@ -2206,20 +2200,6 @@ const FoodTokens = () => {
                                                         {formatDateDDMMYYYY(token.mealDate)}
                                                     </Typography>
                                                 </Box>
-                                            </TableCell>
-                                            <TableCell sx={{ color: '#475569', fontSize: '0.85rem' }}>
-                                                {token.block || token.room ? (
-                                                    <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                                                        <Typography variant="caption" sx={{ fontWeight: 600, color: '#334155' }}>
-                                                            {token.block || 'Hostel'}
-                                                        </Typography>
-                                                        <Typography variant="caption" sx={{ color: '#64748b' }}>
-                                                            Room: {token.room || 'N/A'}
-                                                        </Typography>
-                                                    </Box>
-                                                ) : (
-                                                    '-'
-                                                )}
                                             </TableCell>
                                             <TableCell>
                                                 <Chip
@@ -2253,21 +2233,25 @@ const FoodTokens = () => {
                                                     )}
                                                 </TableCell>
                                             )}
-                                            <TableCell sx={{ textAlign: 'center', fontWeight: 600 }}>{token.printCount || 1}</TableCell>
-                                            <TableCell sx={{ textAlign: 'right' }}>
-                                                <Tooltip title="Reprint token receipt">
-                                                    <span>
-                                                        <IconButton
-                                                            size="small"
-                                                            disabled={token.status === 'CANCELLED'}
-                                                            onClick={() => handleReprint(token._id)}
-                                                            sx={{ color: isRedeemed ? '#16a34a' : '#0b5299' }}
-                                                        >
-                                                            <PrintIcon fontSize="small" />
-                                                        </IconButton>
-                                                    </span>
-                                                </Tooltip>
-                                            </TableCell>
+                                            {!isRedeemed && (
+                                                <>
+                                                    <TableCell sx={{ textAlign: 'center', fontWeight: 600 }}>{token.printCount || 1}</TableCell>
+                                                    <TableCell sx={{ textAlign: 'right' }}>
+                                                        <Tooltip title="Reprint token receipt">
+                                                            <span>
+                                                                <IconButton
+                                                                    size="small"
+                                                                    disabled={token.status === 'CANCELLED'}
+                                                                    onClick={() => handleReprint(token._id)}
+                                                                    sx={{ color: '#0b5299' }}
+                                                                >
+                                                                    <PrintIcon fontSize="small" />
+                                                                </IconButton>
+                                                            </span>
+                                                        </Tooltip>
+                                                    </TableCell>
+                                                </>
+                                            )}
                                         </TableRow>
                                     ))
                                 )}
@@ -2374,7 +2358,7 @@ const FoodTokens = () => {
                                                     {token.name}
                                                 </Typography>
                                                 <Typography variant="body2" sx={{ color: '#64748b', mt: 0.3, fontSize: '0.85rem' }}>
-                                                    {token.personType} {token.identifier ? `• ${token.identifier}` : ''} {token.teamOrSport ? `• ${token.teamOrSport}` : ''}
+                                                    {token.personType} {token.teamOrSport ? `• ${token.teamOrSport}` : ''}
                                                 </Typography>
                                             </Box>
 
@@ -2387,19 +2371,15 @@ const FoodTokens = () => {
                                                         {token.mealType} • {formatDateDDMMYYYY(token.mealDate)}
                                                     </Typography>
                                                 </Box>
-                                                <Chip
-                                                    size="small"
-                                                    label={`Prints: ${token.printCount || 1}`}
-                                                    variant="outlined"
-                                                    sx={{ fontSize: '0.75rem', height: 22 }}
-                                                />
+                                                {!isRedeemed && (
+                                                    <Chip
+                                                        size="small"
+                                                        label={`Prints: ${token.printCount || 1}`}
+                                                        variant="outlined"
+                                                        sx={{ fontSize: '0.75rem', height: 22 }}
+                                                    />
+                                                )}
                                             </Box>
-
-                                            {(token.block || token.room) && (
-                                                <Typography variant="caption" sx={{ color: '#64748b', display: 'block', px: 0.5 }}>
-                                                    Hostel: {token.block || 'N/A'} - Room: {token.room || 'N/A'}
-                                                </Typography>
-                                            )}
 
                                             {token.status === 'REDEEMED' && token.redeemedAt && (
                                                 <Box sx={{ bgcolor: '#f0fdf4', p: 1, borderRadius: 1.5, border: '1px solid #bbf7d0' }}>
@@ -2412,28 +2392,28 @@ const FoodTokens = () => {
                                                 </Box>
                                             )}
 
-                                            <Box sx={{ display: 'flex', justifyContent: 'flex-end', pt: 0.5, borderTop: '1px solid #f1f5f9' }}>
-                                                <Button
-                                                    size="small"
-                                                    variant="outlined"
-                                                    startIcon={<PrintIcon fontSize="small" />}
-                                                    disabled={token.status === 'CANCELLED'}
-                                                    onClick={() => handleReprint(token._id)}
-                                                    sx={{
-                                                        color: isRedeemed ? '#16a34a' : '#0b5299',
-                                                        borderColor: isRedeemed ? '#bbf7d0' : '#bfdbfe',
-                                                        textTransform: 'none',
-                                                        fontWeight: 600,
-                                                        fontSize: '0.82rem',
-                                                        '&:hover': {
-                                                            borderColor: isRedeemed ? '#16a34a' : '#0b5299',
-                                                            bgcolor: isRedeemed ? '#f0fdf4' : '#eff6ff'
-                                                        }
-                                                    }}
-                                                >
-                                                    Reprint Token
-                                                </Button>
-                                            </Box>
+                                            {!isRedeemed && (
+                                                <Box sx={{ display: 'flex', justifyContent: 'flex-end', pt: 0.5, borderTop: '1px solid #f1f5f9' }}>
+                                                    <Button
+                                                        size="small"
+                                                        variant="outlined"
+                                                        startIcon={<PrintIcon fontSize="small" />}
+                                                        disabled={token.status === 'CANCELLED'}
+                                                        onClick={() => handleReprint(token._id)}
+                                                        sx={{
+                                                            color: '#0b5299',
+                                                            borderColor: '#bfdbfe',
+                                                            textTransform: 'none',
+                                                            fontWeight: 600,
+                                                            fontSize: '0.82rem',
+                                                            borderRadius: 1.5,
+                                                            '&:hover': { bgcolor: '#f0f7ff', borderColor: '#0b5299' }
+                                                        }}
+                                                    >
+                                                        Reprint Receipt
+                                                    </Button>
+                                                </Box>
+                                            )}
                                         </CardContent>
                                     </Card>
                                 ))}
@@ -2446,7 +2426,7 @@ const FoodTokens = () => {
                     <Box>
                         {/* 1. Stats Summary Cards */}
                         {stats && (
-                            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 2, mb: 3, width: '100%' }}>
+                            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }, gap: 2, mb: 3, width: '100%' }}>
                                 {/* Total Active Tokens Created */}
                                 <Card
                                     sx={{
@@ -2455,13 +2435,7 @@ const FoodTokens = () => {
                                         borderRadius: '16px',
                                         background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
                                         border: '1px solid #e2e8f0',
-                                        boxShadow: '0 2px 12px rgba(15, 23, 42, 0.04)',
-                                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                                        '&:hover': {
-                                            transform: 'translateY(-2px)',
-                                            boxShadow: '0 10px 24px rgba(15, 23, 42, 0.08)',
-                                            borderColor: '#cbd5e1'
-                                        }
+                                        boxShadow: '0 2px 12px rgba(15, 23, 42, 0.04)'
                                     }}
                                 >
                                     <Chip
@@ -2509,87 +2483,15 @@ const FoodTokens = () => {
                                     </CardContent>
                                 </Card>
 
-                                {/* Issued (Pending) Tokens Card - Clickable */}
+                                {/* Redeemed (Served) Tokens Card */}
                                 <Card
-                                    onClick={() => setTokenReportSubTab('ISSUED')}
                                     sx={{
                                         position: 'relative',
                                         overflow: 'hidden',
                                         borderRadius: '16px',
-                                        background: tokenReportSubTab === 'ISSUED' ? 'linear-gradient(145deg, #eff6ff 0%, #dbeafe 100%)' : 'linear-gradient(145deg, #ffffff 0%, #f0f7ff 100%)',
-                                        border: tokenReportSubTab === 'ISSUED' ? '2px solid #0b5299' : '1px solid #bfdbfe',
-                                        boxShadow: tokenReportSubTab === 'ISSUED' ? '0 6px 16px rgba(11, 82, 153, 0.16)' : '0 2px 12px rgba(11, 82, 153, 0.05)',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                                        '&:hover': {
-                                            transform: 'translateY(-2px)',
-                                            boxShadow: '0 10px 24px rgba(11, 82, 153, 0.15)',
-                                            borderColor: '#0b5299'
-                                        }
-                                    }}
-                                >
-                                    <Chip
-                                        label="Pending"
-                                        size="small"
-                                        sx={{
-                                            position: 'absolute',
-                                            top: 12,
-                                            right: 12,
-                                            bgcolor: '#eff6ff',
-                                            color: '#1d4ed8',
-                                            fontWeight: 700,
-                                            fontSize: '0.72rem',
-                                            height: '22px',
-                                            borderRadius: '6px'
-                                        }}
-                                    />
-                                    <CardContent sx={{ py: 2, pr: 2, pl: 1.5, '&:last-child': { pb: 2 } }}>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                                            <Box sx={{
-                                                width: 48,
-                                                height: 48,
-                                                borderRadius: '12px',
-                                                background: 'linear-gradient(135deg, #0b5299 0%, #1e40af 100%)',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                color: '#fff',
-                                                boxShadow: '0 4px 12px rgba(11, 82, 153, 0.25)'
-                                            }}>
-                                                <ConfirmationNumberOutlinedIcon sx={{ fontSize: 24 }} />
-                                            </Box>
-                                            <Box>
-                                                <Typography variant="caption" sx={{ color: '#0b5299', fontWeight: 700, fontSize: '0.72rem', letterSpacing: '0.5px', textTransform: 'uppercase', display: 'block' }}>
-                                                    ISSUED (PENDING)
-                                                </Typography>
-                                                <Typography sx={{ fontWeight: 800, color: '#0b5299', fontSize: { xs: '1.8rem', md: '2rem' }, lineHeight: 1 }}>
-                                                    {stats.overall?.totalIssued || 0}
-                                                </Typography>
-                                            </Box>
-                                        </Box>
-                                        <Typography variant="caption" sx={{ color: '#0b5299', fontSize: '0.78rem', fontWeight: 600, display: 'block' }}>
-                                            Click to view Issued Table
-                                        </Typography>
-                                    </CardContent>
-                                </Card>
-
-                                {/* Redeemed (Served) Tokens Card - Clickable */}
-                                <Card
-                                    onClick={() => setTokenReportSubTab('REDEEMED')}
-                                    sx={{
-                                        position: 'relative',
-                                        overflow: 'hidden',
-                                        borderRadius: '16px',
-                                        background: tokenReportSubTab === 'REDEEMED' ? 'linear-gradient(145deg, #f0fdf4 0%, #dcfce7 100%)' : 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 100%)',
-                                        border: tokenReportSubTab === 'REDEEMED' ? '2px solid #16a34a' : '1px solid #bbf7d0',
-                                        boxShadow: tokenReportSubTab === 'REDEEMED' ? '0 6px 16px rgba(22, 163, 74, 0.16)' : '0 2px 12px rgba(22, 163, 74, 0.05)',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                                        '&:hover': {
-                                            transform: 'translateY(-2px)',
-                                            boxShadow: '0 10px 24px rgba(22, 163, 74, 0.15)',
-                                            borderColor: '#16a34a'
-                                        }
+                                        background: 'linear-gradient(145deg, #ffffff 0%, #f0fdf4 100%)',
+                                        border: '1px solid #bbf7d0',
+                                        boxShadow: '0 2px 12px rgba(22, 163, 74, 0.05)'
                                     }}
                                 >
                                     <Chip
@@ -2631,8 +2533,8 @@ const FoodTokens = () => {
                                                 </Typography>
                                             </Box>
                                         </Box>
-                                        <Typography variant="caption" sx={{ color: '#16a34a', fontSize: '0.78rem', fontWeight: 600, display: 'block' }}>
-                                            Click to view Redeemed Table
+                                        <Typography variant="caption" sx={{ color: '#16a34a', fontSize: '0.78rem', fontWeight: 500, display: 'block' }}>
+                                            Total food tokens verified and served
                                         </Typography>
                                     </CardContent>
                                 </Card>
