@@ -108,6 +108,7 @@ const QRScanner = () => {
     const videoRef = useRef(null);
     const codeReaderRef = useRef(null);
     const controlsRef = useRef(null);
+    const handleTokenCodeDetectedRef = useRef(null);
 
     const [videoDevices, setVideoDevices] = useState([]);
     const [selectedDeviceId, setSelectedDeviceId] = useState('');
@@ -116,8 +117,8 @@ const QRScanner = () => {
     const [torchSupported, setTorchSupported] = useState(false);
     const [isTorchOn, setIsTorchOn] = useState(false);
 
-    // Scanner preferences
-    const [autoRedeem, setAutoRedeem] = useState(true);
+    // Scanner preferences (Auto-Redeem is always ON by default)
+    const autoRedeem = true;
     const [soundEnabled, setSoundEnabled] = useState(true);
 
     // Manual input & current verification state
@@ -129,35 +130,6 @@ const QRScanner = () => {
 
     // Session log / history of scans
     const [sessionHistory, setSessionHistory] = useState([]);
-
-    // Initialize ZXing code reader
-    useEffect(() => {
-        codeReaderRef.current = new BrowserQRCodeReader();
-        loadVideoDevices();
-
-        return () => {
-            stopCamera();
-        };
-    }, []);
-
-    // Fetch video input devices
-    const loadVideoDevices = async () => {
-        try {
-            const devices = await BrowserCodeReader.listVideoInputDevices();
-            setVideoDevices(devices);
-            if (devices && devices.length > 0) {
-                // Prefer rear camera on mobile devices
-                const rearDevice = devices.find(d =>
-                    d.label.toLowerCase().includes('back') ||
-                    d.label.toLowerCase().includes('rear') ||
-                    d.label.toLowerCase().includes('environment')
-                );
-                setSelectedDeviceId(rearDevice ? rearDevice.deviceId : devices[0].deviceId);
-            }
-        } catch (err) {
-            console.error('Failed to list video devices:', err);
-        }
-    };
 
     // Stop camera stream cleanly
     const stopCamera = useCallback(() => {
@@ -173,10 +145,42 @@ const QRScanner = () => {
         setIsTorchOn(false);
     }, []);
 
-    // Start camera stream with ZXing
+    // Fetch video input devices
+    const loadVideoDevices = useCallback(async (activeDeviceId) => {
+        try {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+                return;
+            }
+            const devices = await BrowserCodeReader.listVideoInputDevices();
+            setVideoDevices(devices || []);
+            if (devices && devices.length > 0) {
+                if (activeDeviceId && devices.some(d => d.deviceId === activeDeviceId)) {
+                    setSelectedDeviceId(activeDeviceId);
+                    return;
+                }
+                const savedId = localStorage.getItem('qr_scanner_preferred_device_id');
+                if (savedId && devices.some(d => d.deviceId === savedId)) {
+                    setSelectedDeviceId(savedId);
+                    return;
+                }
+                // Prefer rear / back camera on mobile devices
+                const rearDevice = devices.find(d =>
+                    d.label.toLowerCase().includes('back') ||
+                    d.label.toLowerCase().includes('rear') ||
+                    d.label.toLowerCase().includes('environment')
+                );
+                setSelectedDeviceId(rearDevice ? rearDevice.deviceId : devices[0].deviceId);
+            }
+        } catch (err) {
+            console.error('Failed to list video devices:', err);
+        }
+    }, []);
+
+    // Start camera stream with ZXing - auto starts on mount with resilient fallbacks
     const startCamera = useCallback(async (deviceIdToUse) => {
         setCameraPermissionError('');
-        const deviceId = deviceIdToUse || selectedDeviceId;
+        const savedPref = localStorage.getItem('qr_scanner_preferred_device_id');
+        const deviceId = deviceIdToUse || selectedDeviceId || savedPref || undefined;
 
         try {
             stopCamera();
@@ -188,26 +192,58 @@ const QRScanner = () => {
             const videoElement = videoRef.current;
             if (!videoElement) return;
 
-            const controls = await codeReaderRef.current.decodeFromVideoDevice(
-                deviceId || undefined,
-                videoElement,
-                (result, error) => {
-                    if (result) {
-                        const scannedText = result.getText();
-                        handleTokenCodeDetected(scannedText);
-                    }
+            const handleResult = (result, error) => {
+                if (result) {
+                    const scannedText = result.getText();
+                    handleTokenCodeDetectedRef.current?.(scannedText);
                 }
-            );
+            };
+
+            let controls = null;
+
+            // Attempt 1: Try with ideal facingMode or specific deviceId (using ideal to avoid NotFoundError on single webcam/desktop systems)
+            try {
+                const constraints = {
+                    video: deviceId
+                        ? { deviceId: { ideal: deviceId } }
+                        : { facingMode: { ideal: 'environment' } }
+                };
+                controls = await codeReaderRef.current.decodeFromConstraints(
+                    constraints,
+                    videoElement,
+                    handleResult
+                );
+            } catch (constraintErr) {
+                console.warn('Preferred camera constraint failed, attempting generic video fallback:', constraintErr);
+                // Clear obsolete saved device id if it was the culprit
+                if (deviceId) {
+                    localStorage.removeItem('qr_scanner_preferred_device_id');
+                }
+                // Attempt 2: Fallback to any generic video camera available on system
+                controls = await codeReaderRef.current.decodeFromConstraints(
+                    { video: true },
+                    videoElement,
+                    handleResult
+                );
+            }
 
             controlsRef.current = controls;
             setIsCameraActive(true);
+            localStorage.setItem('qr_scanner_camera_permission_saved', 'true');
 
-            // Check if torch/flashlight is supported
+            // Refresh device list now that permission is active
+            loadVideoDevices(deviceId);
+
+            // Synchronize selectedDeviceId & check torch capability
             try {
                 const stream = videoElement.srcObject;
                 if (stream) {
                     const tracks = stream.getVideoTracks();
                     if (tracks && tracks[0]) {
+                        const settings = tracks[0].getSettings ? tracks[0].getSettings() : {};
+                        if (settings.deviceId) {
+                            setSelectedDeviceId(settings.deviceId);
+                        }
                         const caps = tracks[0].getCapabilities ? tracks[0].getCapabilities() : {};
                         setTorchSupported(!!caps.torch);
                     }
@@ -217,14 +253,33 @@ const QRScanner = () => {
             }
         } catch (err) {
             console.error('Error starting video stream:', err);
-            setCameraPermissionError(
-                err.name === 'NotAllowedError'
-                    ? 'Camera access was denied. Please allow camera permissions in your browser.'
-                    : `Unable to access camera: ${err.message || 'Unknown error'}`
-            );
+            const isNotFound = err.name === 'NotFoundError' || err.message?.toLowerCase().includes('not found') || err.name === 'DevicesNotFoundError';
+            const isDenied = err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError';
+            const isBusy = err.name === 'NotReadableError' || err.name === 'TrackStartError';
+
+            let friendlyMsg = `Unable to access camera: ${err.message || 'Unknown error'}`;
+            if (isDenied) {
+                friendlyMsg = 'Camera access was denied. Please allow camera permissions in your browser settings.';
+            } else if (isNotFound) {
+                friendlyMsg = 'No camera found on this device. You can type or use a USB barcode scanner below.';
+            } else if (isBusy) {
+                friendlyMsg = 'Camera is in use by another application. Please close other camera apps and retry.';
+            }
+
+            setCameraPermissionError(friendlyMsg);
             setIsCameraActive(false);
         }
-    }, [selectedDeviceId, stopCamera]);
+    }, [selectedDeviceId, stopCamera, loadVideoDevices]);
+
+    // Handle manual camera device dropdown change
+    const handleDeviceChange = (e) => {
+        const newDevId = e.target.value;
+        setSelectedDeviceId(newDevId);
+        if (newDevId) {
+            localStorage.setItem('qr_scanner_preferred_device_id', newDevId);
+        }
+        startCamera(newDevId);
+    };
 
     // Toggle flashlight/torch
     const toggleTorch = async () => {
@@ -244,12 +299,16 @@ const QRScanner = () => {
         }
     };
 
-    // Auto-start camera when selected device changes
+    // Initialize ZXing code reader & auto-start camera on mount
     useEffect(() => {
-        if (selectedDeviceId) {
-            startCamera(selectedDeviceId);
-        }
-    }, [selectedDeviceId]);
+        codeReaderRef.current = new BrowserQRCodeReader();
+        const savedId = localStorage.getItem('qr_scanner_preferred_device_id') || undefined;
+        startCamera(savedId);
+
+        return () => {
+            stopCamera();
+        };
+    }, []);
 
     // Handle incoming scanned or manually entered code
     const handleTokenCodeDetected = useCallback(async (rawText) => {
@@ -267,6 +326,10 @@ const QRScanner = () => {
 
         await processTokenCode(cleanCode);
     }, [cooldown, isProcessing, lastScannedCode, lastScanResult]);
+
+    useEffect(() => {
+        handleTokenCodeDetectedRef.current = handleTokenCodeDetected;
+    }, [handleTokenCodeDetected]);
 
     // Process token verification and optional redemption
     const processTokenCode = async (code) => {
@@ -302,13 +365,24 @@ const QRScanner = () => {
                     setLastScanResult(scanData);
                     addSessionHistoryItem(scanData);
                     toast.warning(data.message || 'Already redeemed!');
+                } else if (res.status === 404) {
+                    playAudioFeedback('error', soundEnabled);
+                    const scanData = {
+                        token: null,
+                        status: 'NOT_FOUND',
+                        message: data.message || `Token "${code}" not found in database.`,
+                        timestamp: Date.now()
+                    };
+                    setLastScanResult(scanData);
+                    addSessionHistoryItem(scanData);
+                    toast.error(data.message || 'Token not found');
                 } else {
-                    // Cancelled or invalid
+                    // Cancelled or server error
                     playAudioFeedback('error', soundEnabled);
                     const scanData = {
                         token: data.token || null,
                         status: data.token?.status === 'CANCELLED' ? 'CANCELLED' : 'INVALID',
-                        message: data.message || `Invalid or cancelled token (${code})`,
+                        message: data.message || `Unable to redeem token (${code})`,
                         timestamp: Date.now()
                     };
                     setLastScanResult(scanData);
@@ -435,7 +509,14 @@ const QRScanner = () => {
                     </Box>
 
                     {/* Quick controls on header */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                    <Box sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: { xs: 'center', sm: 'flex-end' },
+                        width: { xs: '100%', sm: 'auto' },
+                        gap: 1.5,
+                        flexWrap: 'wrap'
+                    }}>
                         <Chip
                             icon={<RestaurantIcon sx={{ color: '#ffffff !important' }} />}
                             label={`Redeemed This Session: ${redeemedSessionCount}`}
@@ -453,6 +534,7 @@ const QRScanner = () => {
                             <IconButton
                                 onClick={() => setSoundEnabled(!soundEnabled)}
                                 sx={{
+                                    display: { xs: 'none', sm: 'inline-flex' },
                                     border: '1px solid #e2e8f0',
                                     backgroundColor: '#ffffff',
                                     color: soundEnabled ? '#d06c38' : '#94a3b8',
@@ -476,9 +558,9 @@ const QRScanner = () => {
                 overflow: 'hidden'
             }}>
                 <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
-                    {/* Camera Toolbar */}
+                    {/* Camera Toolbar - Hidden on mobile view as camera auto-starts */}
                     <Box sx={{
-                        display: 'flex',
+                        display: { xs: 'none', sm: 'flex' },
                         flexWrap: 'wrap',
                         alignItems: 'center',
                         justifyContent: 'space-between',
@@ -492,10 +574,7 @@ const QRScanner = () => {
                                 labelId="camera-select-label"
                                 value={selectedDeviceId}
                                 label="Camera Source"
-                                onChange={(e) => {
-                                    setSelectedDeviceId(e.target.value);
-                                    startCamera(e.target.value);
-                                }}
+                                onChange={handleDeviceChange}
                                 disabled={!videoDevices.length}
                             >
                                 {videoDevices.map((device, idx) => (
@@ -637,6 +716,30 @@ const QRScanner = () => {
                                 >
                                     Align QR Code within the frame
                                 </Typography>
+
+                                {/* Floating Torch Button (Mobile / Fast Access) */}
+                                {torchSupported && (
+                                    <Tooltip title={isTorchOn ? 'Turn Off Flashlight' : 'Turn On Flashlight'}>
+                                        <IconButton
+                                            onClick={toggleTorch}
+                                            size="small"
+                                            sx={{
+                                                position: 'absolute',
+                                                top: 12,
+                                                right: 12,
+                                                backgroundColor: isTorchOn ? '#d06c38' : 'rgba(0,0,0,0.5)',
+                                                color: '#ffffff',
+                                                zIndex: 6,
+                                                border: '1px solid rgba(255,255,255,0.25)',
+                                                '&:hover': {
+                                                    backgroundColor: isTorchOn ? '#b65c2e' : 'rgba(0,0,0,0.7)'
+                                                }
+                                            }}
+                                        >
+                                            {isTorchOn ? <FlashOnIcon fontSize="small" /> : <FlashOffIcon fontSize="small" />}
+                                        </IconButton>
+                                    </Tooltip>
+                                )}
                             </>
                         )}
 
@@ -664,39 +767,21 @@ const QRScanner = () => {
 
                     {/* Camera Error Message */}
                     {cameraPermissionError && (
-                        <Alert severity="error" sx={{ mt: 2 }}>
+                        <Alert
+                            severity="warning"
+                            action={
+                                <Button color="inherit" size="small" onClick={() => startCamera()}>
+                                    Retry
+                                </Button>
+                            }
+                            sx={{ mt: 2 }}
+                        >
                             {cameraPermissionError}
                         </Alert>
                     )}
 
-                    {/* Scanner Mode Toggles & Manual Input */}
-                    <Box sx={{ mt: 2.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        {/* Auto Redeem Toggle */}
-                        <Box sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            p: 1.5,
-                            backgroundColor: '#f9f9fb',
-                            borderRadius: 2,
-                            border: '1px solid #eef0f3'
-                        }}>
-                            <Box>
-                                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#0b5299' }}>
-                                    Auto-Redeem on Scan (Fast Queue Mode)
-                                </Typography>
-                                <Typography variant="caption" sx={{ color: '#666' }}>
-                                    Immediately marks token as redeemed upon valid scan
-                                </Typography>
-                            </Box>
-                            <Switch
-                                checked={autoRedeem}
-                                onChange={(e) => setAutoRedeem(e.target.checked)}
-                                color="success"
-                            />
-                        </Box>
-
-                        {/* Manual Input for Barcode Gun or Typing */}
+                    {/* Manual Input for Barcode Gun or Typing */}
+                    <Box sx={{ mt: 2.5 }}>
                         <form onSubmit={handleManualSubmit}>
                             <Box sx={{ display: 'flex', gap: 1 }}>
                                 <TextField
@@ -908,28 +993,6 @@ const QRScanner = () => {
                                         </Box>
                                     )}
                                 </Box>
-                            )}
-
-                            {/* Manual Redeem Action Button (when autoRedeem is OFF and token is ISSUED) */}
-                            {!autoRedeem && lastScanResult.token?.status === 'ISSUED' && (
-                                <Button
-                                    variant="contained"
-                                    color="success"
-                                    fullWidth
-                                    size="large"
-                                    onClick={handleManualRedeemClick}
-                                    disabled={isProcessing}
-                                    startIcon={<CheckCircleIcon />}
-                                    sx={{
-                                        py: 1.5,
-                                        fontWeight: 800,
-                                        fontSize: '1rem',
-                                        backgroundColor: '#2e7d32',
-                                        '&:hover': { backgroundColor: '#1b5e20' }
-                                    }}
-                                >
-                                    CONFIRM & REDEEM (SERVE MEAL)
-                                </Button>
                             )}
 
                             {/* Clear / Scan Next Button */}
