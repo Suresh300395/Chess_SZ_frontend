@@ -43,6 +43,7 @@ import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import VolumeOffIcon from '@mui/icons-material/VolumeOff';
 
 import { BrowserQRCodeReader, BrowserCodeReader } from '@zxing/browser';
+import { DecodeHintType, BarcodeFormat } from '@zxing/library';
 import { foodTokenAPI } from '../../utils/api';
 import { toast } from 'sonner';
 
@@ -65,10 +66,24 @@ const getSharedAudioContext = () => {
     return sharedAudioCtx;
 };
 
+// Factory for high-speed QR-only ZXing decoder (25 checks/sec instead of 2/sec)
+const createOptimizedQRCodeReader = () => {
+    const hints = new Map();
+    hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.QR_CODE]);
+    hints.set(DecodeHintType.TRY_HARDER, true);
+    return new BrowserQRCodeReader(hints, {
+        delayBetweenScanAttempts: 40,
+        delayBetweenScanSuccess: 800
+    });
+};
+
 const playOscillatorBeep = (freq, duration, type = 'sine') => {
     try {
         const ctx = getSharedAudioContext();
         if (!ctx) return;
+        if (ctx.state === 'suspended') {
+            ctx.resume().catch(() => {});
+        }
         const now = ctx.currentTime;
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
@@ -76,7 +91,7 @@ const playOscillatorBeep = (freq, duration, type = 'sine') => {
         gain.connect(ctx.destination);
         osc.type = type;
         osc.frequency.setValueAtTime(freq, now);
-        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.setValueAtTime(0.35, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
         osc.start(now);
         osc.stop(now + duration);
@@ -94,27 +109,21 @@ const playAudioFeedback = (type = 'success', enabled = true) => {
     if (type === 'scan') {
         // Haptic feedback for mobile devices immediately
         if (typeof navigator !== 'undefined' && navigator.vibrate) {
-            try { navigator.vibrate(60); } catch { }
+            try { navigator.vibrate(80); } catch { }
         }
 
-        // Try playing via HTML5 Audio element first (most reliable on mobile browsers)
+        // 1. Play Web Audio oscillator immediately (zero latency)
+        playOscillatorBeep(1800, 0.08, 'sine');
+
+        // 2. Play HTML5 Audio element as parallel channel
         try {
             if (!cachedBeepAudio) {
                 cachedBeepAudio = new Audio(SCAN_BEEP_DATA_URI);
             }
             cachedBeepAudio.currentTime = 0;
-            const p = cachedBeepAudio.play();
-            if (p !== undefined) {
-                p.catch(() => {
-                    // Fallback to Web Audio oscillator if Audio element was prevented
-                    playOscillatorBeep(1800, 0.08, 'sine');
-                });
-            }
-            return;
-        } catch {
-            playOscillatorBeep(1800, 0.08, 'sine');
-            return;
-        }
+            cachedBeepAudio.play().catch(() => {});
+        } catch { }
+        return;
     }
 
     try {
@@ -182,6 +191,7 @@ const QRScanner = () => {
     const videoRef = useRef(null);
     const codeReaderRef = useRef(null);
     const controlsRef = useRef(null);
+    const nativeScanRef = useRef(null);
     const handleTokenCodeDetectedRef = useRef(null);
 
     const [videoDevices, setVideoDevices] = useState([]);
@@ -190,6 +200,9 @@ const QRScanner = () => {
     const [cameraPermissionError, setCameraPermissionError] = useState('');
     const [torchSupported, setTorchSupported] = useState(false);
     const [isTorchOn, setIsTorchOn] = useState(false);
+    const [isAudioUnlocked, setIsAudioUnlocked] = useState(() => {
+        return localStorage.getItem('qr_scanner_audio_unlocked') === 'true';
+    });
 
     // Scanner preferences (Auto-Redeem is always ON by default)
     const autoRedeem = true;
@@ -207,6 +220,10 @@ const QRScanner = () => {
 
     // Stop camera stream cleanly
     const stopCamera = useCallback(() => {
+        if (nativeScanRef.current) {
+            clearInterval(nativeScanRef.current);
+            nativeScanRef.current = null;
+        }
         if (controlsRef.current) {
             try {
                 controlsRef.current.stop();
@@ -217,6 +234,47 @@ const QRScanner = () => {
         }
         setIsCameraActive(false);
         setIsTorchOn(false);
+    }, []);
+
+    // Dedicated function to unlock browser audio for mobile devices
+    const unlockAudioEngine = useCallback(async () => {
+        try {
+            // 1. Web Audio API silent buffer
+            const ctx = getSharedAudioContext();
+            if (ctx) {
+                if (ctx.state === 'suspended') {
+                    await ctx.resume().catch(() => {});
+                }
+                const buffer = ctx.createBuffer(1, 1, 22050);
+                const source = ctx.createBufferSource();
+                source.buffer = buffer;
+                source.connect(ctx.destination);
+                source.start(0);
+            }
+
+            // 2. HTML5 Audio element silent playback
+            if (!cachedBeepAudio) {
+                cachedBeepAudio = new Audio(SCAN_BEEP_DATA_URI);
+            }
+            cachedBeepAudio.muted = true;
+            const p = cachedBeepAudio.play();
+            if (p !== undefined) {
+                p.then(() => {
+                    cachedBeepAudio.pause();
+                    cachedBeepAudio.currentTime = 0;
+                    cachedBeepAudio.muted = false;
+                }).catch(() => {});
+            } else {
+                cachedBeepAudio.muted = false;
+            }
+
+            setIsAudioUnlocked(true);
+            localStorage.setItem('qr_scanner_audio_unlocked', 'true');
+            return true;
+        } catch (err) {
+            console.warn('Audio unlock failed:', err);
+            return false;
+        }
     }, []);
 
     // Fetch video input devices
@@ -282,7 +340,7 @@ const QRScanner = () => {
             }
 
             if (!codeReaderRef.current) {
-                codeReaderRef.current = new BrowserQRCodeReader();
+                codeReaderRef.current = createOptimizedQRCodeReader();
             }
 
             const videoElement = videoRef.current;
@@ -297,12 +355,22 @@ const QRScanner = () => {
 
             let controls = null;
 
-            // Attempt 1: Try with ideal facingMode or specific deviceId (using ideal to avoid NotFoundError on single webcam/desktop systems)
+            // Attempt 1: Optimal 720p constraints with continuous focus for instant scan
             try {
                 const constraints = {
                     video: deviceId
-                        ? { deviceId: { ideal: deviceId } }
-                        : { facingMode: { ideal: 'environment' } }
+                        ? {
+                            deviceId: { ideal: deviceId },
+                            width: { ideal: 1280, max: 1920 },
+                            height: { ideal: 720, max: 1080 },
+                            frameRate: { ideal: 30, max: 60 }
+                        }
+                        : {
+                            facingMode: { ideal: 'environment' },
+                            width: { ideal: 1280, max: 1920 },
+                            height: { ideal: 720, max: 1080 },
+                            frameRate: { ideal: 30, max: 60 }
+                        }
                 };
                 controls = await codeReaderRef.current.decodeFromConstraints(
                     constraints,
@@ -329,7 +397,29 @@ const QRScanner = () => {
             // Refresh device list now that permission is active
             loadVideoDevices(deviceId);
 
-            // Synchronize selectedDeviceId & check torch capability
+            // Hardware-accelerated native BarcodeDetector on Android Chrome / Chromium
+            if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
+                try {
+                    const formats = await window.BarcodeDetector.getSupportedFormats();
+                    if (formats && formats.includes('qr_code')) {
+                        const nativeDetector = new window.BarcodeDetector({ formats: ['qr_code'] });
+                        const scanNative = async () => {
+                            if (!videoRef.current || videoRef.current.readyState < 2) return;
+                            try {
+                                const codes = await nativeDetector.detect(videoRef.current);
+                                if (codes && codes.length > 0 && codes[0].rawValue) {
+                                    handleTokenCodeDetectedRef.current?.(codes[0].rawValue);
+                                }
+                            } catch {}
+                        };
+                        nativeScanRef.current = setInterval(scanNative, 35); // 28 checks/sec in hardware GPU
+                    }
+                } catch (e) {
+                    // Fallback to ZXing
+                }
+            }
+
+            // Synchronize selectedDeviceId, enable continuous autofocus & check torch capability
             try {
                 const stream = videoElement.srcObject;
                 if (stream) {
@@ -340,6 +430,10 @@ const QRScanner = () => {
                             setSelectedDeviceId(settings.deviceId);
                         }
                         const caps = tracks[0].getCapabilities ? tracks[0].getCapabilities() : {};
+                        // Apply continuous autofocus if hardware supported
+                        if (caps.focusMode && Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) {
+                            tracks[0].applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+                        }
                         setTorchSupported(!!caps.torch);
                     }
                 }
@@ -399,31 +493,24 @@ const QRScanner = () => {
         }
     };
 
-    // Unlock audio context on initial user interaction (required by mobile browsers)
+    // Global interaction listener: any screen touch or click activates mobile audio
     useEffect(() => {
-        const unlockAudio = () => {
-            if (!cachedBeepAudio) {
-                try {
-                    cachedBeepAudio = new Audio(SCAN_BEEP_DATA_URI);
-                    cachedBeepAudio.load();
-                } catch { }
-            }
-            const ctx = getSharedAudioContext();
-            if (ctx && ctx.state === 'suspended') {
-                ctx.resume().catch(() => { });
+        const handleInteraction = () => {
+            if (!isAudioUnlocked) {
+                unlockAudioEngine();
             }
         };
-        window.addEventListener('touchstart', unlockAudio, { once: true, passive: true });
-        window.addEventListener('click', unlockAudio, { once: true, passive: true });
+        window.addEventListener('touchstart', handleInteraction, { passive: true });
+        window.addEventListener('click', handleInteraction, { passive: true });
         return () => {
-            window.removeEventListener('touchstart', unlockAudio);
-            window.removeEventListener('click', unlockAudio);
+            window.removeEventListener('touchstart', handleInteraction);
+            window.removeEventListener('click', handleInteraction);
         };
-    }, []);
+    }, [isAudioUnlocked, unlockAudioEngine]);
 
     // Initialize ZXing code reader & auto-start camera on mount
     useEffect(() => {
-        codeReaderRef.current = new BrowserQRCodeReader();
+        codeReaderRef.current = createOptimizedQRCodeReader();
         const savedId = localStorage.getItem('qr_scanner_preferred_device_id') || undefined;
         startCamera(savedId);
 
@@ -749,6 +836,39 @@ const QRScanner = () => {
                                 </Button>
                             </Box>
                         </Box>
+
+                        {/* Mobile Tap-to-Enable Beep Sound prompt */}
+                        {!isAudioUnlocked && (
+                            <Box
+                                onClick={async () => {
+                                    await unlockAudioEngine();
+                                    playAudioFeedback('scan', true);
+                                    toast.success('Beep sound activated!');
+                                }}
+                                sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: 1.2,
+                                    py: 1.1,
+                                    px: 2,
+                                    mb: 1.5,
+                                    backgroundColor: '#f0fdf4',
+                                    border: '1.5px dashed #16a34a',
+                                    borderRadius: 2,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease',
+                                    '&:hover': {
+                                        backgroundColor: '#dcfce7'
+                                    }
+                                }}
+                            >
+                                <VolumeUpIcon sx={{ color: '#16a34a', fontSize: 22 }} />
+                                <Typography variant="body2" sx={{ color: '#15803d', fontWeight: 700, fontSize: '0.875rem' }}>
+                                    Tap to Enable Beep Sound 🔊
+                                </Typography>
+                            </Box>
+                        )}
 
                         {/* Scanner Video Viewport */}
                         <Box sx={{
