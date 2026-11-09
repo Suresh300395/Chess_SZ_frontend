@@ -46,15 +46,81 @@ import { BrowserQRCodeReader, BrowserCodeReader } from '@zxing/browser';
 import { foodTokenAPI } from '../../utils/api';
 import { toast } from 'sonner';
 
+// Base64 WAV: 80ms 1800Hz classic supermarket/retail scanner beep
+const SCAN_BEEP_DATA_URI = 'data:audio/wav;base64,UklGRgQEAABXQVZFZm10IBAAAAABAAEAESsAABErAAABAAgAZGF0YeADAAB/gYN/eHZ9io6DcGl5kZuJal1xlqiSZ1BnmLSdZkRal7+raTlMksm6bzE8itHKeSorf9bZhisics/fkjMdZcbinz0aWbzlq0cZTbHlt1MZQqXkwV8cOJnhy2wfL4zc03glKH/W2YYrInLP35IzHWXG4p89Glm85atHGU2x5bdTGUKl5MFfHDiZ4ctsHy+M3NN4JSh/1tmGKyJyz9+SMx1lxuKfPRpZvOWrRxlNseW3UxlCpeTBXxw4meHLbB8vjNzTeCUof9bZhisics/fkjMdZcbinz0aWbzlq0cZTbHlt1MZQqXkwV8cOJnhy2wfL4zc03glKH/W2YYrInLP35IzHWXG4p89Glm85atHGU2x5bdTGUKl5MFfHDiZ4ctsHy+M3NN4JSh/1tmGKyJyz9+SMx1lxuKfPRpZvOWrRxlNseW3UxlCpeTBXxw4meHLbB8vjNzTeCUof9bZhisics/fkjMdZcbinz0aWbzlq0cZTbHlt1MZQqXkwV8cOJnhy2wfL4zc03glKH/W2YYrInLP35IzHWXG4p89Glm85atHGU2x5bdTGUKl5MFfHDiZ4ctsHy+M3NN4JSh/1tmGKyJyz9+SMx1lxuKfPRpZvOWrRxlNseW3UxlCpeTBXxw4meHLbB8vjNzTeCUof9bZhisics/fkjMdZcbinz0aWbzlq0cZTbHlt1MZQqXkwV8cOJnhy2wfL4zc03glKH/W2YYrInLP35IzHWXG4p89Glm85atHGU2x5bdTGUKl5MFfHDiZ4ctsHy+M3NN4JSh/1tmGKyJyz9+SMx1lxuKfPRpZvOWrRxlNseW3UxlCpeTBXxw4meHLbB8vjNzTeCUof9bZhisics/fkjMdZcbinz0aWbzlq0cZTbHlt1MZQqXkwV8cOJnhy2wfL4zc03glKH/W2YYrInLP35IzHWXG4p89Glm85atHGU2x5bdTGUKl5MFfHDiZ4ctsHy+M3NN4JSh/1tmGKyJyz9+SMx5mxN6eQSFct9qmTiZUqtWtWy1Onc6yZzRKksW1cT1JiL21e0ZJf7O0g09LeKqyiVhOcqGujmFTb5mpkWlYbJGjknBfbIqcknZlbYWVkHtscIGPjH5ydH+JiIB4eH6Dg4B9fg==';
+
+let sharedAudioCtx = null;
+let cachedBeepAudio = null;
+
+const getSharedAudioContext = () => {
+    if (!sharedAudioCtx) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) {
+            sharedAudioCtx = new AudioCtx();
+        }
+    }
+    if (sharedAudioCtx && sharedAudioCtx.state === 'suspended') {
+        sharedAudioCtx.resume().catch(() => { });
+    }
+    return sharedAudioCtx;
+};
+
+const playOscillatorBeep = (freq, duration, type = 'sine') => {
+    try {
+        const ctx = getSharedAudioContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, now);
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+        osc.start(now);
+        osc.stop(now + duration);
+    } catch (e) {
+        console.warn('Oscillator fallback failed:', e);
+    }
+};
+
 /**
- * Synthesizes short audio chimes via Web Audio API for fast feedback in busy cafeteria lines
+ * Synthesizes short audio chimes & plays instant scanner beep + haptic feedback
  */
 const playAudioFeedback = (type = 'success', enabled = true) => {
     if (!enabled) return;
+
+    if (type === 'scan') {
+        // Haptic feedback for mobile devices immediately
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+            try { navigator.vibrate(60); } catch { }
+        }
+
+        // Try playing via HTML5 Audio element first (most reliable on mobile browsers)
+        try {
+            if (!cachedBeepAudio) {
+                cachedBeepAudio = new Audio(SCAN_BEEP_DATA_URI);
+            }
+            cachedBeepAudio.currentTime = 0;
+            const p = cachedBeepAudio.play();
+            if (p !== undefined) {
+                p.catch(() => {
+                    // Fallback to Web Audio oscillator if Audio element was prevented
+                    playOscillatorBeep(1800, 0.08, 'sine');
+                });
+            }
+            return;
+        } catch {
+            playOscillatorBeep(1800, 0.08, 'sine');
+            return;
+        }
+    }
+
     try {
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        if (!AudioCtx) return;
-        const ctx = new AudioCtx();
+        const ctx = getSharedAudioContext();
+        if (!ctx) return;
+        const now = ctx.currentTime;
 
         if (type === 'success') {
             const osc = ctx.createOscillator();
@@ -62,24 +128,32 @@ const playAudioFeedback = (type = 'success', enabled = true) => {
             osc.connect(gain);
             gain.connect(ctx.destination);
             osc.type = 'sine';
-            osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
-            osc.frequency.setValueAtTime(880, ctx.currentTime + 0.1); // A5
-            gain.gain.setValueAtTime(0.25, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
-            osc.start(ctx.currentTime);
-            osc.stop(ctx.currentTime + 0.35);
+            osc.frequency.setValueAtTime(587.33, now); // D5
+            osc.frequency.setValueAtTime(880, now + 0.1); // A5
+            gain.gain.setValueAtTime(0.25, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+            osc.start(now);
+            osc.stop(now + 0.35);
+
+            if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                try { navigator.vibrate([50, 40, 50]); } catch { }
+            }
         } else {
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
             osc.connect(gain);
             gain.connect(ctx.destination);
             osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(240, ctx.currentTime);
-            osc.frequency.setValueAtTime(160, ctx.currentTime + 0.15);
-            gain.gain.setValueAtTime(0.3, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-            osc.start(ctx.currentTime);
-            osc.stop(ctx.currentTime + 0.4);
+            osc.frequency.setValueAtTime(240, now);
+            osc.frequency.setValueAtTime(160, now + 0.15);
+            gain.gain.setValueAtTime(0.3, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+            osc.start(now);
+            osc.stop(now + 0.4);
+
+            if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                try { navigator.vibrate([120, 80, 120]); } catch { }
+            }
         }
     } catch {
         // Audio might be ignored if browser prevents autoplay
@@ -185,6 +259,28 @@ const QRScanner = () => {
         try {
             stopCamera();
 
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                setCameraPermissionError('Camera is not supported in this browser or environment.');
+                setIsCameraActive(false);
+                return;
+            }
+
+            // Proactively check if any video camera hardware exists on this system
+            try {
+                if (navigator.mediaDevices.enumerateDevices) {
+                    const devs = await navigator.mediaDevices.enumerateDevices();
+                    const videoDevs = devs.filter(d => d.kind === 'videoinput');
+                    if (videoDevs.length === 0) {
+                        console.info('No video camera hardware detected on this device.');
+                        setCameraPermissionError('No camera found on this device. You can type or use a USB barcode scanner below.');
+                        setIsCameraActive(false);
+                        return;
+                    }
+                }
+            } catch {
+                // If device enumeration is restricted, continue to stream attempt
+            }
+
             if (!codeReaderRef.current) {
                 codeReaderRef.current = new BrowserQRCodeReader();
             }
@@ -214,7 +310,6 @@ const QRScanner = () => {
                     handleResult
                 );
             } catch (constraintErr) {
-                console.warn('Preferred camera constraint failed, attempting generic video fallback:', constraintErr);
                 // Clear obsolete saved device id if it was the culprit
                 if (deviceId) {
                     localStorage.removeItem('qr_scanner_preferred_device_id');
@@ -252,10 +347,15 @@ const QRScanner = () => {
                 setTorchSupported(false);
             }
         } catch (err) {
-            console.error('Error starting video stream:', err);
             const isNotFound = err.name === 'NotFoundError' || err.message?.toLowerCase().includes('not found') || err.name === 'DevicesNotFoundError';
             const isDenied = err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError';
             const isBusy = err.name === 'NotReadableError' || err.name === 'TrackStartError';
+
+            if (isNotFound) {
+                console.info('No camera hardware found on this system:', err.message);
+            } else {
+                console.warn('Camera stream could not be started:', err);
+            }
 
             let friendlyMsg = `Unable to access camera: ${err.message || 'Unknown error'}`;
             if (isDenied) {
@@ -299,6 +399,28 @@ const QRScanner = () => {
         }
     };
 
+    // Unlock audio context on initial user interaction (required by mobile browsers)
+    useEffect(() => {
+        const unlockAudio = () => {
+            if (!cachedBeepAudio) {
+                try {
+                    cachedBeepAudio = new Audio(SCAN_BEEP_DATA_URI);
+                    cachedBeepAudio.load();
+                } catch { }
+            }
+            const ctx = getSharedAudioContext();
+            if (ctx && ctx.state === 'suspended') {
+                ctx.resume().catch(() => { });
+            }
+        };
+        window.addEventListener('touchstart', unlockAudio, { once: true, passive: true });
+        window.addEventListener('click', unlockAudio, { once: true, passive: true });
+        return () => {
+            window.removeEventListener('touchstart', unlockAudio);
+            window.removeEventListener('click', unlockAudio);
+        };
+    }, []);
+
     // Initialize ZXing code reader & auto-start camera on mount
     useEffect(() => {
         codeReaderRef.current = new BrowserQRCodeReader();
@@ -324,8 +446,11 @@ const QRScanner = () => {
         setCooldown(true);
         setTimeout(() => setCooldown(false), 2000);
 
+        // Immediate crisp scan beep sound & haptic feedback as soon as QR is detected
+        playAudioFeedback('scan', soundEnabled);
+
         await processTokenCode(cleanCode);
-    }, [cooldown, isProcessing, lastScannedCode, lastScanResult]);
+    }, [cooldown, isProcessing, lastScannedCode, lastScanResult, soundEnabled]);
 
     useEffect(() => {
         handleTokenCodeDetectedRef.current = handleTokenCodeDetected;
@@ -557,457 +682,445 @@ const QRScanner = () => {
                 boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
                 overflow: 'hidden'
             }}>
-                <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
-                    {/* Camera Toolbar - Hidden on mobile view as camera auto-starts */}
-                    <Box sx={{
-                        display: { xs: 'none', sm: 'flex' },
-                        flexWrap: 'wrap',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: 1.5,
-                        mb: 2
-                    }}>
-                        {/* Device Select */}
-                        <FormControl size="small" sx={{ minWidth: 200, flex: 1 }}>
-                            <InputLabel id="camera-select-label">Camera Source</InputLabel>
-                            <Select
-                                labelId="camera-select-label"
-                                value={selectedDeviceId}
-                                label="Camera Source"
-                                onChange={handleDeviceChange}
-                                disabled={!videoDevices.length}
-                            >
-                                {videoDevices.map((device, idx) => (
-                                    <MenuItem key={device.deviceId || idx} value={device.deviceId}>
-                                        {device.label || `Camera ${idx + 1}`}
-                                    </MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-
-                        {/* Camera Action Buttons */}
-                        <Box sx={{ display: 'flex', gap: 1 }}>
-                            {torchSupported && isCameraActive && (
-                                <Tooltip title={isTorchOn ? 'Turn Off Flashlight' : 'Turn On Flashlight'}>
-                                    <Button
-                                        variant="outlined"
-                                        size="small"
-                                        onClick={toggleTorch}
-                                        color={isTorchOn ? 'warning' : 'primary'}
-                                        startIcon={isTorchOn ? <FlashOffIcon /> : <FlashOnIcon />}
-                                    >
-                                        {isTorchOn ? 'Torch On' : 'Torch'}
-                                    </Button>
-                                </Tooltip>
-                            )}
-
-                            <Button
-                                variant={isCameraActive ? 'outlined' : 'contained'}
-                                color={isCameraActive ? 'error' : 'primary'}
-                                size="small"
-                                onClick={() => {
-                                    if (isCameraActive) {
-                                        stopCamera();
-                                    } else {
-                                        startCamera();
-                                    }
-                                }}
-                                startIcon={isCameraActive ? <VideocamOffIcon /> : <VideocamIcon />}
-                                sx={{
-                                    backgroundColor: !isCameraActive ? '#d06c38' : undefined,
-                                    '&:hover': {
-                                        backgroundColor: !isCameraActive ? '#b65c2e' : undefined
-                                    }
-                                }}
-                            >
-                                {isCameraActive ? 'Pause' : 'Start Camera'}
-                            </Button>
-                        </Box>
-                    </Box>
-
-                    {/* Scanner Video Viewport */}
-                    <Box sx={{
-                        position: 'relative',
-                        width: '100%',
-                        height: { xs: '260px', sm: '320px', md: '360px' },
-                        backgroundColor: '#050c14',
-                        borderRadius: 2,
-                        overflow: 'hidden',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        border: '2px solid #0b5299'
-                    }}>
-                        {/* Video Element */}
-                        <video
-                            ref={videoRef}
-                            style={{
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'cover',
-                                display: isCameraActive ? 'block' : 'none'
-                            }}
-                            autoPlay
-                            playsInline
-                            muted
-                        />
-
-                        {/* Camera Paused Overlay */}
-                        {!isCameraActive && (
-                            <Box sx={{ textAlign: 'center', color: '#fff', p: 2 }}>
-                                <VideocamOffIcon sx={{ fontSize: 54, color: '#888', mb: 1 }} />
-                                <Typography variant="body1" sx={{ color: '#ccc', fontWeight: 600 }}>
-                                    Camera is Paused
-                                </Typography>
-                                <Typography variant="caption" sx={{ color: '#888', display: 'block', mt: 0.5 }}>
-                                    Click "Start Camera" above or type token code below
-                                </Typography>
-                            </Box>
-                        )}
-
-                        {/* Live Target Overlay & Laser Animation */}
-                        {isCameraActive && (
-                            <>
-                                {/* Scan Frame Guidelines */}
-                                <Box sx={{
-                                    position: 'absolute',
-                                    width: '240px',
-                                    height: '240px',
-                                    border: '2px solid rgba(208, 108, 56, 0.7)',
-                                    borderRadius: 2,
-                                    boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.35)',
-                                    pointerEvents: 'none'
-                                }}>
-                                    {/* Corner brackets */}
-                                    <Box sx={{ position: 'absolute', top: -3, left: -3, width: 20, height: 20, borderTop: '4px solid #d06c38', borderLeft: '4px solid #d06c38' }} />
-                                    <Box sx={{ position: 'absolute', top: -3, right: -3, width: 20, height: 20, borderTop: '4px solid #d06c38', borderRight: '4px solid #d06c38' }} />
-                                    <Box sx={{ position: 'absolute', bottom: -3, left: -3, width: 20, height: 20, borderBottom: '4px solid #d06c38', borderLeft: '4px solid #d06c38' }} />
-                                    <Box sx={{ position: 'absolute', bottom: -3, right: -3, width: 20, height: 20, borderBottom: '4px solid #d06c38', borderRight: '4px solid #d06c38' }} />
-
-                                    {/* Animated Laser Bar */}
-                                    <Box sx={{
-                                        position: 'absolute',
-                                        left: 0,
-                                        right: 0,
-                                        height: '2px',
-                                        backgroundColor: '#d06c38',
-                                        boxShadow: '0 0 8px 2px #d06c38',
-                                        animation: 'scanLaser 2s infinite ease-in-out',
-                                        '@keyframes scanLaser': {
-                                            '0%': { top: '5%' },
-                                            '50%': { top: '95%' },
-                                            '100%': { top: '5%' }
-                                        }
-                                    }} />
-                                </Box>
-
-                                <Typography
-                                    variant="caption"
-                                    sx={{
-                                        position: 'absolute',
-                                        bottom: 12,
-                                        color: '#ffffff',
-                                        backgroundColor: 'rgba(0,0,0,0.6)',
-                                        px: 1.5,
-                                        py: 0.5,
-                                        borderRadius: 1,
-                                        fontWeight: 500
-                                    }}
+                    <CardContent sx={{ p: '8px !important', '&:last-child': { pb: '8px !important' } }}>
+                        {/* Camera Toolbar - Hidden on mobile view as camera auto-starts */}
+                        <Box sx={{
+                            display: { xs: 'none', sm: 'flex' },
+                            flexWrap: 'wrap',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: 1.5,
+                        mb: 1.5
+                        }}>
+                            {/* Device Select */}
+                            <FormControl size="small" sx={{ minWidth: 200, flex: 1 }}>
+                                <InputLabel id="camera-select-label">Camera Source</InputLabel>
+                                <Select
+                                    labelId="camera-select-label"
+                                    value={selectedDeviceId}
+                                    label="Camera Source"
+                                    onChange={handleDeviceChange}
+                                    disabled={!videoDevices.length}
                                 >
-                                    Align QR Code within the frame
-                                </Typography>
+                                    {videoDevices.map((device, idx) => (
+                                        <MenuItem key={device.deviceId || idx} value={device.deviceId}>
+                                            {device.label || `Camera ${idx + 1}`}
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
 
-                                {/* Floating Torch Button (Mobile / Fast Access) */}
-                                {torchSupported && (
+                            {/* Camera Action Buttons */}
+                            <Box sx={{ display: 'flex', gap: 1 }}>
+                                {torchSupported && isCameraActive && (
                                     <Tooltip title={isTorchOn ? 'Turn Off Flashlight' : 'Turn On Flashlight'}>
-                                        <IconButton
-                                            onClick={toggleTorch}
+                                        <Button
+                                            variant="outlined"
                                             size="small"
-                                            sx={{
-                                                position: 'absolute',
-                                                top: 12,
-                                                right: 12,
-                                                backgroundColor: isTorchOn ? '#d06c38' : 'rgba(0,0,0,0.5)',
-                                                color: '#ffffff',
-                                                zIndex: 6,
-                                                border: '1px solid rgba(255,255,255,0.25)',
-                                                '&:hover': {
-                                                    backgroundColor: isTorchOn ? '#b65c2e' : 'rgba(0,0,0,0.7)'
-                                                }
-                                            }}
+                                            onClick={toggleTorch}
+                                            color={isTorchOn ? 'warning' : 'primary'}
+                                            startIcon={isTorchOn ? <FlashOffIcon /> : <FlashOnIcon />}
                                         >
-                                            {isTorchOn ? <FlashOnIcon fontSize="small" /> : <FlashOffIcon fontSize="small" />}
-                                        </IconButton>
+                                            {isTorchOn ? 'Torch On' : 'Torch'}
+                                        </Button>
                                     </Tooltip>
                                 )}
-                            </>
-                        )}
 
-                        {/* Processing Indicator */}
-                        {isProcessing && (
-                            <Box sx={{
-                                position: 'absolute',
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                bottom: 0,
-                                backgroundColor: 'rgba(0,0,0,0.6)',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: '#fff',
-                                zIndex: 10
-                            }}>
-                                <CircularProgress size={44} sx={{ color: '#d06c38', mb: 1 }} />
-                                <Typography variant="body2" sx={{ fontWeight: 600 }}>Validating Token...</Typography>
-                            </Box>
-                        )}
-                    </Box>
-
-                    {/* Camera Error Message */}
-                    {cameraPermissionError && (
-                        <Alert
-                            severity="warning"
-                            action={
-                                <Button color="inherit" size="small" onClick={() => startCamera()}>
-                                    Retry
-                                </Button>
-                            }
-                            sx={{ mt: 2 }}
-                        >
-                            {cameraPermissionError}
-                        </Alert>
-                    )}
-
-                    {/* Manual Input for Barcode Gun or Typing */}
-                    <Box sx={{ mt: 2.5 }}>
-                        <form onSubmit={handleManualSubmit}>
-                            <Box sx={{ display: 'flex', gap: 1 }}>
-                                <TextField
+                                <Button
+                                    variant={isCameraActive ? 'outlined' : 'contained'}
+                                    color={isCameraActive ? 'error' : 'primary'}
                                     size="small"
-                                    fullWidth
-                                    placeholder="Enter or scan token code (e.g. 7W36FS9GCB)"
-                                    value={manualCode}
-                                    onChange={(e) => setManualCode(e.target.value.toUpperCase())}
-                                    slotProps={{
-                                        htmlInput: {
-                                            style: {
+                                    onClick={() => {
+                                        if (isCameraActive) {
+                                            stopCamera();
+                                        } else {
+                                            startCamera();
+                                        }
+                                    }}
+                                    startIcon={isCameraActive ? <VideocamOffIcon /> : <VideocamIcon />}
+                                    sx={{
+                                        backgroundColor: !isCameraActive ? '#d06c38' : undefined,
+                                        '&:hover': {
+                                            backgroundColor: !isCameraActive ? '#b65c2e' : undefined
+                                        }
+                                    }}
+                                >
+                                    {isCameraActive ? 'Pause' : 'Start Camera'}
+                                </Button>
+                            </Box>
+                        </Box>
+
+                        {/* Scanner Video Viewport */}
+                        <Box sx={{
+                            position: 'relative',
+                            width: '100%',
+                            height: { xs: '260px', sm: '320px', md: '360px' },
+                            backgroundColor: '#050c14',
+                            borderRadius: 2,
+                            overflow: 'hidden',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: '2px solid #0b5299'
+                        }}>
+                            {/* Video Element */}
+                            <video
+                                ref={videoRef}
+                                style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'cover',
+                                    display: isCameraActive ? 'block' : 'none'
+                                }}
+                                autoPlay
+                                playsInline
+                                muted
+                            />
+
+                            {/* Camera Paused Overlay */}
+                            {!isCameraActive && (
+                                <Box sx={{ textAlign: 'center', color: '#fff', p: 2 }}>
+                                    <VideocamOffIcon sx={{ fontSize: 54, color: '#888', mb: 1 }} />
+                                    <Typography variant="body1" sx={{ color: '#ccc', fontWeight: 600 }}>
+                                        Camera is Paused
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ color: '#888', display: 'block', mt: 0.5 }}>
+                                        Click "Start Camera" above or type token code below
+                                    </Typography>
+                                </Box>
+                            )}
+
+                            {/* Live Target Overlay & Laser Animation */}
+                            {isCameraActive && (
+                                <>
+                                    {/* Scan Frame Guidelines */}
+                                    <Box sx={{
+                                        position: 'absolute',
+                                        width: '240px',
+                                        height: '240px',
+                                        border: '2px solid rgba(208, 108, 56, 0.7)',
+                                        borderRadius: 2,
+                                        boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.35)',
+                                        pointerEvents: 'none'
+                                    }}>
+                                        {/* Corner brackets */}
+                                        <Box sx={{ position: 'absolute', top: -3, left: -3, width: 20, height: 20, borderTop: '4px solid #d06c38', borderLeft: '4px solid #d06c38' }} />
+                                        <Box sx={{ position: 'absolute', top: -3, right: -3, width: 20, height: 20, borderTop: '4px solid #d06c38', borderRight: '4px solid #d06c38' }} />
+                                        <Box sx={{ position: 'absolute', bottom: -3, left: -3, width: 20, height: 20, borderBottom: '4px solid #d06c38', borderLeft: '4px solid #d06c38' }} />
+                                        <Box sx={{ position: 'absolute', bottom: -3, right: -3, width: 20, height: 20, borderBottom: '4px solid #d06c38', borderRight: '4px solid #d06c38' }} />
+
+                                        {/* Animated Laser Bar */}
+                                        <Box sx={{
+                                            position: 'absolute',
+                                            left: 0,
+                                            right: 0,
+                                            height: '2px',
+                                            backgroundColor: '#d06c38',
+                                            boxShadow: '0 0 8px 2px #d06c38',
+                                            animation: 'scanLaser 2s infinite ease-in-out',
+                                            '@keyframes scanLaser': {
+                                                '0%': { top: '5%' },
+                                                '50%': { top: '95%' },
+                                                '100%': { top: '5%' }
+                                            }
+                                        }} />
+                                    </Box>
+
+                                    <Typography
+                                        variant="caption"
+                                        sx={{
+                                            position: 'absolute',
+                                            bottom: 12,
+                                            color: '#ffffff',
+                                            backgroundColor: 'rgba(0,0,0,0.6)',
+                                            px: 1.5,
+                                            py: 0.5,
+                                            borderRadius: 1,
+                                            fontWeight: 500
+                                        }}
+                                    >
+                                        Align QR Code within the frame
+                                    </Typography>
+
+                                    {/* Floating Torch Button (Mobile / Fast Access) */}
+                                    {torchSupported && (
+                                        <Tooltip title={isTorchOn ? 'Turn Off Flashlight' : 'Turn On Flashlight'}>
+                                            <IconButton
+                                                onClick={toggleTorch}
+                                                size="small"
+                                                sx={{
+                                                    position: 'absolute',
+                                                    top: 12,
+                                                    right: 12,
+                                                    backgroundColor: isTorchOn ? '#d06c38' : 'rgba(0,0,0,0.5)',
+                                                    color: '#ffffff',
+                                                    zIndex: 6,
+                                                    border: '1px solid rgba(255,255,255,0.25)',
+                                                    '&:hover': {
+                                                        backgroundColor: isTorchOn ? '#b65c2e' : 'rgba(0,0,0,0.7)'
+                                                    }
+                                                }}
+                                            >
+                                                {isTorchOn ? <FlashOnIcon fontSize="small" /> : <FlashOffIcon fontSize="small" />}
+                                            </IconButton>
+                                        </Tooltip>
+                                    )}
+                                </>
+                            )}
+                        </Box>
+
+                        {/* Camera Error Message */}
+                        {cameraPermissionError && (
+                            <Alert
+                                severity="warning"
+                                action={
+                                    <Button color="inherit" size="small" onClick={() => startCamera()}>
+                                        Retry
+                                    </Button>
+                                }
+                                sx={{ mt: 2 }}
+                            >
+                                {cameraPermissionError}
+                            </Alert>
+                        )}
+
+                        {/* Manual Input for Barcode Gun or Typing */}
+                        <Box sx={{ mt: 2.5 }}>
+                            <form onSubmit={handleManualSubmit}>
+                                <Box sx={{
+                                    display: 'flex',
+                                    flexDirection: { xs: 'column', sm: 'row' },
+                                    gap: 1.5,
+                                    alignItems: 'stretch'
+                                }}>
+                                    <TextField
+                                        size="small"
+                                        fullWidth
+                                        placeholder="Enter or scan token code (e.g. 7W36FS9GCB)"
+                                        value={manualCode}
+                                        onChange={(e) => setManualCode(e.target.value.toUpperCase())}
+                                        slotProps={{
+                                            htmlInput: {
+                                                style: {
+                                                    textTransform: 'uppercase',
+                                                    fontFamily: 'monospace',
+                                                    fontWeight: 700,
+                                                    letterSpacing: '1px'
+                                                }
+                                            }
+                                        }}
+                                        sx={{
+                                            '& input': {
                                                 textTransform: 'uppercase',
                                                 fontFamily: 'monospace',
                                                 fontWeight: 700,
                                                 letterSpacing: '1px'
                                             }
-                                        }
-                                    }}
-                                    sx={{
-                                        '& input': {
-                                            textTransform: 'uppercase',
-                                            fontFamily: 'monospace',
-                                            fontWeight: 700,
-                                            letterSpacing: '1px'
-                                        }
-                                    }}
-                                />
-                                <Button
-                                    type="submit"
-                                    variant="contained"
-                                    disabled={!manualCode.trim() || isProcessing}
-                                    sx={{
-                                        backgroundColor: '#0b5299',
-                                        minWidth: '110px',
-                                        fontWeight: 600,
-                                        '&:hover': { backgroundColor: '#093e74' }
-                                    }}
-                                >
-                                    Verify
-                                </Button>
-                            </Box>
-                        </form>
-                    </Box>
-
-                    {/* Scan Result & Meal Details (Appears right here when a token is scanned) */}
-                    {lastScanResult && (
-                        <Box sx={{ mt: 3, pt: 2.5, borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            {/* Big Status Banner */}
-                            {lastScanResult.status === 'REDEEMED_NOW' && (
-                                <Box sx={{
-                                    backgroundColor: '#e8f5e9',
-                                    border: '2px solid #4caf50',
-                                    borderRadius: 2,
-                                    p: 2,
-                                    textAlign: 'center'
-                                }}>
-                                    <CheckCircleIcon sx={{ fontSize: 44, color: '#2e7d32', mb: 0.5 }} />
-                                    <Typography variant="h6" sx={{ fontWeight: 800, color: '#2e7d32', letterSpacing: 0.5 }}>
-                                        MEAL SERVED - REDEEMED!
-                                    </Typography>
-                                    <Typography variant="caption" sx={{ color: '#1b5e20', fontWeight: 600 }}>
-                                        Token successfully accepted
-                                    </Typography>
+                                        }}
+                                    />
+                                    <Button
+                                        type="submit"
+                                        variant="contained"
+                                        disabled={!manualCode.trim() || isProcessing}
+                                        sx={{
+                                            backgroundColor: '#0b5299',
+                                            minWidth: { xs: '100%', sm: '110px' },
+                                            width: { xs: '100%', sm: 'auto' },
+                                            py: { xs: 1.1, sm: 'auto' },
+                                            fontWeight: 600,
+                                            fontSize: { xs: '0.95rem', sm: '0.875rem' },
+                                            whiteSpace: 'nowrap',
+                                            '&:hover': { backgroundColor: '#093e74' }
+                                        }}
+                                    >
+                                        Verify
+                                    </Button>
                                 </Box>
-                            )}
+                            </form>
+                        </Box>
 
-                            {lastScanResult.status === 'ISSUED' && (
-                                <Box sx={{
-                                    backgroundColor: '#e3f2fd',
-                                    border: '2px solid #2196f3',
-                                    borderRadius: 2,
-                                    p: 2,
-                                    textAlign: 'center'
-                                }}>
-                                    <CheckCircleIcon sx={{ fontSize: 44, color: '#1976d2', mb: 0.5 }} />
-                                    <Typography variant="h6" sx={{ fontWeight: 800, color: '#1565c0' }}>
-                                        TOKEN VALID
-                                    </Typography>
-                                    <Typography variant="caption" sx={{ color: '#0d47a1', fontWeight: 600 }}>
-                                        Eligible for redemption
-                                    </Typography>
-                                </Box>
-                            )}
-
-                            {lastScanResult.status === 'ALREADY_REDEEMED' && (
-                                <Box sx={{
-                                    backgroundColor: '#ffebee',
-                                    border: '2px solid #f44336',
-                                    borderRadius: 2,
-                                    p: 2,
-                                    textAlign: 'center'
-                                }}>
-                                    <WarningAmberIcon sx={{ fontSize: 44, color: '#d32f2f', mb: 0.5 }} />
-                                    <Typography variant="h6" sx={{ fontWeight: 800, color: '#c62828' }}>
-                                        ALREADY REDEEMED!
-                                    </Typography>
-                                    <Typography variant="body2" sx={{ color: '#b71c1c', fontWeight: 600, mt: 0.5 }}>
-                                        {lastScanResult.message}
-                                    </Typography>
-                                </Box>
-                            )}
-
-                            {(lastScanResult.status === 'CANCELLED' || lastScanResult.status === 'INVALID' || lastScanResult.status === 'NOT_FOUND' || lastScanResult.status === 'ERROR') && (
-                                <Box sx={{
-                                    backgroundColor: '#fff3e0',
-                                    border: '2px solid #ff9800',
-                                    borderRadius: 2,
-                                    p: 2,
-                                    textAlign: 'center'
-                                }}>
-                                    <ErrorOutlineIcon sx={{ fontSize: 44, color: '#e65100', mb: 0.5 }} />
-                                    <Typography variant="h6" sx={{ fontWeight: 800, color: '#e65100' }}>
-                                        {lastScanResult.status === 'CANCELLED' ? 'TOKEN CANCELLED' : 'INVALID TOKEN'}
-                                    </Typography>
-                                    <Typography variant="body2" sx={{ color: '#bf360c', fontWeight: 600, mt: 0.5 }}>
-                                        {lastScanResult.message}
-                                    </Typography>
-                                </Box>
-                            )}
-
-                            {/* Token Details Card */}
-                            {lastScanResult.token && (
-                                <Box sx={{
-                                    backgroundColor: '#fbfbfd',
-                                    borderRadius: 2,
-                                    p: 2,
-                                    border: '1px solid #eef0f3',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: 1.5
-                                }}>
-                                    {/* Code & Meal Badge */}
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <Typography variant="caption" sx={{ color: '#777', fontWeight: 600 }}>TOKEN CODE</Typography>
-                                        <Chip
-                                            label={lastScanResult.token.code}
-                                            size="small"
-                                            sx={{
-                                                fontFamily: 'monospace',
-                                                fontWeight: 900,
-                                                fontSize: '0.9rem',
-                                                letterSpacing: 1.5,
-                                                backgroundColor: '#0b5299',
-                                                color: '#fff'
-                                            }}
-                                        />
-                                    </Box>
-
-                                    <Divider />
-
-                                    {/* Participant Name & Role */}
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                        <PersonIcon sx={{ color: '#d06c38' }} />
-                                        <Box>
-                                            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#222' }}>
-                                                {lastScanResult.token.name}
-                                            </Typography>
-                                            <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>
-                                                {lastScanResult.token.personType} {lastScanResult.token.identifier ? `• ${lastScanResult.token.identifier}` : ''}
-                                            </Typography>
-                                        </Box>
-                                    </Box>
-
-                                    {/* University / College */}
-                                    {lastScanResult.token.teamOrSport && (
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                            <SchoolIcon sx={{ color: '#0b5299' }} />
-                                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#444' }}>
-                                                {lastScanResult.token.teamOrSport}
-                                            </Typography>
-                                        </Box>
-                                    )}
-
-                                    {/* Meal & Date */}
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                        <RestaurantIcon sx={{ color: '#d06c38' }} />
-                                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#0b5299' }}>
-                                            {lastScanResult.token.mealType} • {lastScanResult.token.mealDate}
+                        {/* Scan Result & Meal Details (Appears right here when a token is scanned) */}
+                        {lastScanResult && (
+                            <Box sx={{ mt: 3, pt: 2.5, borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                {/* Big Status Banner */}
+                                {lastScanResult.status === 'REDEEMED_NOW' && (
+                                    <Box sx={{
+                                        backgroundColor: '#e8f5e9',
+                                        border: '2px solid #4caf50',
+                                        borderRadius: 2,
+                                        p: 2,
+                                        textAlign: 'center'
+                                    }}>
+                                        <CheckCircleIcon sx={{ fontSize: 44, color: '#2e7d32', mb: 0.5 }} />
+                                        <Typography variant="h6" sx={{ fontWeight: 800, color: '#2e7d32', letterSpacing: 0.5 }}>
+                                            MEAL SERVED - REDEEMED!
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ color: '#1b5e20', fontWeight: 600 }}>
+                                            Token successfully accepted
                                         </Typography>
                                     </Box>
+                                )}
 
-                                    {/* Hostel Accommodation */}
-                                    {(lastScanResult.token.block || lastScanResult.token.room) && (
+                                {lastScanResult.status === 'ISSUED' && (
+                                    <Box sx={{
+                                        backgroundColor: '#e3f2fd',
+                                        border: '2px solid #2196f3',
+                                        borderRadius: 2,
+                                        p: 2,
+                                        textAlign: 'center'
+                                    }}>
+                                        <CheckCircleIcon sx={{ fontSize: 44, color: '#1976d2', mb: 0.5 }} />
+                                        <Typography variant="h6" sx={{ fontWeight: 800, color: '#1565c0' }}>
+                                            TOKEN VALID
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ color: '#0d47a1', fontWeight: 600 }}>
+                                            Eligible for redemption
+                                        </Typography>
+                                    </Box>
+                                )}
+
+                                {lastScanResult.status === 'ALREADY_REDEEMED' && (
+                                    <Box sx={{
+                                        backgroundColor: '#ffebee',
+                                        border: '2px solid #f44336',
+                                        borderRadius: 2,
+                                        p: 2,
+                                        textAlign: 'center'
+                                    }}>
+                                        <WarningAmberIcon sx={{ fontSize: 44, color: '#d32f2f', mb: 0.5 }} />
+                                        <Typography variant="h6" sx={{ fontWeight: 800, color: '#c62828' }}>
+                                            ALREADY REDEEMED!
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ color: '#b71c1c', fontWeight: 600, mt: 0.5 }}>
+                                            {lastScanResult.message}
+                                        </Typography>
+                                    </Box>
+                                )}
+
+                                {(lastScanResult.status === 'CANCELLED' || lastScanResult.status === 'INVALID' || lastScanResult.status === 'NOT_FOUND' || lastScanResult.status === 'ERROR') && (
+                                    <Box sx={{
+                                        backgroundColor: '#fff3e0',
+                                        border: '2px solid #ff9800',
+                                        borderRadius: 2,
+                                        p: 2,
+                                        textAlign: 'center'
+                                    }}>
+                                        <ErrorOutlineIcon sx={{ fontSize: 44, color: '#e65100', mb: 0.5 }} />
+                                        <Typography variant="h6" sx={{ fontWeight: 800, color: '#e65100' }}>
+                                            {lastScanResult.status === 'CANCELLED' ? 'TOKEN CANCELLED' : 'INVALID TOKEN'}
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ color: '#bf360c', fontWeight: 600, mt: 0.5 }}>
+                                            {lastScanResult.message}
+                                        </Typography>
+                                    </Box>
+                                )}
+
+                                {/* Token Details Card */}
+                                {lastScanResult.token && (
+                                    <Box sx={{
+                                        backgroundColor: '#fbfbfd',
+                                        borderRadius: 2,
+                                        p: 2,
+                                        border: '1px solid #eef0f3',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: 1.5
+                                    }}>
+                                        {/* Code & Meal Badge */}
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <Typography variant="caption" sx={{ color: '#777', fontWeight: 600 }}>TOKEN CODE</Typography>
+                                            <Chip
+                                                label={lastScanResult.token.code}
+                                                size="small"
+                                                sx={{
+                                                    fontFamily: 'monospace',
+                                                    fontWeight: 900,
+                                                    fontSize: '0.9rem',
+                                                    letterSpacing: 1.5,
+                                                    backgroundColor: '#0b5299',
+                                                    color: '#fff'
+                                                }}
+                                            />
+                                        </Box>
+
+                                        <Divider />
+
+                                        {/* Participant Name & Role */}
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                            <MeetingRoomIcon sx={{ color: '#666' }} />
-                                            <Typography variant="caption" sx={{ color: '#555', fontWeight: 600 }}>
-                                                Hostel: {lastScanResult.token.block || 'N/A'} - Room: {lastScanResult.token.room || 'N/A'}
-                                            </Typography>
-                                        </Box>
-                                    )}
-
-                                    {/* Redemption Info if already redeemed */}
-                                    {lastScanResult.token.redeemedAt && (
-                                        <Box sx={{
-                                            mt: 0.5,
-                                            p: 1,
-                                            borderRadius: 1,
-                                            backgroundColor: '#fff3e0',
-                                            border: '1px solid #ffe0b2'
-                                        }}>
-                                            <Typography variant="caption" sx={{ color: '#e65100', fontWeight: 600, display: 'block' }}>
-                                                Redeemed at: {new Date(lastScanResult.token.redeemedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
-                                            </Typography>
-                                            {lastScanResult.token.redeemedBy && (
-                                                <Typography variant="caption" sx={{ color: '#bf360c' }}>
-                                                    Redeemed by: {lastScanResult.token.redeemedBy}
+                                            <PersonIcon sx={{ color: '#d06c38' }} />
+                                            <Box>
+                                                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#222' }}>
+                                                    {lastScanResult.token.name}
                                                 </Typography>
-                                            )}
+                                                <Typography variant="caption" sx={{ color: '#666', fontWeight: 500 }}>
+                                                    {lastScanResult.token.personType} {lastScanResult.token.identifier ? `• ${lastScanResult.token.identifier}` : ''}
+                                                </Typography>
+                                            </Box>
                                         </Box>
-                                    )}
-                                </Box>
-                            )}
 
-                            {/* Clear / Scan Next Button */}
-                            <Button
-                                variant="outlined"
-                                size="small"
-                                onClick={() => setLastScanResult(null)}
-                                startIcon={<RestartAltIcon />}
-                                sx={{ alignSelf: 'flex-start' }}
-                            >
-                                Scan Next Token
-                            </Button>
-                        </Box>
-                    )}
-                </CardContent>
+                                        {/* University / College */}
+                                        {lastScanResult.token.teamOrSport && (
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                <SchoolIcon sx={{ color: '#0b5299' }} />
+                                                <Typography variant="body2" sx={{ fontWeight: 600, color: '#444' }}>
+                                                    {lastScanResult.token.teamOrSport}
+                                                </Typography>
+                                            </Box>
+                                        )}
+
+                                        {/* Meal & Date */}
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                            <RestaurantIcon sx={{ color: '#d06c38' }} />
+                                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#0b5299' }}>
+                                                {lastScanResult.token.mealType} • {lastScanResult.token.mealDate}
+                                            </Typography>
+                                        </Box>
+
+                                        {/* Hostel Accommodation */}
+                                        {(lastScanResult.token.block || lastScanResult.token.room) && (
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                <MeetingRoomIcon sx={{ color: '#666' }} />
+                                                <Typography variant="caption" sx={{ color: '#555', fontWeight: 600 }}>
+                                                    Hostel: {lastScanResult.token.block || 'N/A'} - Room: {lastScanResult.token.room || 'N/A'}
+                                                </Typography>
+                                            </Box>
+                                        )}
+
+                                        {/* Redemption Info if already redeemed */}
+                                        {lastScanResult.token.redeemedAt && (
+                                            <Box sx={{
+                                                mt: 0.5,
+                                                p: 1,
+                                                borderRadius: 1,
+                                                backgroundColor: '#fff3e0',
+                                                border: '1px solid #ffe0b2'
+                                            }}>
+                                                <Typography variant="caption" sx={{ color: '#e65100', fontWeight: 600, display: 'block' }}>
+                                                    Redeemed at: {new Date(lastScanResult.token.redeemedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
+                                                </Typography>
+                                                {lastScanResult.token.redeemedBy && (
+                                                    <Typography variant="caption" sx={{ color: '#bf360c' }}>
+                                                        Redeemed by: {lastScanResult.token.redeemedBy}
+                                                    </Typography>
+                                                )}
+                                            </Box>
+                                        )}
+                                    </Box>
+                                )}
+
+                                {/* Clear / Scan Next Button */}
+                                <Button
+                                    variant="outlined"
+                                    size="small"
+                                    onClick={() => setLastScanResult(null)}
+                                    startIcon={<RestartAltIcon />}
+                                    sx={{ alignSelf: 'flex-start' }}
+                                >
+                                    Scan Next Token
+                                </Button>
+                            </Box>
+                        )}
+                    </CardContent>
             </Card>
 
             {/* Session Scans History Table */}
