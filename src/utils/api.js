@@ -364,10 +364,17 @@ export const universityMasterAPI = {
     getTemplateUrl: () => `${API_BASE}/universities/template`,
     getExportUrl: (params = {}) => {
         const query = new URLSearchParams();
-        if (params.status) query.append('status', params.status);
-        if (params.state) query.append('state', params.state);
+        if (params.status && params.status !== 'ALL') query.append('status', params.status);
+        const token = getToken();
+        if (token) query.append('token', token);
         const qs = query.toString();
         return `${API_BASE}/universities/export${qs ? `?${qs}` : ''}`;
+    },
+    exportExcel: (params = {}) => {
+        const query = new URLSearchParams();
+        if (params.status && params.status !== 'ALL') query.append('status', params.status);
+        const qs = query.toString();
+        return apiFetch(`/universities/export${qs ? `?${qs}` : ''}`, {}, true);
     }
 };
 

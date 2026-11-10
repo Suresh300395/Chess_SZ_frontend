@@ -414,6 +414,11 @@ const Registration = () => {
     const removePlayer = (index) => {
         // Prevent removing existing saved records
         if (players[index]?.isExisting) return;
+        // For new university, enforce minimum 1 player
+        if (!isExistingUniversity && players.length <= 1) {
+            toast.error('At least 1 Player is required for new university registration.');
+            return;
+        }
         const updatedPlayers = [...players];
         updatedPlayers.splice(index, 1);
         setPlayers(updatedPlayers);
@@ -426,6 +431,11 @@ const Registration = () => {
     const removeCoach = (index) => {
         // Prevent removing existing saved records
         if (coaches[index]?.isExisting) return;
+        // For new university, enforce minimum 1 coach/manager
+        if (!isExistingUniversity && coaches.length <= 1) {
+            toast.error('At least 1 Coach/Manager is required for new university registration.');
+            return;
+        }
         const updatedCoaches = [...coaches];
         updatedCoaches.splice(index, 1);
         setCoaches(updatedCoaches);
@@ -461,6 +471,17 @@ const Registration = () => {
                 newErrors.team.address = 'Address is required';
                 isValid = false;
             }
+
+            // Enforce at least 1 player and 1 coach for new university
+            if (!players || players.length === 0) {
+                toast.error('At least 1 Player is required for new university registration.');
+                return false;
+            }
+
+            if (!coaches || coaches.length === 0) {
+                toast.error('At least 1 Coach/Manager is required for new university registration.');
+                return false;
+            }
         }
 
         // For existing university, ensure at least one new player or coach is added
@@ -468,7 +489,7 @@ const Registration = () => {
             const hasNewPlayer = players.some(p => !p.isExisting);
             const hasNewCoach = coaches.some(c => !c.isExisting);
             if (!hasNewPlayer && !hasNewCoach) {
-                toast.error('Please add at least one new player or coach to register for this university.');
+                toast.error('Please add at least 1 new Player or 1 new Coach/Manager to register for this university.');
                 return false;
             }
         }
@@ -929,7 +950,7 @@ const Registration = () => {
                                             />
                                         )}
                                     </Box>
-                                    {!player.isExisting && (
+                                    {!player.isExisting && (!isExistingUniversity ? players.length > 1 : true) && (
                                         <Box component="button" type="button" className="remove-player-btn" onClick={() => removePlayer(index)}>
                                             Remove
                                         </Box>
@@ -1188,7 +1209,7 @@ const Registration = () => {
                                             />
                                         )}
                                     </Box>
-                                    {!coach.isExisting && (
+                                    {!coach.isExisting && (!isExistingUniversity ? coaches.length > 1 : true) && (
                                         <Box component="button" type="button" className="remove-player-btn" onClick={() => removeCoach(index)}>
                                             Remove
                                         </Box>
@@ -1333,7 +1354,10 @@ const Registration = () => {
                 slotProps={{
                     paper: {
                         sx: {
-                            borderRadius: 4,
+                            borderRadius: { xs: 3, sm: 4 },
+                            m: { xs: '8px !important', sm: '32px' },
+                            width: { xs: 'calc(100% - 16px) !important', sm: '100%' },
+                            maxWidth: { xs: 'calc(100% - 16px) !important', sm: '500px' },
                             p: { xs: 1, sm: 2 },
                             boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
                             textAlign: 'center',
@@ -1342,11 +1366,11 @@ const Registration = () => {
                     }
                 }}
             >
-                <DialogContent sx={{ pt: 3, pb: 2 }}>
+                <DialogContent sx={{ p: { xs: '8px !important', sm: 2 }, pt: { xs: 1.5, sm: 2.5 }, pb: { xs: 1, sm: 1.5 } }}>
                     {/* Success Icon */}
                     <Box sx={{
-                        width: 72,
-                        height: 72,
+                        width: { xs: 60, sm: 72 },
+                        height: { xs: 60, sm: 72 },
                         borderRadius: '50%',
                         bgcolor: '#dcfce7',
                         color: '#16a34a',
@@ -1354,16 +1378,16 @@ const Registration = () => {
                         alignItems: 'center',
                         justifyContent: 'center',
                         mx: 'auto',
-                        mb: 2,
+                        mb: 1,
                         boxShadow: '0 8px 24px rgba(22, 163, 74, 0.2)'
                     }}>
-                        <CheckCircleIcon sx={{ fontSize: 44 }} />
+                        <CheckCircleIcon sx={{ fontSize: { xs: 38, sm: 44 } }} />
                     </Box>
 
-                    <Typography variant="h5" fontWeight="bold" sx={{ color: '#0f172a', mb: 0.5 }}>
+                    <Typography variant="h5" fontWeight="bold" sx={{ color: '#0f172a', mb: 0.5, fontSize: { xs: '1.25rem', sm: '1.5rem' } }}>
                         {successModal.isExistingUniversity ? 'Registration Updated! 🎉' : 'Registration Successful! 🎉'}
                     </Typography>
-                    <Typography variant="body2" sx={{ color: '#64748b', mb: 3 }}>
+                    <Typography variant="body2" sx={{ color: '#64748b', mb: { xs: 1, sm: 2 }, fontSize: { xs: '13px', sm: '14px' } }}>
                         {successModal.isExistingUniversity ? (
                             <>
                                 New participants for <b>{successModal.universityName}</b> have been added successfully. Total: {successModal.totalPlayers} Players, {successModal.totalCoaches} Coaches/Managers.
@@ -1380,17 +1404,17 @@ const Registration = () => {
                         <Box sx={{
                             bgcolor: '#f8fafc',
                             border: '1.5px solid #e2e8f0',
-                            borderRadius: 3,
-                            p: 2.5,
-                            mb: 2.5,
+                            borderRadius: 2.5,
+                            p: { xs: '8px !important', sm: 2.5 },
+                            mb: { xs: '8px !important', sm: 2 },
                             textAlign: 'left'
                         }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-                                <Typography variant="subtitle2" fontWeight="700" sx={{ color: '#0b5299', textTransform: 'uppercase', letterSpacing: 0.8, fontSize: '12px' }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: { xs: 0.75, sm: 1.5 } }}>
+                                <Typography variant="subtitle2" fontWeight="700" sx={{ color: '#0b5299', textTransform: 'uppercase', letterSpacing: 0.8, fontSize: { xs: '11px', sm: '12px' } }}>
                                     New Participant Login Credentials
                                 </Typography>
                                 {successModal.sampleCredentials.name && (
-                                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
+                                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, fontSize: { xs: '11px', sm: '12px' } }}>
                                         ({successModal.sampleCredentials.name})
                                     </Typography>
                                 )}
@@ -1404,15 +1428,14 @@ const Registration = () => {
                                 bgcolor: '#fff',
                                 border: '1px solid #cbd5e1',
                                 borderRadius: 2,
-                                px: 2,
-                                py: 1,
-                                mb: 1.5
+                                p: { xs: '8px !important', sm: '8px 16px' },
+                                mb: { xs: '8px !important', sm: 1.5 }
                             }}>
                                 <Box>
-                                    <Typography variant="caption" sx={{ color: '#64748b', display: 'block', fontSize: '11px', fontWeight: 500 }}>
+                                    <Typography variant="caption" sx={{ color: '#64748b', display: 'block', fontSize: '10.5px', fontWeight: 500 }}>
                                         Username (Mobile No)
                                     </Typography>
-                                    <Typography variant="body1" fontWeight="700" sx={{ color: '#0f172a', letterSpacing: 0.5 }}>
+                                    <Typography variant="body1" fontWeight="700" sx={{ color: '#0f172a', letterSpacing: 0.5, fontSize: { xs: '14px', sm: '16px' } }}>
                                         {successModal.sampleCredentials.mobile || '—'}
                                     </Typography>
                                 </Box>
@@ -1420,9 +1443,9 @@ const Registration = () => {
                                     size="small"
                                     onClick={() => handleCopy(successModal.sampleCredentials.mobile, 'Username')}
                                     title="Copy Username"
-                                    sx={{ color: copiedField === 'Username' ? '#16a34a' : '#64748b' }}
+                                    sx={{ color: copiedField === 'Username' ? '#16a34a' : '#64748b', p: 0.5 }}
                                 >
-                                    <ContentCopyIcon fontSize="small" />
+                                    <ContentCopyIcon sx={{ fontSize: { xs: 18, sm: 20 } }} />
                                 </IconButton>
                             </Box>
 
@@ -1434,14 +1457,13 @@ const Registration = () => {
                                 bgcolor: '#fff',
                                 border: '1px solid #cbd5e1',
                                 borderRadius: 2,
-                                px: 2,
-                                py: 1
+                                p: { xs: '8px !important', sm: '8px 16px' }
                             }}>
                                 <Box>
-                                    <Typography variant="caption" sx={{ color: '#64748b', display: 'block', fontSize: '11px', fontWeight: 500 }}>
+                                    <Typography variant="caption" sx={{ color: '#64748b', display: 'block', fontSize: '10.5px', fontWeight: 500 }}>
                                         Default Password
                                     </Typography>
-                                    <Typography variant="body1" fontWeight="700" sx={{ color: '#0b5299', letterSpacing: 0.5 }}>
+                                    <Typography variant="body1" fontWeight="700" sx={{ color: '#0b5299', letterSpacing: 0.5, fontSize: { xs: '14px', sm: '16px' } }}>
                                         {successModal.sampleCredentials.password}
                                     </Typography>
                                 </Box>
@@ -1449,9 +1471,9 @@ const Registration = () => {
                                     size="small"
                                     onClick={() => handleCopy(successModal.sampleCredentials.password, 'Password')}
                                     title="Copy Password"
-                                    sx={{ color: copiedField === 'Password' ? '#16a34a' : '#64748b' }}
+                                    sx={{ color: copiedField === 'Password' ? '#16a34a' : '#64748b', p: 0.5 }}
                                 >
-                                    <ContentCopyIcon fontSize="small" />
+                                    <ContentCopyIcon sx={{ fontSize: { xs: 18, sm: 20 } }} />
                                 </IconButton>
                             </Box>
                         </Box>
@@ -1459,12 +1481,12 @@ const Registration = () => {
                         <Box sx={{
                             bgcolor: '#f8fafc',
                             border: '1.5px solid #e2e8f0',
-                            borderRadius: 3,
-                            p: 2,
-                            mb: 2.5,
+                            borderRadius: 2.5,
+                            p: { xs: '8px !important', sm: 2 },
+                            mb: { xs: '8px !important', sm: 2 },
                             textAlign: 'left'
                         }}>
-                            <Typography variant="body2" sx={{ color: '#334155', fontWeight: 600 }}>
+                            <Typography variant="body2" sx={{ color: '#334155', fontWeight: 600, fontSize: { xs: '12px', sm: '14px' } }}>
                                 Existing members retain their previous login credentials.
                             </Typography>
                         </Box>
@@ -1475,13 +1497,14 @@ const Registration = () => {
                         bgcolor: '#eff6ff',
                         border: '1px solid #bfdbfe',
                         borderRadius: 2.5,
-                        p: 2,
+                        p: { xs: '8px !important', sm: 2 },
+                        mb: { xs: '8px !important', sm: 1.5 },
                         textAlign: 'left'
                     }}>
-                        <Typography variant="body2" sx={{ color: '#1e3a8a', fontWeight: 700, mb: 0.8 }}>
+                        <Typography variant="body2" sx={{ color: '#1e3a8a', fontWeight: 700, mb: 0.5, fontSize: { xs: '12px', sm: '13px' } }}>
                             {successModal.isExistingUniversity ? 'New Members Added:' : 'Accounts Created for All Members:'}
                         </Typography>
-                        <Typography variant="caption" sx={{ color: '#1e40af', lineHeight: 1.6, display: 'block', mb: 0.4 }}>
+                        <Typography variant="caption" sx={{ color: '#1e40af', lineHeight: 1.5, display: 'block', mb: 0.4, fontSize: { xs: '11px', sm: '12px' } }}>
                             {successModal.isExistingUniversity ? (
                                 <>
                                     • Successfully appended <b>{successModal.newPlayersAdded} new player(s)</b> and <b>{successModal.newCoachesAdded} new coach/manager(s)</b> to {successModal.universityName}.
@@ -1492,13 +1515,13 @@ const Registration = () => {
                                 </>
                             )}
                         </Typography>
-                        <Typography variant="caption" sx={{ color: '#1e40af', lineHeight: 1.6, display: 'block' }}>
+                        <Typography variant="caption" sx={{ color: '#1e40af', lineHeight: 1.5, display: 'block', fontSize: { xs: '11px', sm: '12px' } }}>
                             • Every new participant can log in using their own <b>Registered Mobile Number</b> and default password <b>{successModal.sampleCredentials.password}</b>.
                         </Typography>
                     </Box>
                 </DialogContent>
 
-                <DialogActions sx={{ p: 2, pt: 1, px: 3, display: 'flex', justifyContent: 'space-between', gap: 1.5 }}>
+                <DialogActions sx={{ p: { xs: '8px !important', sm: 2 }, pt: { xs: '4px !important', sm: 1 }, px: { xs: '8px !important', sm: 3 }, display: 'flex', justifyContent: 'space-between', gap: 1 }}>
                     <Button
                         variant="outlined"
                         onClick={() => {
@@ -1512,10 +1535,11 @@ const Registration = () => {
                             color: '#64748b',
                             borderColor: '#cbd5e1',
                             flex: 1,
-                            py: 1
+                            py: { xs: 0.8, sm: 1 },
+                            fontSize: { xs: '13px', sm: '14px' }
                         }}
                     >
-                        Done (Go to Home)
+                        Done
                     </Button>
                     <Button
                         variant="contained"
@@ -1530,7 +1554,8 @@ const Registration = () => {
                             bgcolor: '#0b5299',
                             '&:hover': { bgcolor: '#083d73' },
                             flex: 1,
-                            py: 1,
+                            py: { xs: 0.8, sm: 1 },
+                            fontSize: { xs: '13px', sm: '14px' },
                             boxShadow: '0 4px 14px rgba(11,82,153,0.3)'
                         }}
                     >

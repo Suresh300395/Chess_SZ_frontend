@@ -307,15 +307,15 @@ const UniversityMaster = () => {
             const res = await universityMasterAPI.toggleStatus(uni._id);
             const data = await res.json();
             if (res.ok && data.success) {
-                toast.success(data.message);
+                toast.success(data.message || `Status updated to ${uni.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'}`);
                 fetchUniversities();
                 fetchStats();
             } else {
-                toast.error(data.message || 'Status toggle failed');
+                toast.error(data.message || data.error || 'Status toggle failed');
             }
         } catch (err) {
             console.error('Toggle status error:', err);
-            toast.error('Failed to update status');
+            toast.error(err.message || 'Failed to update status');
         }
     };
 
@@ -430,9 +430,29 @@ const UniversityMaster = () => {
         window.open(universityMasterAPI.getTemplateUrl(), '_blank');
     };
 
-    const handleExportExcel = () => {
-        const url = universityMasterAPI.getExportUrl({ status: statusFilter });
-        window.open(url, '_blank');
+    const handleExportExcel = async () => {
+        try {
+            toast.info('Generating Excel export...');
+            const res = await universityMasterAPI.exportExcel({ status: statusFilter });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                toast.error(err.message || 'Export failed');
+                return;
+            }
+            const blob = await res.blob();
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = `universities_master_export_${new Date().toISOString().split('T')[0]}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(downloadUrl);
+            toast.success('Excel exported successfully!');
+        } catch (err) {
+            console.error('Export error:', err);
+            toast.error(err.message || 'Failed to export universities');
+        }
     };
 
     const statCards = [
