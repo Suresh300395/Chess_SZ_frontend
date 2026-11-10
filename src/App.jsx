@@ -17,6 +17,7 @@ import ManageAdmin from './Components/Admin/ManageAdmin'
 import ManageBlocks from './Components/Admin/ManageBlocks'
 import ManageLiveBoard from './Components/Admin/ManageLiveBoard'
 import RouteMapUpload from './Components/Admin/RouteMapUpload'
+import UniversityMaster from './Components/Admin/UniversityMaster'
 import UserDashboard from './Components/User/UserDashboard'
 import FrontendLayout from './Components/FrontendLayout'
 import ProtectedRoute from './Components/Common/ProtectedRoute'
@@ -210,6 +211,7 @@ function App() {
           <Route path="/admin/manage-blocks" element={<ManageBlocks />} />
           <Route path="/admin/manage-live-board" element={<ManageLiveBoard />} />
           <Route path="/admin/route-map-upload" element={<RouteMapUpload />} />
+          <Route path="/admin/university-master" element={<UniversityMaster />} />
         </Route>
       </Routes>
     </ThemeProvider>

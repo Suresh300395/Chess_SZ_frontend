@@ -304,5 +304,72 @@ export const blocksAPI = {
     updateGuidelines: (points) => apiFetch('/blocks/guidelines', { method: 'PUT', body: JSON.stringify({ points }) }, true),
 };
 
+// University Master APIs
+export const universityMasterAPI = {
+    getAll: (params = {}) => {
+        const query = new URLSearchParams();
+        if (params.page) query.append('page', params.page);
+        if (params.limit) query.append('limit', params.limit);
+        if (params.q) query.append('q', params.q);
+        if (params.status) query.append('status', params.status);
+        if (params.state) query.append('state', params.state);
+        if (params.sortBy) query.append('sortBy', params.sortBy);
+        if (params.sortOrder) query.append('sortOrder', params.sortOrder);
+        const qs = query.toString();
+        return apiFetch(`/universities${qs ? `?${qs}` : ''}`, {}, true);
+    },
+
+    getStats: () => apiFetch('/universities/stats', {}, true),
+
+    searchActive: (q, signal) =>
+        apiFetch(`/universities/search-active?q=${encodeURIComponent(q)}`, { signal }),
+
+    checkDuplicate: (params = {}) => {
+        const query = new URLSearchParams();
+        if (params.name) query.append('name', params.name);
+        if (params.shortCode) query.append('shortCode', params.shortCode);
+        if (params.aliases) query.append('aliases', params.aliases);
+        if (params.excludeId) query.append('excludeId', params.excludeId);
+        return apiFetch(`/universities/check-duplicate?${query.toString()}`, {}, true);
+    },
+
+    create: (data) =>
+        apiFetch('/universities', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        }, true),
+
+    update: (id, data) =>
+        apiFetch(`/universities/${encodeURIComponent(id)}`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        }, true),
+
+    toggleStatus: (id) =>
+        apiFetch(`/universities/${encodeURIComponent(id)}/status`, {
+            method: 'PATCH'
+        }, true),
+
+    delete: (id) =>
+        apiFetch(`/universities/${encodeURIComponent(id)}`, {
+            method: 'DELETE'
+        }, true),
+
+    bulkImport: (payload) =>
+        apiFetch('/universities/bulk-import', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        }, true),
+
+    getTemplateUrl: () => `${API_BASE}/universities/template`,
+    getExportUrl: (params = {}) => {
+        const query = new URLSearchParams();
+        if (params.status) query.append('status', params.status);
+        if (params.state) query.append('state', params.state);
+        const qs = query.toString();
+        return `${API_BASE}/universities/export${qs ? `?${qs}` : ''}`;
+    }
+};
+
 export default apiFetch;
 

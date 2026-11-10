@@ -10,7 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import Authentication from '../Admin/Authentication';
-import { registrationAPI } from '../../utils/api';
+import { registrationAPI, universityMasterAPI } from '../../utils/api';
 import { AnimatedCard, AnimatedText } from '../animations';
 
 const createInitialPlayer = () => ({
@@ -47,7 +47,7 @@ const Registration = () => {
 
     // Existing university reuse state
     const [selectedUniversity, setSelectedUniversity] = useState(null);
-    const isExistingUniversity = Boolean(selectedUniversity?._id);
+    const isExistingUniversity = Boolean(selectedUniversity?.isExistingUniversity);
 
     // Autocomplete search state
     const [searchResults, setSearchResults] = useState([]);
@@ -144,7 +144,7 @@ const Registration = () => {
             searchAbortController.current = controller;
 
             try {
-                const res = await registrationAPI.searchUniversities(trimmed, controller.signal);
+                const res = await universityMasterAPI.searchActive(trimmed, controller.signal);
                 if (res.ok) {
                     const data = await res.json();
                     setSearchResults(Array.isArray(data) ? data : []);
@@ -160,7 +160,7 @@ const Registration = () => {
     };
 
     /**
-     * CASE A: Existing University Selected from Autocomplete
+     * University Selected from Autocomplete
      */
     const handleSelectUniversity = (uni) => {
         if (!uni) {
@@ -174,48 +174,59 @@ const Registration = () => {
         }
 
         setSelectedUniversity(uni);
+        const resolvedAddress = uni.address || [uni.city, uni.state].filter(Boolean).join(', ');
+        const resolvedContact = uni.universityContact || uni.phone || '';
+
         setTeamDetails({
             universityName: uni.universityName,
-            universityContact: uni.universityContact,
-            address: uni.address
+            universityContact: resolvedContact,
+            address: resolvedAddress
         });
 
-        const loadedPlayers = (uni.players && uni.players.length > 0)
-            ? uni.players.map(p => ({
-                _id: p._id,
-                playerName: p.playerName || '',
-                mobileNo: p.mobileNo || '',
-                gender: p.gender || '',
-                dob: p.dob || '',
-                transportMode: p.transportMode || '',
-                transportNumber: p.transportNumber || '',
-                arrivalDate: p.arrivalDate || '',
-                arrivalTime: p.arrivalTime || '',
-                departureDate: p.departureDate || '',
-                departureTime: p.departureTime || '',
-                accommodation: p.accommodation || 'Yes',
-                isExisting: true
-            }))
-            : [createInitialPlayer()];
+        if (uni.isExistingUniversity) {
+            const loadedPlayers = (uni.players && uni.players.length > 0)
+                ? uni.players.map(p => ({
+                    _id: p._id,
+                    playerName: p.playerName || '',
+                    mobileNo: p.mobileNo || '',
+                    gender: p.gender || '',
+                    dob: p.dob || '',
+                    transportMode: p.transportMode || '',
+                    transportNumber: p.transportNumber || '',
+                    arrivalDate: p.arrivalDate || '',
+                    arrivalTime: p.arrivalTime || '',
+                    departureDate: p.departureDate || '',
+                    departureTime: p.departureTime || '',
+                    accommodation: p.accommodation || 'Yes',
+                    isExisting: true
+                }))
+                : [createInitialPlayer()];
 
-        const loadedCoaches = (uni.coaches && uni.coaches.length > 0)
-            ? uni.coaches.map(c => ({
-                _id: c._id,
-                role: c.role || 'Coach',
-                name: c.name || '',
-                mobileNo: c.mobileNo || '',
-                mailId: c.mailId || '',
-                gender: c.gender || '',
-                foodType: c.foodType || 'Veg',
-                accommodation: c.accommodation || 'Yes',
-                isExisting: true
-            }))
-            : [createInitialCoach()];
+            const loadedCoaches = (uni.coaches && uni.coaches.length > 0)
+                ? uni.coaches.map(c => ({
+                    _id: c._id,
+                    role: c.role || 'Coach',
+                    name: c.name || '',
+                    mobileNo: c.mobileNo || '',
+                    mailId: c.mailId || '',
+                    gender: c.gender || '',
+                    foodType: c.foodType || 'Veg',
+                    accommodation: c.accommodation || 'Yes',
+                    isExisting: true
+                }))
+                : [createInitialCoach()];
 
-        setPlayers(loadedPlayers);
-        setCoaches(loadedCoaches);
-        setErrors({ team: {}, players: [], coaches: [] });
-        toast.info(`Loaded existing details for ${uni.universityName}. Saved members are locked.`);
+            setPlayers(loadedPlayers);
+            setCoaches(loadedCoaches);
+            setErrors({ team: {}, players: [], coaches: [] });
+            toast.info(`Loaded existing details for ${uni.universityName}. Saved members are locked.`);
+        } else {
+            // Master directory university selected for fresh team registration
+            setPlayers([createInitialPlayer()]);
+            setCoaches([createInitialCoach()]);
+            setErrors({ team: {}, players: [], coaches: [] });
+            toast.success(`Verified university selected: ${uni.universityName}`);
+        }
     };
 
     const handleTeamChange = (e) => {
@@ -661,7 +672,7 @@ const Registration = () => {
         if (!validateForm()) return;
 
         const payload = {
-            universityId: selectedUniversity?._id || undefined,
+            universityId: (selectedUniversity?.isExistingUniversity ? (selectedUniversity.registrationId || selectedUniversity._id) : undefined),
             teamDetails: {
                 universityName: teamDetails.universityName,
                 address: teamDetails.address,
@@ -766,7 +777,11 @@ const Registration = () => {
                                             label="Name of University*"
                                             name="universityName"
                                             error={!!errors.team?.universityName}
-                                            helperText={errors.team?.universityName || (isExistingUniversity ? "Saved university loaded" : "Type to search existing or enter new")}
+                                            helperText={errors.team?.universityName || (
+                                                isExistingUniversity 
+                                                    ? "Saved university loaded — new members will be appended" 
+                                                    : (selectedUniversity?.isMaster ? "Verified university selected" : "Type to search or enter university name")
+                                            )}
                                             slotProps={{
                                                 ...params.slotProps,
                                                 input: {
@@ -782,20 +797,41 @@ const Registration = () => {
                                         />
                                     )}
                                     renderOption={(props, option) => (
-                                        <li {...props} key={option._id}>
-                                            <Box sx={{ py: 0.5, width: '100%' }}>
-                                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-                                                    <Typography variant="body2" fontWeight={700} color="#0f172a">
-                                                        {option.universityName}
-                                                    </Typography>
-                                                    <Chip
-                                                        label="Registered"
-                                                        size="small"
-                                                        sx={{ height: 20, fontSize: '10px', bgcolor: '#e0f2fe', color: '#0369a1', fontWeight: 600 }}
-                                                    />
+                                        <li {...props} key={option._id || option.registrationId || option.universityName}>
+                                            <Box sx={{ py: 0.8, width: '100%' }}>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                                                        <Typography variant="body2" fontWeight={700} color="#0f172a">
+                                                            {option.universityName}
+                                                        </Typography>
+                                                        {option.shortCode && (
+                                                            <Chip
+                                                                label={option.shortCode}
+                                                                size="small"
+                                                                sx={{ height: 18, fontSize: '10px', bgcolor: '#f1f5f9', color: '#475569', fontWeight: 700 }}
+                                                            />
+                                                        )}
+                                                    </Box>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>
+                                                        {option.isMaster && (
+                                                            <Chip
+                                                                label="Verified"
+                                                                size="small"
+                                                                sx={{ height: 20, fontSize: '10px', bgcolor: '#ecfdf5', color: '#059669', fontWeight: 700, border: '1px solid #a7f3d0' }}
+                                                            />
+                                                        )}
+                                                        {option.isExistingUniversity && (
+                                                            <Chip
+                                                                label={`Registered (${(option.players?.length || 0) + (option.coaches?.length || 0)})`}
+                                                                size="small"
+                                                                sx={{ height: 20, fontSize: '10px', bgcolor: '#e0f2fe', color: '#0369a1', fontWeight: 700, border: '1px solid #bae6fd' }}
+                                                            />
+                                                        )}
+                                                    </Box>
                                                 </Box>
                                                 <Typography variant="caption" color="#64748b" sx={{ display: 'block', mt: 0.3 }}>
-                                                    {option.address} • {option.players?.length || 0} Players, {option.coaches?.length || 0} Coaches
+                                                    {[option.city, option.state].filter(Boolean).join(', ') || option.address || 'University Directory'}
+                                                    {Array.isArray(option.aliases) && option.aliases.length > 0 && ` • aka: ${option.aliases.join(', ')}`}
                                                 </Typography>
                                             </Box>
                                         </li>

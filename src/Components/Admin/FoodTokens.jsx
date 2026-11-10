@@ -233,9 +233,15 @@ const FoodTokens = () => {
         const day = String(d.getDate()).padStart(2, '0');
         return `${y}-${m}-${day}`;
     };
-    const [summaryDateMode, setSummaryDateMode] = useState('today'); // 'today' | 'custom' | 'all'
+    const [summaryDateMode, setSummaryDateMode] = useState('all'); // 'all' (overall default) | 'today' | 'custom'
     const [summaryFromDate, setSummaryFromDate] = useState(getTodayYMD);
     const [summaryToDate, setSummaryToDate] = useState(getTodayYMD);
+    const summaryDateModeRef = useRef('all');
+    summaryDateModeRef.current = summaryDateMode;
+    const summaryFromDateRef = useRef(summaryFromDate);
+    summaryFromDateRef.current = summaryFromDate;
+    const summaryToDateRef = useRef(summaryToDate);
+    summaryToDateRef.current = summaryToDate;
 
     // Debounce search query to prevent typing lag
     useEffect(() => {
@@ -284,16 +290,6 @@ const FoodTokens = () => {
     // -------------------------------------------------------------
     // SHARED REFRESH CALLBACKS
     // -------------------------------------------------------------
-    const fetchStats = useCallback(async (params = {}) => {
-        try {
-            const res = await foodTokenAPI.getStats(params);
-            const data = await res.json();
-            if (res.ok) setStats(data);
-        } catch (err) {
-            console.error('Stats error:', err);
-        }
-    }, []);
-
     // Build stats params based on summaryDateMode
     const buildSummaryStatsParams = useCallback((mode, fromDate, toDate) => {
         if (mode === 'today') {
@@ -312,8 +308,21 @@ const FoodTokens = () => {
             if (toDate) p.toDate = toDate;
             return p;
         }
-        return {}; // 'all'
+        return {}; // 'all' -> overall counts across all dates
     }, []);
+
+    const fetchStats = useCallback(async (customParams) => {
+        try {
+            const params = customParams !== undefined
+                ? customParams
+                : buildSummaryStatsParams(summaryDateModeRef.current, summaryFromDateRef.current, summaryToDateRef.current);
+            const res = await foodTokenAPI.getStats(params);
+            const data = await res.json();
+            if (res.ok) setStats(data);
+        } catch (err) {
+            console.error('Stats error:', err);
+        }
+    }, [buildSummaryStatsParams]);
 
     const handleDateFilterChange = (dateVal) => {
         setFilterMealDate(dateVal);
@@ -1014,14 +1023,7 @@ const FoodTokens = () => {
 
 
     useEffect(() => {
-        const today = (() => {
-            const d = new Date();
-            const y = d.getFullYear();
-            const m = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            return `${y}-${m}-${day}`;
-        })();
-        fetchStats({ fromDate: today, toDate: today });
+        fetchStats({});
     }, [fetchStats]);
 
     useEffect(() => {
@@ -1928,121 +1930,191 @@ const FoodTokens = () => {
                         </Paper>
                     </Box>
 
-                    {/* Bottom: Players Missing Departure Details */}
-                    <Box sx={{ width: '100%' }}>
-                        <Paper sx={{ p: 3, borderRadius: 3, border: '1px solid #fed7aa', bgcolor: '#ffffff' }}>
-                            {/* Header */}
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, flexWrap: 'wrap', gap: 2, mb: 2.5 }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-                                    <Box sx={{ p: 1, borderRadius: 2, bgcolor: '#fff7ed', color: '#ea580c', display: 'flex' }}>
-                                        <WarningAmberIcon sx={{ fontSize: 24 }} />
+                    {/* Bottom: Players Missing Departure Details (Only shown when there are pending players) */}
+                    {missingDepPlayers.length > 0 && (
+                        <Box sx={{ width: '100%' }}>
+                            <Paper sx={{ p: { xs: 1.5, sm: 2.5, md: 3 }, borderRadius: 3, border: '1px solid #fed7aa', bgcolor: '#ffffff', width: '100%', boxSizing: 'border-box' }}>
+                                {/* Header */}
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' }, flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mb: 2.5 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+                                        <Box sx={{ p: 1, borderRadius: 2, bgcolor: '#fff7ed', color: '#ea580c', display: 'flex', flexShrink: 0 }}>
+                                            <WarningAmberIcon sx={{ fontSize: 24 }} />
+                                        </Box>
+                                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                                                <Typography variant="h6" sx={{ fontWeight: 800, color: '#0f172a', fontSize: { xs: '0.95rem', sm: '1.15rem' }, lineHeight: 1.25 }}>
+                                                    Players Missing Departure Details
+                                                </Typography>
+                                                <Chip
+                                                    size="small"
+                                                    label={`${missingDepPlayers.length} Pending`}
+                                                    sx={{
+                                                        fontWeight: 700,
+                                                        fontSize: '11px',
+                                                        bgcolor: '#ffedd5',
+                                                        color: '#c2410c'
+                                                    }}
+                                                />
+                                            </Box>
+                                            <Typography sx={{ fontSize: { xs: '12px', sm: '13px' }, color: '#64748b', mt: 0.5, lineHeight: 1.4 }}>
+                                                Add departure date and time to enable food token generation for these registered participants.
+                                            </Typography>
+                                        </Box>
                                     </Box>
-                                    <Box>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                            <Typography variant="h6" sx={{ fontWeight: 800, color: '#0f172a' }}>
-                                                Players Missing Departure Details
-                                            </Typography>
-                                            <Chip
-                                                size="small"
-                                                label={`${missingDepPlayers.length} Pending`}
-                                                sx={{
-                                                    fontWeight: 700,
-                                                    fontSize: '12px',
-                                                    bgcolor: missingDepPlayers.length > 0 ? '#ffedd5' : '#dcfce7',
-                                                    color: missingDepPlayers.length > 0 ? '#c2410c' : '#15803d'
-                                                }}
-                                            />
-                                        </Box>
-                                        <Typography sx={{ fontSize: '13px', color: '#64748b', mt: 0.25 }}>
-                                            Add departure date and time to enable food token generation for these registered participants.
-                                        </Typography>
+
+                                    <Box sx={{ width: { xs: '100%', sm: 'auto' } }}>
+                                        <TextField
+                                            size="small"
+                                            placeholder="Search by name, university..."
+                                            value={missingDepSearch}
+                                            onChange={(e) => setMissingDepSearch(e.target.value)}
+                                            slotProps={{
+                                                input: {
+                                                    startAdornment: (
+                                                        <InputAdornment position="start">
+                                                            <SearchIcon sx={{ color: '#94a3b8', fontSize: 18 }} />
+                                                        </InputAdornment>
+                                                    )
+                                                }
+                                            }}
+                                            sx={{ width: { xs: '100%', sm: 260 } }}
+                                        />
                                     </Box>
                                 </Box>
 
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                    <TextField
-                                        size="small"
-                                        placeholder="Search by name, university..."
-                                        value={missingDepSearch}
-                                        onChange={(e) => setMissingDepSearch(e.target.value)}
-                                        slotProps={{
-                                            input: {
-                                                startAdornment: (
-                                                    <InputAdornment position="start">
-                                                        <SearchIcon sx={{ color: '#94a3b8', fontSize: 20 }} />
-                                                    </InputAdornment>
-                                                )
-                                            }
-                                        }}
-                                        sx={{ minWidth: 230 }}
-                                    />
-                                    <Button
-                                        variant="outlined"
-                                        size="small"
-                                        startIcon={loadingMissingDep ? <CircularProgress size={16} /> : <RefreshIcon sx={{ fontSize: 18 }} />}
-                                        onClick={fetchMissingDeparturePlayers}
-                                        disabled={loadingMissingDep}
-                                        sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600, color: '#0b5299', borderColor: '#cbd5e1' }}
-                                    >
-                                        Refresh
-                                    </Button>
-                                </Box>
-                            </Box>
+                                {/* Content */}
+                                {loadingMissingDep ? (
+                                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 6 }}>
+                                        <CircularProgress size={36} sx={{ color: '#0b5299' }} />
+                                    </Box>
+                                ) : (() => {
+                                    const filtered = missingDepPlayers.filter(p => {
+                                        if (!missingDepSearch.trim()) return true;
+                                        const s = missingDepSearch.toLowerCase().trim();
+                                        return (
+                                            (p.playerName && p.playerName.toLowerCase().includes(s)) ||
+                                            (p.universityName && p.universityName.toLowerCase().includes(s)) ||
+                                            (p.mobileNo && p.mobileNo.includes(s))
+                                        );
+                                    });
 
-                            {/* Content */}
-                            {loadingMissingDep ? (
-                                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 6 }}>
-                                    <CircularProgress size={36} sx={{ color: '#0b5299' }} />
-                                </Box>
-                            ) : (() => {
-                                const filtered = missingDepPlayers.filter(p => {
-                                    if (!missingDepSearch.trim()) return true;
-                                    const s = missingDepSearch.toLowerCase().trim();
+                                    if (filtered.length === 0) {
+                                        return (
+                                            <Box sx={{ textAlign: 'center', py: 4, color: '#64748b' }}>
+                                                <Typography sx={{ fontSize: '14px' }}>
+                                                    No players matching "{missingDepSearch}".
+                                                </Typography>
+                                            </Box>
+                                        );
+                                    }
+
                                     return (
-                                        (p.playerName && p.playerName.toLowerCase().includes(s)) ||
-                                        (p.universityName && p.universityName.toLowerCase().includes(s)) ||
-                                        (p.mobileNo && p.mobileNo.includes(s))
-                                    );
-                                });
+                                        <>
+                                            {/* Desktop Table View (md and above) */}
+                                            <TableContainer sx={{ border: '1px solid #e2e8f0', borderRadius: 2, maxHeight: 420, width: '100%', overflowX: 'auto', display: { xs: 'none', md: 'block' } }}>
+                                                <Table size="small" stickyHeader sx={{ minWidth: 700 }}>
+                                                    <TableHead>
+                                                        <TableRow sx={{ bgcolor: '#f8fafc' }}>
+                                                            <TableCell sx={{ fontWeight: 700, py: 1.5, color: '#334155', bgcolor: '#f8fafc' }}>Player Name</TableCell>
+                                                            <TableCell sx={{ fontWeight: 700, py: 1.5, color: '#334155', bgcolor: '#f8fafc' }}>University / Team</TableCell>
+                                                            <TableCell sx={{ fontWeight: 700, py: 1.5, color: '#334155', bgcolor: '#f8fafc' }}>Arrival Info</TableCell>
+                                                            <TableCell sx={{ fontWeight: 700, py: 1.5, color: '#334155', bgcolor: '#f8fafc' }}>Departure Date</TableCell>
+                                                            <TableCell sx={{ fontWeight: 700, py: 1.5, color: '#334155', bgcolor: '#f8fafc' }}>Departure Time</TableCell>
+                                                            <TableCell sx={{ fontWeight: 700, py: 1.5, color: '#334155', bgcolor: '#f8fafc', textAlign: 'center' }}>Action</TableCell>
+                                                        </TableRow>
+                                                    </TableHead>
+                                                    <TableBody>
+                                                        {filtered.map((player) => {
+                                                            const editData = editingDepDates[player.playerRef] || {
+                                                                departureDate: '',
+                                                                departureTime: ''
+                                                            };
+                                                            const isSaving = savingDepPlayerRef === player.playerRef;
 
-                                if (missingDepPlayers.length === 0) {
-                                    return (
-                                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 4, bgcolor: '#f0fdf4', borderRadius: 2, border: '1px dashed #86efac' }}>
-                                            <CheckCircleOutlineIcon sx={{ fontSize: 44, color: '#16a34a', mb: 1 }} />
-                                            <Typography sx={{ fontWeight: 700, fontSize: '15px', color: '#15803d' }}>
-                                                All Registered Players Have Departure Details!
-                                            </Typography>
-                                            <Typography sx={{ fontSize: '13px', color: '#166534', mt: 0.5 }}>
-                                                All participants are eligible for food token generation.
-                                            </Typography>
-                                        </Box>
-                                    );
-                                }
+                                                            return (
+                                                                <TableRow key={player.playerRef} hover sx={{ '&:hover': { bgcolor: '#f8fafc' } }}>
+                                                                    <TableCell sx={{ py: 1.5 }}>
+                                                                        <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>
+                                                                            {player.playerName}
+                                                                        </Typography>
+                                                                        <Typography sx={{ fontSize: '12px', color: '#64748b' }}>
+                                                                            {player.mobileNo || 'No phone'}
+                                                                        </Typography>
+                                                                    </TableCell>
+                                                                    <TableCell sx={{ py: 1.5 }}>
+                                                                        <Typography sx={{ fontWeight: 600, fontSize: '13px', color: '#334155' }}>
+                                                                            {player.universityName}
+                                                                        </Typography>
+                                                                        {player.block && (
+                                                                            <Typography sx={{ fontSize: '11px', color: '#64748b' }}>
+                                                                                {player.block} (Room {player.room})
+                                                                            </Typography>
+                                                                        )}
+                                                                    </TableCell>
+                                                                    <TableCell sx={{ py: 1.5 }}>
+                                                                        <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#0b5299' }}>
+                                                                            {formatDateDDMMYYYY(player.arrivalDate)}
+                                                                        </Typography>
+                                                                        {player.arrivalTime && (
+                                                                            <Typography sx={{ fontSize: '11px', color: '#64748b' }}>
+                                                                                Time: {player.arrivalTime}
+                                                                            </Typography>
+                                                                        )}
+                                                                    </TableCell>
+                                                                    <TableCell sx={{ py: 1.5 }}>
+                                                                        <TextField
+                                                                            type="date"
+                                                                            size="small"
+                                                                            value={editData.departureDate || ''}
+                                                                            onChange={(e) => handleDepDateChange(player.playerRef, 'departureDate', e.target.value)}
+                                                                            slotProps={{
+                                                                                inputLabel: { shrink: true }
+                                                                            }}
+                                                                            sx={{ width: 160 }}
+                                                                        />
+                                                                    </TableCell>
+                                                                    <TableCell sx={{ py: 1.5 }}>
+                                                                        <TextField
+                                                                            type="time"
+                                                                            size="small"
+                                                                            value={editData.departureTime || ''}
+                                                                            onChange={(e) => handleDepDateChange(player.playerRef, 'departureTime', e.target.value)}
+                                                                            slotProps={{
+                                                                                inputLabel: { shrink: true }
+                                                                            }}
+                                                                            sx={{ width: 130 }}
+                                                                        />
+                                                                    </TableCell>
+                                                                    <TableCell sx={{ py: 1.5, textAlign: 'center' }}>
+                                                                        <Button
+                                                                            variant="contained"
+                                                                            size="small"
+                                                                            startIcon={isSaving ? <CircularProgress size={14} color="inherit" /> : <SaveIcon sx={{ fontSize: 16 }} />}
+                                                                            disabled={isSaving || !editData.departureDate}
+                                                                            onClick={() => handleSavePlayerDeparture(player)}
+                                                                            sx={{
+                                                                                bgcolor: '#16a34a',
+                                                                                '&:hover': { bgcolor: '#15803d' },
+                                                                                textTransform: 'none',
+                                                                                fontWeight: 700,
+                                                                                fontSize: '12px',
+                                                                                borderRadius: 2,
+                                                                                px: 1.75,
+                                                                                whiteSpace: 'nowrap'
+                                                                            }}
+                                                                        >
+                                                                            {isSaving ? 'Saving...' : 'Save & Enable'}
+                                                                        </Button>
+                                                                    </TableCell>
+                                                                </TableRow>
+                                                            );
+                                                        })}
+                                                    </TableBody>
+                                                </Table>
+                                            </TableContainer>
 
-                                if (filtered.length === 0) {
-                                    return (
-                                        <Box sx={{ textAlign: 'center', py: 4, color: '#64748b' }}>
-                                            <Typography sx={{ fontSize: '14px' }}>
-                                                No players matching "{missingDepSearch}".
-                                            </Typography>
-                                        </Box>
-                                    );
-                                }
-
-                                return (
-                                    <TableContainer sx={{ border: '1px solid #e2e8f0', borderRadius: 2, maxHeight: 420 }}>
-                                        <Table size="small" stickyHeader>
-                                            <TableHead>
-                                                <TableRow sx={{ bgcolor: '#f8fafc' }}>
-                                                    <TableCell sx={{ fontWeight: 700, py: 1.5, color: '#334155', bgcolor: '#f8fafc' }}>Player Name</TableCell>
-                                                    <TableCell sx={{ fontWeight: 700, py: 1.5, color: '#334155', bgcolor: '#f8fafc' }}>University / Team</TableCell>
-                                                    <TableCell sx={{ fontWeight: 700, py: 1.5, color: '#334155', bgcolor: '#f8fafc' }}>Arrival Info</TableCell>
-                                                    <TableCell sx={{ fontWeight: 700, py: 1.5, color: '#334155', bgcolor: '#f8fafc' }}>Departure Date</TableCell>
-                                                    <TableCell sx={{ fontWeight: 700, py: 1.5, color: '#334155', bgcolor: '#f8fafc' }}>Departure Time</TableCell>
-                                                    <TableCell sx={{ fontWeight: 700, py: 1.5, color: '#334155', bgcolor: '#f8fafc', textAlign: 'center' }}>Action</TableCell>
-                                                </TableRow>
-                                            </TableHead>
-                                            <TableBody>
+                                            {/* Mobile Card View (xs & sm) */}
+                                            <Box sx={{ display: { xs: 'flex', md: 'none' }, flexDirection: 'column', gap: 1.5 }}>
                                                 {filtered.map((player) => {
                                                     const editData = editingDepDates[player.playerRef] || {
                                                         departureDate: '',
@@ -2051,90 +2123,102 @@ const FoodTokens = () => {
                                                     const isSaving = savingDepPlayerRef === player.playerRef;
 
                                                     return (
-                                                        <TableRow key={player.playerRef} hover sx={{ '&:hover': { bgcolor: '#f8fafc' } }}>
-                                                            <TableCell sx={{ py: 1.5 }}>
-                                                                <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>
-                                                                    {player.playerName}
-                                                                </Typography>
-                                                                <Typography sx={{ fontSize: '12px', color: '#64748b' }}>
-                                                                    {player.mobileNo || 'No phone'}
-                                                                </Typography>
-                                                            </TableCell>
-                                                            <TableCell sx={{ py: 1.5 }}>
-                                                                <Typography sx={{ fontWeight: 600, fontSize: '13px', color: '#334155' }}>
-                                                                    {player.universityName}
+                                                        <Paper
+                                                            key={player.playerRef}
+                                                            elevation={0}
+                                                            sx={{
+                                                                p: 2,
+                                                                borderRadius: 2.5,
+                                                                border: '1px solid #fed7aa',
+                                                                bgcolor: '#fffbf5',
+                                                                display: 'flex',
+                                                                flexDirection: 'column',
+                                                                gap: 1.5
+                                                            }}
+                                                        >
+                                                            {/* Name & Phone */}
+                                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
+                                                                <Box sx={{ minWidth: 0, flex: 1 }}>
+                                                                    <Typography sx={{ fontWeight: 800, fontSize: '14px', color: '#0f172a', wordBreak: 'break-word' }}>
+                                                                        {player.playerName}
+                                                                    </Typography>
+                                                                    <Typography sx={{ fontSize: '12px', color: '#64748b' }}>
+                                                                        📞 {player.mobileNo || 'No phone'}
+                                                                    </Typography>
+                                                                </Box>
+                                                                <Chip
+                                                                    size="small"
+                                                                    label="Pending"
+                                                                    sx={{ bgcolor: '#ffedd5', color: '#c2410c', fontWeight: 700, fontSize: '11px', height: 22, flexShrink: 0 }}
+                                                                />
+                                                            </Box>
+
+                                                            {/* Team & Arrival */}
+                                                            <Box sx={{ bgcolor: '#ffffff', p: 1.25, borderRadius: 2, border: '1px solid #f1f5f9' }}>
+                                                                <Typography sx={{ fontWeight: 700, fontSize: '13px', color: '#334155', wordBreak: 'break-word' }}>
+                                                                    🏫 {player.universityName}
                                                                 </Typography>
                                                                 {player.block && (
-                                                                    <Typography sx={{ fontSize: '11px', color: '#64748b' }}>
-                                                                        {player.block} (Room {player.room})
+                                                                    <Typography sx={{ fontSize: '11px', color: '#64748b', mt: 0.25 }}>
+                                                                        🏢 {player.block} (Room {player.room})
                                                                     </Typography>
                                                                 )}
-                                                            </TableCell>
-                                                            <TableCell sx={{ py: 1.5 }}>
-                                                                <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#0b5299' }}>
-                                                                    {formatDateDDMMYYYY(player.arrivalDate)}
+                                                                <Typography sx={{ fontSize: '12px', color: '#0b5299', fontWeight: 600, mt: 0.5 }}>
+                                                                    🛬 Arrival: {formatDateDDMMYYYY(player.arrivalDate)} {player.arrivalTime ? `at ${player.arrivalTime}` : ''}
                                                                 </Typography>
-                                                                {player.arrivalTime && (
-                                                                    <Typography sx={{ fontSize: '11px', color: '#64748b' }}>
-                                                                        Time: {player.arrivalTime}
-                                                                    </Typography>
-                                                                )}
-                                                            </TableCell>
-                                                            <TableCell sx={{ py: 1.5 }}>
+                                                            </Box>
+
+                                                            {/* Departure Date & Time inputs */}
+                                                            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1.25 }}>
                                                                 <TextField
                                                                     type="date"
                                                                     size="small"
+                                                                    label="Departure Date"
                                                                     value={editData.departureDate || ''}
                                                                     onChange={(e) => handleDepDateChange(player.playerRef, 'departureDate', e.target.value)}
-                                                                    slotProps={{
-                                                                        inputLabel: { shrink: true }
-                                                                    }}
-                                                                    sx={{ width: 160 }}
+                                                                    slotProps={{ inputLabel: { shrink: true } }}
+                                                                    fullWidth
                                                                 />
-                                                            </TableCell>
-                                                            <TableCell sx={{ py: 1.5 }}>
                                                                 <TextField
                                                                     type="time"
                                                                     size="small"
+                                                                    label="Departure Time"
                                                                     value={editData.departureTime || ''}
                                                                     onChange={(e) => handleDepDateChange(player.playerRef, 'departureTime', e.target.value)}
-                                                                    slotProps={{
-                                                                        inputLabel: { shrink: true }
-                                                                    }}
-                                                                    sx={{ width: 130 }}
+                                                                    slotProps={{ inputLabel: { shrink: true } }}
+                                                                    fullWidth
                                                                 />
-                                                            </TableCell>
-                                                            <TableCell sx={{ py: 1.5, textAlign: 'center' }}>
-                                                                <Button
-                                                                    variant="contained"
-                                                                    size="small"
-                                                                    startIcon={isSaving ? <CircularProgress size={14} color="inherit" /> : <SaveIcon sx={{ fontSize: 16 }} />}
-                                                                    disabled={isSaving || !editData.departureDate}
-                                                                    onClick={() => handleSavePlayerDeparture(player)}
-                                                                    sx={{
-                                                                        bgcolor: '#16a34a',
-                                                                        '&:hover': { bgcolor: '#15803d' },
-                                                                        textTransform: 'none',
-                                                                        fontWeight: 700,
-                                                                        fontSize: '12px',
-                                                                        borderRadius: 2,
-                                                                        px: 1.75,
-                                                                        whiteSpace: 'nowrap'
-                                                                    }}
-                                                                >
-                                                                    {isSaving ? 'Saving...' : 'Save & Enable'}
-                                                                </Button>
-                                                            </TableCell>
-                                                        </TableRow>
+                                                            </Box>
+
+                                                            {/* Action Button */}
+                                                            <Button
+                                                                variant="contained"
+                                                                fullWidth
+                                                                startIcon={isSaving ? <CircularProgress size={16} color="inherit" /> : <SaveIcon sx={{ fontSize: 18 }} />}
+                                                                disabled={isSaving || !editData.departureDate}
+                                                                onClick={() => handleSavePlayerDeparture(player)}
+                                                                sx={{
+                                                                    bgcolor: '#16a34a',
+                                                                    '&:hover': { bgcolor: '#15803d' },
+                                                                    textTransform: 'none',
+                                                                    fontWeight: 700,
+                                                                    fontSize: '13px',
+                                                                    borderRadius: 2,
+                                                                    py: 1
+                                                                }}
+                                                            >
+                                                                {isSaving ? 'Saving...' : 'Save & Enable Tokens'}
+                                                            </Button>
+                                                        </Paper>
                                                     );
                                                 })}
-                                            </TableBody>
-                                        </Table>
-                                    </TableContainer>
-                                );
-                            })()}
-                        </Paper>
-                    </Box>
+                                            </Box>
+                                        </>
+                                    );
+                                })()}
+                            </Paper>
+                        </Box>
+                    )}
                 </Box>
             )}
 
@@ -2783,21 +2867,27 @@ const FoodTokens = () => {
                                                     fontWeight: 700,
                                                     fontSize: '0.84rem',
                                                     borderRadius: 2,
-                                                    color: '#0b5299',
-                                                    '& .MuiOutlinedInput-notchedOutline': { borderColor: '#0b5299' },
-                                                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#083d73' },
-                                                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#0b5299' },
+                                                    color: summaryDateMode === 'today' ? '#0b5299' : summaryDateMode === 'custom' ? '#7c3aed' : '#047857',
+                                                    '& .MuiOutlinedInput-notchedOutline': {
+                                                        borderColor: summaryDateMode === 'today' ? '#0b5299' : summaryDateMode === 'custom' ? '#7c3aed' : '#047857'
+                                                    },
+                                                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                                                        borderColor: summaryDateMode === 'today' ? '#083d73' : summaryDateMode === 'custom' ? '#6d28d9' : '#065f46'
+                                                    },
+                                                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                                                        borderColor: summaryDateMode === 'today' ? '#0b5299' : summaryDateMode === 'custom' ? '#7c3aed' : '#047857'
+                                                    },
                                                     '& .MuiSelect-select': { py: 0.8, pl: 1.5, pr: 3 }
                                                 }}
                                             >
+                                                <MenuItem value="all" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: '0.85rem', fontWeight: 600 }}>
+                                                    <ViewListIcon sx={{ fontSize: 17, color: '#047857' }} /> All Dates (Overall)
+                                                </MenuItem>
                                                 <MenuItem value="today" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: '0.85rem', fontWeight: 600 }}>
                                                     <TodayIcon sx={{ fontSize: 17, color: '#0b5299' }} /> Today
                                                 </MenuItem>
                                                 <MenuItem value="custom" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: '0.85rem', fontWeight: 600 }}>
                                                     <DateRangeIcon sx={{ fontSize: 17, color: '#7c3aed' }} /> Custom
-                                                </MenuItem>
-                                                <MenuItem value="all" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontSize: '0.85rem', fontWeight: 600 }}>
-                                                    <ViewListIcon sx={{ fontSize: 17, color: '#047857' }} /> All Dates
                                                 </MenuItem>
                                             </Select>
                                         </FormControl>
@@ -2906,7 +2996,7 @@ const FoodTokens = () => {
                                 ) : (
                                     <Box sx={{ py: 4, textAlign: 'center', color: '#94a3b8' }}>
                                         <Typography sx={{ fontWeight: 600, fontSize: '0.9rem' }}>
-                                            {summaryDateMode === 'today' ? 'No tokens issued for today.' : 'No tokens found for the selected date range.'}
+                                            {summaryDateMode === 'today' ? 'No tokens issued for today.' : summaryDateMode === 'all' ? 'No food tokens created for this event yet.' : 'No tokens found for the selected date range.'}
                                         </Typography>
                                     </Box>
                                 )}

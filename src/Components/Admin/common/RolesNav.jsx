@@ -10,10 +10,12 @@ import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import LiveTvIcon from '@mui/icons-material/LiveTv';
 import MapIcon from '@mui/icons-material/Map';
 import ApartmentIcon from '@mui/icons-material/Apartment';
+import SchoolIcon from '@mui/icons-material/School';
 
 export const ALL_ADMIN_MODULES = [
     { id: 'dashboard', name: 'Dashboard', path: '/admin/dashboard', icon: <DashboardIcon />, description: 'Overview metrics & analytics' },
     { id: 'organizing-committee', name: 'Organizing Commitee', path: '/admin/organizing-committee', icon: <GroupsIcon />, description: 'Organizing committee members' },
+    { id: 'university-master', name: 'University Master', path: '/admin/university-master', icon: <SchoolIcon />, description: 'Master directory of universities & aliases' },
     { id: 'players-mapping', name: 'Players Mapping', path: '/admin/players-mapping', icon: <AssignmentIndIcon />, description: 'Map players & university rosters' },
     { id: 'hostel-provision', name: 'Accommodation', path: '/admin/hostel-provision', icon: <HotelIcon />, description: 'Hostel room allocation & management' },
     { id: 'food-tokens', name: 'Food Tokens', path: '/admin/food-tokens', icon: <RestaurantIcon />, description: 'Food tokens issuance & redemption' },
@@ -41,6 +43,7 @@ export const getMenusByRole = (role, allowedModules = undefined) => {
     const defaultIds = [
         'dashboard',
         'organizing-committee',
+        'university-master',
         'players-mapping',
         'hostel-provision',
         'food-tokens',
