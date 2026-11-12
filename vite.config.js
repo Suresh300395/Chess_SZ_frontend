@@ -79,6 +79,7 @@ export default defineConfig({
   preview: {
     allowedHosts: [
       'tournament.adityauniversity.in/chess-men',
+      'https://tournament.adityauniversity.in/chess-men',
       'www.tournament.adityauniversity.in/chess-men'
     ]
   }
