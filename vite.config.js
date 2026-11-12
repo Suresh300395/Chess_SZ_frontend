@@ -76,4 +76,10 @@ const baseRedirectPlugin = () => ({
 export default defineConfig({
   plugins: [react(), baseRedirectPlugin()],
   base: BASE_PATH,
+  preview: {
+    allowedHosts: [
+      'tournament.adityauniversity.in/chess-men',
+      'www.tournament.adityauniversity.in/chess-men'
+    ]
+  }
 })
