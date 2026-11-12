@@ -75,12 +75,12 @@ const baseRedirectPlugin = () => ({
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), baseRedirectPlugin()],
-  base: BASE_PATH,
+  base: '/chess-men/',
   preview: {
     allowedHosts: [
-      'tournament.adityauniversity.in/chess-men',
-      'https://tournament.adityauniversity.in/chess-men',
-      'www.tournament.adityauniversity.in/chess-men'
+      'tournament.adityauniversity.in',
+      'https://tournament.adityauniversity.in',
+      'www.tournament.adityauniversity.in'
     ]
   }
 })
