@@ -7,6 +7,7 @@ import LoginIcon from '@mui/icons-material/Login';
 import Authentication from '../Admin/Authentication';
 import { getCurrentUser } from '../../utils/auth';
 import ProfilePopover from './ProfilePopover';
+import { getAssetUrl } from '../../utils/assetHelper';
 
 const Header = () => {
     const [scrolled, setScrolled] = useState(false);
@@ -68,14 +69,26 @@ const Header = () => {
             <Box className="header-container">
                 <Box className="header-logos-wrapper" sx={{ width: { xs: '100%', md: 'auto' }, display: 'flex', alignItems: 'center' }}>
                     <Box component={Link} to="/" className="header-logo">
-                        <Box component="img" src="/ADITYA LOGO2.png" alt="Aditya Logo" className="logo-img" />
+                        <Box component="img" src={getAssetUrl('ADITYA LOGO2.png')} alt="Aditya Logo" className="logo-img" />
                     </Box>
 
                     {/* Vertical Divider Line between Aditya Logo and AIU Logo on Desktop */}
                     <Box className="header-vr" sx={{ display: { xs: 'none', md: 'block' } }} />
 
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.8, md: 1.5 }, ml: { xs: 'auto', md: 0 } }}>
-                        <Box component="img" src="/Association_of_Indian_Universities_Logo.svg" alt="Association of Indian Universities Logo" className="logo-img chess-logo aiu-logo" />
+                        <Box
+                            component="img"
+                            src={getAssetUrl('Association_of_Indian_Universities_Logo.svg')}
+                            alt="Association of Indian Universities Logo"
+                            className="logo-img chess-logo aiu-logo"
+                            sx={{
+                                height: { xs: '48px', md: '68px' },
+                                width: 'auto',
+                                display: 'block',
+                                objectFit: 'contain',
+                                flexShrink: 0
+                            }}
+                        />
                     </Box>
                 </Box>
 

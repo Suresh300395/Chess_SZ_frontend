@@ -3,6 +3,7 @@ import { Box, Typography } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getMenusByRole } from './RolesNav';
 import { getCurrentUser } from '../../../utils/auth';
+import { getAssetUrl } from '../../../utils/assetHelper';
 
 const Sidebar = ({ onNavigate }) => {
     const navigate = useNavigate();
@@ -52,7 +53,7 @@ const Sidebar = ({ onNavigate }) => {
             }}>
                 <Box
                     component="img"
-                    src="/ADITYA LOGO2.png"
+                    src={getAssetUrl('ADITYA LOGO2.png')}
                     alt="Aditya University Logo"
                     sx={{ width: '85%', maxWidth: '200px', display: 'block' }}
                 />

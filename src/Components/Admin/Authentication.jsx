@@ -8,6 +8,7 @@ import { authAPI } from '../../utils/api';
 import { saveAuthSession } from '../../utils/auth';
 import { getMenusByRole } from './common/RolesNav';
 import ForgotPasswordWorkflow from '../Common/ForgotPasswordWorkflow';
+import { getAssetUrl } from '../../utils/assetHelper';
 
 const Authentication = ({ open, onClose, initialUsername = '', initialPassword = '' }) => {
     const navigate = useNavigate();
@@ -116,7 +117,7 @@ const Authentication = ({ open, onClose, initialUsername = '', initialPassword =
                 </IconButton>
 
                 <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2.5 }}>
-                    <img src="/site-logo.svg" alt="Portal Logo" style={{ maxWidth: '190px', width: '100%' }} />
+                    <img src={getAssetUrl('site-logo.svg')} alt="Portal Logo" style={{ maxWidth: '190px', width: '100%' }} />
                 </Box>
 
                 {!isForgotPassword ? (

@@ -15,6 +15,7 @@ import { AnimatedCard, AnimatedText } from '../animations';
 
 const createInitialPlayer = () => ({
     playerName: '',
+    fideId: '',
     mobileNo: '',
     gender: '',
     dob: '',
@@ -27,6 +28,8 @@ const createInitialPlayer = () => ({
     accommodation: 'Yes',
     isExisting: false
 });
+
+const createInitialPlayersList = () => Array.from({ length: 4 }, () => createInitialPlayer());
 
 const createInitialCoach = () => ({
     role: 'Coach',
@@ -77,7 +80,7 @@ const Registration = () => {
         universityContact: ''
     });
 
-    const [players, setPlayers] = useState([createInitialPlayer()]);
+    const [players, setPlayers] = useState(createInitialPlayersList());
     const [coaches, setCoaches] = useState([createInitialCoach()]);
 
     const [errors, setErrors] = useState({
@@ -108,7 +111,7 @@ const Registration = () => {
                 universityContact: '',
                 address: ''
             });
-            setPlayers([createInitialPlayer()]);
+            setPlayers(createInitialPlayersList());
             setCoaches([createInitialCoach()]);
             setErrors({
                 team: errorMsg ? { universityName: errorMsg } : {},
@@ -188,6 +191,7 @@ const Registration = () => {
                 ? uni.players.map(p => ({
                     _id: p._id,
                     playerName: p.playerName || '',
+                    fideId: p.fideId || '',
                     mobileNo: p.mobileNo || '',
                     gender: p.gender || '',
                     dob: p.dob || '',
@@ -200,7 +204,7 @@ const Registration = () => {
                     accommodation: p.accommodation || 'Yes',
                     isExisting: true
                 }))
-                : [createInitialPlayer()];
+                : createInitialPlayersList();
 
             const loadedCoaches = (uni.coaches && uni.coaches.length > 0)
                 ? uni.coaches.map(c => ({
@@ -222,7 +226,7 @@ const Registration = () => {
             toast.info(`Loaded existing details for ${uni.universityName}. Saved members are locked.`);
         } else {
             // Master directory university selected for fresh team registration
-            setPlayers([createInitialPlayer()]);
+            setPlayers(createInitialPlayersList());
             setCoaches([createInitialCoach()]);
             setErrors({ team: {}, players: [], coaches: [] });
             toast.success(`Verified university selected: ${uni.universityName}`);
@@ -280,6 +284,8 @@ const Registration = () => {
                 errorMsg = 'Numbers are not allowed in player name';
             }
             finalValue = value.replace(/[0-9]/g, '');
+        } else if (name === 'fideId') {
+            finalValue = value.replace(/[^0-9]/g, '').slice(0, 15);
         } else if (name === 'mobileNo') {
             let digits = value.replace(/\D/g, '');
             if (digits.length === 12 && digits.startsWith('91')) {
@@ -408,15 +414,19 @@ const Registration = () => {
     };
 
     const addPlayer = () => {
+        if (players.length >= 6) {
+            toast.warning('Maximum 6 players allowed (4 Main + 2 Reserves).');
+            return;
+        }
         setPlayers([...players, createInitialPlayer()]);
     };
 
     const removePlayer = (index) => {
         // Prevent removing existing saved records
         if (players[index]?.isExisting) return;
-        // For new university, enforce minimum 1 player
-        if (!isExistingUniversity && players.length <= 1) {
-            toast.error('At least 1 Player is required for new university registration.');
+        // For new university, enforce minimum 4 players
+        if (!isExistingUniversity && players.length <= 4) {
+            toast.error('Minimum 4 players are required (4 Main players fixed).');
             return;
         }
         const updatedPlayers = [...players];
@@ -425,6 +435,10 @@ const Registration = () => {
     };
 
     const addCoach = () => {
+        if (coaches.length >= 2) {
+            toast.error('Maximum 2 Coach/Manager members are allowed.');
+            return;
+        }
         setCoaches([...coaches, createInitialCoach()]);
     };
 
@@ -472,14 +486,24 @@ const Registration = () => {
                 isValid = false;
             }
 
-            // Enforce at least 1 player and 1 coach for new university
-            if (!players || players.length === 0) {
-                toast.error('At least 1 Player is required for new university registration.');
+            // Enforce minimum 4 players and max 6 players, and at least 1 coach for new university
+            if (!players || players.length < 4) {
+                toast.error('Minimum 4 players are required for university registration.');
                 return false;
             }
 
-            if (!coaches || coaches.length === 0) {
+            if (players.length > 6) {
+                toast.error('Maximum 6 players are allowed (4 Main + 2 Reserves).');
+                return false;
+            }
+
+            if (!coaches || coaches.length < 1) {
                 toast.error('At least 1 Coach/Manager is required for new university registration.');
+                return false;
+            }
+
+            if (coaches.length > 2) {
+                toast.error('Maximum 2 Coach/Manager members are allowed.');
                 return false;
             }
         }
@@ -490,6 +514,16 @@ const Registration = () => {
             const hasNewCoach = coaches.some(c => !c.isExisting);
             if (!hasNewPlayer && !hasNewCoach) {
                 toast.error('Please add at least 1 new Player or 1 new Coach/Manager to register for this university.');
+                return false;
+            }
+
+            if (players.length > 6) {
+                toast.error('Maximum 6 players are allowed per university team.');
+                return false;
+            }
+
+            if (coaches.length > 2) {
+                toast.error('Maximum 2 Coach/Manager members are allowed per university team.');
                 return false;
             }
         }
@@ -921,7 +955,7 @@ const Registration = () => {
                             >
                                 <Box className="player-header">
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                        <Box component="h4">Player {index + 1}</Box>
+                                        <Box component="h4">Player {index + 1} {index >= 4 ? '(Reserve)' : ''}</Box>
                                         {player.isExisting ? (
                                             <Chip
                                                 label="Saved Record"
@@ -937,20 +971,20 @@ const Registration = () => {
                                             />
                                         ) : (
                                             <Chip
-                                                label="New Entry"
+                                                label={index >= 4 ? "Optional Entry" : "New Entry"}
                                                 size="small"
                                                 sx={{
                                                     height: 22,
                                                     fontSize: '11px',
                                                     fontWeight: 700,
-                                                    bgcolor: '#fef3c7',
-                                                    color: '#b45309',
-                                                    border: '1px solid #fde68a'
+                                                    bgcolor: index >= 4 ? '#ecfdf5' : '#fef3c7',
+                                                    color: index >= 4 ? '#047857' : '#b45309',
+                                                    border: index >= 4 ? '1px solid #a7f3d0' : '1px solid #fde68a'
                                                 }}
                                             />
                                         )}
                                     </Box>
-                                    {!player.isExisting && (!isExistingUniversity ? players.length > 1 : true) && (
+                                    {!player.isExisting && (!isExistingUniversity ? players.length > 4 : true) && (
                                         <Box component="button" type="button" className="remove-player-btn" onClick={() => removePlayer(index)}>
                                             Remove
                                         </Box>
@@ -969,6 +1003,22 @@ const Registration = () => {
                                             helperText={errors.players[index]?.playerName}
                                             disabled={player.isExisting}
                                             slotProps={{ input: { readOnly: player.isExisting } }}
+                                            sx={player.isExisting ? { bgcolor: '#f8fafc', borderRadius: 1 } : {}}
+                                        />
+                                    </Box>
+                                    <Box sx={{ mt: 1 }}>
+                                        <TextField
+                                            fullWidth
+                                            label="FIDE ID (Optional)"
+                                            name="fideId"
+                                            value={player.fideId || ''}
+                                            onChange={(e) => handlePlayerChange(index, e)}
+                                            disabled={player.isExisting}
+                                            placeholder="e.g. 25000014"
+                                            slotProps={{
+                                                input: { readOnly: player.isExisting },
+                                                htmlInput: { maxLength: 15, inputMode: 'numeric' }
+                                            }}
                                             sx={player.isExisting ? { bgcolor: '#f8fafc', borderRadius: 1 } : {}}
                                         />
                                     </Box>
@@ -1158,15 +1208,31 @@ const Registration = () => {
                             </Box>
                         ))}
 
-                        <Box sx={{ display: 'flex', justifyContent: { xs: 'center', sm: 'flex-start' } }}>
-                            <Box component="button" type="button" className="btn-secondary" onClick={addPlayer}>
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                                </svg>
-                                Add Another Player
+                        {players.length < 6 ? (
+                            <Box sx={{ display: 'flex', justifyContent: { xs: 'center', sm: 'flex-start' } }}>
+                                <Box component="button" type="button" className="btn-secondary" onClick={addPlayer}>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    </svg>
+                                    Add Another Player (Max 6)
+                                </Box>
                             </Box>
-                        </Box>
+                        ) : (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.5 }}>
+                                <Chip
+                                    label="Maximum 6 players reached (4 Main + 2 Reserves)"
+                                    size="small"
+                                    sx={{
+                                        bgcolor: '#f1f5f9',
+                                        color: '#475569',
+                                        fontWeight: 600,
+                                        fontSize: '12px',
+                                        border: '1px solid #cbd5e1'
+                                    }}
+                                />
+                            </Box>
+                        )}
                     </Box>
 
                     {/* Coach/Manager Section */}
@@ -1321,15 +1387,31 @@ const Registration = () => {
                             </Box>
                         ))}
 
-                        <Box sx={{ display: 'flex', justifyContent: { xs: 'center', sm: 'flex-start' } }}>
-                            <Box component="button" type="button" className="btn-secondary" onClick={addCoach}>
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                                </svg>
-                                Add Coach / Manager
+                        {coaches.length < 2 ? (
+                            <Box sx={{ display: 'flex', justifyContent: { xs: 'center', sm: 'flex-start' } }}>
+                                <Box component="button" type="button" className="btn-secondary" onClick={addCoach}>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    </svg>
+                                    Add Coach / Manager
+                                </Box>
                             </Box>
-                        </Box>
+                        ) : (
+                            <Box sx={{ display: 'flex', justifyContent: { xs: 'center', sm: 'flex-start' }, mt: 1 }}>
+                                <Chip
+                                    label="Maximum 2 Coach / Manager members reached"
+                                    size="small"
+                                    sx={{
+                                        bgcolor: '#f1f5f9',
+                                        color: '#475569',
+                                        fontWeight: 600,
+                                        fontSize: '12px',
+                                        border: '1px solid #cbd5e1'
+                                    }}
+                                />
+                            </Box>
+                        )}
                     </Box>
 
                     <Box

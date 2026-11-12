@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box } from '@mui/material';
 import ProfilePopover from '../../Common/ProfilePopover';
+import { getAssetUrl } from '../../../utils/assetHelper';
 
 const Header = () => {
     return (
@@ -18,7 +19,7 @@ const Header = () => {
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                 <Box
                     component="img"
-                    src="/Circle_logo.svg"
+                    src={getAssetUrl('Circle_logo.svg')}
                     alt="Aditya University"
                     sx={{
                         height: { xs: 48, sm: 56 },

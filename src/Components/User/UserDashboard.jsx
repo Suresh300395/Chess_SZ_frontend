@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 import { authAPI, SOCKET_URL } from '../../utils/api';
+import { getAssetUrl } from '../../utils/assetHelper';
 import PersonIcon from '@mui/icons-material/Person';
 import StarIcon from '@mui/icons-material/Star';
 import HotelIcon from '@mui/icons-material/Hotel';
@@ -261,7 +262,7 @@ const UserDashboard = () => {
                                     height: '130%',
                                     aspectRatio: '1/1',
                                     transform: 'translate(50%, -50%)',
-                                    backgroundImage: 'url("/Circle _Gold.svg")',
+                                    backgroundImage: `url("${getAssetUrl('Circle _Gold.svg')}")`,
                                     backgroundRepeat: 'no-repeat',
                                     backgroundPosition: 'center',
                                     backgroundSize: 'contain',
@@ -278,7 +279,7 @@ const UserDashboard = () => {
                                     width: '120%',
                                     aspectRatio: '1/1',
                                     transform: 'translate(-50%, 50%)',
-                                    backgroundImage: 'url("/Circle _Gold.svg")',
+                                    backgroundImage: `url("${getAssetUrl('Circle _Gold.svg')}")`,
                                     backgroundRepeat: 'no-repeat',
                                     backgroundPosition: 'center',
                                     backgroundSize: 'contain',

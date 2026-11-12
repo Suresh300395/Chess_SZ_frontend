@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import ForgotPasswordWorkflow from './ForgotPasswordWorkflow';
 import Authentication from '../Admin/Authentication';
 import { AnimatedCard } from '../animations';
+import { getAssetUrl } from '../../utils/assetHelper';
 
 export default function ForgotPasswordPage() {
     const navigate = useNavigate();
@@ -44,7 +45,7 @@ export default function ForgotPasswordPage() {
                     }}
                 >
                     <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
-                        <img src="/site-logo.svg" alt="Tournament Logo" style={{ maxWidth: '190px', width: '100%' }} />
+                        <img src={getAssetUrl('site-logo.svg')} alt="Tournament Logo" style={{ maxWidth: '190px', width: '100%' }} />
                     </Box>
 
                     <ForgotPasswordWorkflow

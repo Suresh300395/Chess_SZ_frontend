@@ -5,6 +5,7 @@ import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined';
 import LocalPhoneOutlinedIcon from '@mui/icons-material/LocalPhoneOutlined';
 import WebOutlinedIcon from '@mui/icons-material/WebOutlined';
 import { AnimatedCard } from '../animations';
+import { getAssetUrl } from '../../utils/assetHelper';
 
 const CommitteeCard = ({ member, index = 0 }) => {
     const [imageError, setImageError] = useState(false);
@@ -49,7 +50,7 @@ const CommitteeCard = ({ member, index = 0 }) => {
                         right: 0,
                         width: { xs: '100%', sm: '55%' },
                         height: '100%',
-                        backgroundImage: 'url("/hero.png")',
+                        backgroundImage: `url("${getAssetUrl('hero.png')}")`,
                         backgroundPosition: 'right 30%',
                         backgroundSize: 'cover',
                         opacity: 0.1,
@@ -229,7 +230,7 @@ const CommitteeCard = ({ member, index = 0 }) => {
                     >
                         <Box
                             component="img"
-                            src="/commitee_card_icon.png"
+                            src={getAssetUrl('commitee_card_icon.png')}
                             alt=""
                             sx={{
                                 width: 18,

@@ -1,6 +1,7 @@
 import { formatDateDDMMYYYY } from './dateUtils';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
+import { getAssetUrl } from './assetHelper';
 
 /**
  * Format date safely
@@ -903,9 +904,10 @@ export const downloadCautionDepositPDF = async (data) => {
   const amountWords = getAmountInWords(amount);
 
   // Load logo as base64 for seamless canvas rendering
-  let logoBase64 = '/ADITYA LOGO2.png';
+  const logoUrl = getAssetUrl('ADITYA LOGO2.png');
+  let logoBase64 = logoUrl;
   try {
-    logoBase64 = await convertImageToBase64('/ADITYA LOGO2.png');
+    logoBase64 = await convertImageToBase64(logoUrl);
   } catch (err) {
     console.warn('Could not convert logo to base64, using direct url', err);
   }
@@ -1337,7 +1339,7 @@ export const exportCautionDepositReceiptPDF = (data) => {
         <div class="receipt-container">
           <div class="header-row">
             <div class="logo-box">
-              <img src="/ADITYA LOGO2.png" alt="Aditya University" />
+              <img src="${window.location.origin}${getAssetUrl('ADITYA LOGO2.png')}" alt="Aditya University" />
             </div>
             <div class="header-text">
               <h1>SOUTH ZONE INTER-UNIVERSITY TOURNAMENT</h1>

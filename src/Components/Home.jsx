@@ -20,6 +20,7 @@ import { AnimatedCard, AnimatedText } from './animations';
 import io from 'socket.io-client';
 import { committeeAPI, routeMapAPI, liveBoardAPI, SOCKET_URL } from '../utils/api';
 import { scrollToTabContainer } from '../utils/scrollUtils';
+import { getAssetUrl } from '../utils/assetHelper';
 
 const getMatchDetails = (m, currentRound) => {
     const rawRes = (m.result || '*').trim();
@@ -212,7 +213,7 @@ const Home = () => {
         <Box className="home-container">
             <Box component="main">
                 <Box component="section" className="hero-section">
-                    <Box component="img" src="/hero.png" alt="South Zone Chess Tournament" className="hero-banner-img" />
+                    <Box component="img" src={getAssetUrl('hero.png')} alt="South Zone Chess Tournament" className="hero-banner-img" />
                     <Box className="hero-content page-container">
                         <AnimatedText direction="down" delay={0.05}>
                             <Box component="h1" className="hero-title">
@@ -602,7 +603,7 @@ const Home = () => {
                                                                         {details.p1Won && (
                                                                             <Box
                                                                                 component="img"
-                                                                                src="/Trophyy.webp"
+                                                                                src={getAssetUrl('Trophyy.webp')}
                                                                                 alt="Winner Trophy"
                                                                                 sx={{ width: 22, height: 22, objectFit: 'contain' }}
                                                                             />
@@ -641,7 +642,7 @@ const Home = () => {
                                                                         {details.p2Won && (
                                                                             <Box
                                                                                 component="img"
-                                                                                src="/Trophyy.webp"
+                                                                                src={getAssetUrl('Trophyy.webp')}
                                                                                 alt="Winner Trophy"
                                                                                 sx={{ width: 22, height: 22, objectFit: 'contain' }}
                                                                             />
@@ -942,7 +943,7 @@ const Home = () => {
                                                                 <Tooltip title={`Winner: ${details.p1Won ? m.whitePlayer : m.blackPlayer}`} arrow>
                                                                     <Box
                                                                         component="img"
-                                                                        src="/Trophyy.webp"
+                                                                        src={getAssetUrl('Trophyy.webp')}
                                                                         alt="Winner Trophy"
                                                                         sx={{
                                                                             width: { sm: 38, md: 44 },

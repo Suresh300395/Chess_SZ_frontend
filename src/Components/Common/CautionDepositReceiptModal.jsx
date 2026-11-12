@@ -13,6 +13,7 @@ import {
 import ClearIcon from '@mui/icons-material/Clear';
 import PrintIcon from '@mui/icons-material/Print';
 import ReceiptIcon from '@mui/icons-material/Receipt';
+import { getAssetUrl } from '../../utils/assetHelper';
 import SchoolIcon from '@mui/icons-material/School';
 import PersonIcon from '@mui/icons-material/Person';
 import CreditCardIcon from '@mui/icons-material/CreditCard';
@@ -118,7 +119,7 @@ const CautionDepositReceiptModal = ({
                             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', pr: { xs: 0, sm: 2.5 }, borderRight: { xs: 'none', sm: '1.5px solid #e2e8f0' }, minWidth: { sm: 145 } }}>
                                 <Box
                                     component="img"
-                                    src="/ADITYA LOGO2.png"
+                                    src={getAssetUrl('ADITYA LOGO2.png')}
                                     alt="Aditya University"
                                     sx={{ height: { xs: 46, sm: 58 }, width: 'auto', objectFit: 'contain' }}
                                 />
