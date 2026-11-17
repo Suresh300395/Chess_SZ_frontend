@@ -30,7 +30,7 @@ const Header = () => {
             }
 
             // Add solid color if scrolled down a bit
-            if (currentScrollY > 50) {
+            if (currentScrollY > 15) {
                 setScrolled(true);
             } else {
                 setScrolled(false);
