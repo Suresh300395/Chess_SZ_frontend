@@ -705,18 +705,18 @@ const Dashboard = () => {
                                 </Box>
                                 <Box>
                                     <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase', display: 'block', mb: 0.3 }}>
-                                        Contact
+                                        University Email
                                     </Typography>
                                     <Typography sx={{ fontWeight: 600, color: '#1e293b', fontSize: { xs: '0.88rem', sm: '0.95rem' }, wordBreak: 'break-word' }}>
-                                        {selectedReg.universityContact || 'N/A'}
+                                        {selectedReg.universityEmail || selectedReg.address || 'N/A'}
                                     </Typography>
                                 </Box>
                                 <Box>
                                     <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase', display: 'block', mb: 0.3 }}>
-                                        Address
+                                        Contact
                                     </Typography>
                                     <Typography sx={{ fontWeight: 600, color: '#1e293b', fontSize: { xs: '0.88rem', sm: '0.95rem' }, wordBreak: 'break-word' }}>
-                                        {selectedReg.address || 'N/A'}
+                                        {selectedReg.universityContact || 'N/A'}
                                     </Typography>
                                 </Box>
                             </Box>

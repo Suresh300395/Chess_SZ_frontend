@@ -76,8 +76,9 @@ const Registration = () => {
 
     const [teamDetails, setTeamDetails] = useState({
         universityName: '',
-        address: '',
-        universityContact: ''
+        universityContact: '',
+        universityEmail: '',
+        address: ''
     });
 
     const [players, setPlayers] = useState(createInitialPlayersList());
@@ -109,6 +110,7 @@ const Registration = () => {
             setTeamDetails({
                 universityName: finalValue,
                 universityContact: '',
+                universityEmail: '',
                 address: ''
             });
             setPlayers(createInitialPlayersList());
@@ -177,12 +179,14 @@ const Registration = () => {
         }
 
         setSelectedUniversity(uni);
-        const resolvedAddress = uni.address || [uni.city, uni.state].filter(Boolean).join(', ');
         const resolvedContact = uni.universityContact || uni.phone || '';
+        const resolvedEmail = uni.universityEmail || (uni.address && uni.address.includes('@') ? uni.address : '') || uni.email || '';
+        const resolvedAddress = uni.address || resolvedEmail || [uni.city, uni.state].filter(Boolean).join(', ');
 
         setTeamDetails({
             universityName: uni.universityName,
             universityContact: resolvedContact,
+            universityEmail: resolvedEmail,
             address: resolvedAddress
         });
 
@@ -235,7 +239,7 @@ const Registration = () => {
 
     const handleTeamChange = (e) => {
         const { name, value } = e.target;
-        if (isExistingUniversity && (name === 'universityContact' || name === 'address')) {
+        if (isExistingUniversity && (name === 'universityContact' || name === 'universityEmail' || name === 'address')) {
             return; // Locked for existing universities
         }
 
@@ -262,9 +266,19 @@ const Registration = () => {
             if (finalValue.length === 10) {
                 errorMsg = '';
             }
+        } else if (name === 'universityEmail') {
+            finalValue = value.trim();
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (finalValue && !emailRegex.test(finalValue)) {
+                errorMsg = 'Please enter a valid email address';
+            }
         }
 
-        setTeamDetails(prev => ({ ...prev, [name]: finalValue }));
+        setTeamDetails(prev => ({
+            ...prev,
+            [name]: finalValue,
+            ...(name === 'universityEmail' ? { address: finalValue } : {})
+        }));
         setErrors(prev => ({
             ...prev,
             team: { ...prev.team, [name]: errorMsg }
@@ -384,6 +398,15 @@ const Registration = () => {
                     team: { ...prev.team, universityContact: 'Must be exactly 10 digits' }
                 }));
             }
+        } else if (field === 'universityEmail' && !isExistingUniversity) {
+            const val = (teamDetails.universityEmail || teamDetails.address || '').trim();
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (val && !emailRegex.test(val)) {
+                setErrors(prev => ({
+                    ...prev,
+                    team: { ...prev.team, universityEmail: 'Please enter a valid email address' }
+                }));
+            }
         }
     };
 
@@ -468,7 +491,7 @@ const Registration = () => {
             isValid = false;
         }
 
-        // For new university, contact and address are required
+        // For new university, contact and email are required
         if (!isExistingUniversity) {
             if (!teamDetails.universityContact.trim()) {
                 newErrors.team.universityContact = 'University contact is required';
@@ -481,8 +504,13 @@ const Registration = () => {
                 isValid = false;
             }
 
-            if (!teamDetails.address.trim()) {
-                newErrors.team.address = 'Address is required';
+            const emailVal = (teamDetails.universityEmail || teamDetails.address || '').trim();
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailVal) {
+                newErrors.team.universityEmail = 'University email is required';
+                isValid = false;
+            } else if (!emailRegex.test(emailVal)) {
+                newErrors.team.universityEmail = 'Please enter a valid email address';
                 isValid = false;
             }
 
@@ -730,8 +758,9 @@ const Registration = () => {
             universityId: (selectedUniversity?.isExistingUniversity ? (selectedUniversity.registrationId || selectedUniversity._id) : undefined),
             teamDetails: {
                 universityName: teamDetails.universityName,
-                address: teamDetails.address,
-                universityContact: teamDetails.universityContact
+                universityContact: teamDetails.universityContact,
+                universityEmail: (teamDetails.universityEmail || teamDetails.address || '').trim(),
+                address: (teamDetails.universityEmail || teamDetails.address || '').trim()
             },
             players: players.map(p => ({
                 _id: p.isExisting ? p._id : undefined,
@@ -894,6 +923,29 @@ const Registration = () => {
                                 />
                             </Box>
 
+                            {/* University Email: Read-only if existing */}
+                            <Box sx={{ mt: 1 }}>
+                                <TextField
+                                    fullWidth
+                                    label="University Email*"
+                                    name="universityEmail"
+                                    type="email"
+                                    value={teamDetails.universityEmail || teamDetails.address}
+                                    onChange={handleTeamChange}
+                                    onBlur={() => handleTeamBlur('universityEmail')}
+                                    error={!!(errors.team?.universityEmail || errors.team?.address)}
+                                    helperText={errors.team?.universityEmail || errors.team?.address || (isExistingUniversity ? 'Saved record (read-only)' : '')}
+                                    disabled={isExistingUniversity}
+                                    placeholder="e.g. sports@university.ac.in"
+                                    slotProps={{
+                                        input: {
+                                            readOnly: isExistingUniversity
+                                        }
+                                    }}
+                                    sx={isExistingUniversity ? { bgcolor: '#f8fafc', borderRadius: 1 } : {}}
+                                />
+                            </Box>
+
                             {/* Contact Number: Read-only if existing */}
                             <Box sx={{ mt: 1 }}>
                                 <TextField
@@ -914,28 +966,6 @@ const Registration = () => {
                                         htmlInput: {
                                             maxLength: 10,
                                             inputMode: 'numeric'
-                                        }
-                                    }}
-                                    sx={isExistingUniversity ? { bgcolor: '#f8fafc', borderRadius: 1 } : {}}
-                                />
-                            </Box>
-
-                            {/* Address: Read-only if existing */}
-                            <Box sx={{ mt: 1 }}>
-                                <TextField
-                                    fullWidth
-                                    multiline
-                                    rows={1}
-                                    label="Address*"
-                                    name="address"
-                                    value={teamDetails.address}
-                                    onChange={handleTeamChange}
-                                    error={!!errors.team?.address}
-                                    helperText={errors.team?.address || (isExistingUniversity ? 'Saved record (read-only)' : '')}
-                                    disabled={isExistingUniversity}
-                                    slotProps={{
-                                        input: {
-                                            readOnly: isExistingUniversity
                                         }
                                     }}
                                     sx={isExistingUniversity ? { bgcolor: '#f8fafc', borderRadius: 1 } : {}}
