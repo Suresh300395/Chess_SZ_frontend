@@ -521,16 +521,14 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
 /* --- Header.css --- */
 
 .main-header {
-  background: rgba(255, 255, 255, 0.75);
-  -webkit-backdrop-filter: blur(16px);
-  backdrop-filter: blur(16px);
+  background: #FAF6F3;
   position: sticky;
   top: 0;
   z-index: 1000;
   width: 100%;
   border-bottom: none;
   box-shadow: none;
-  transition: transform 0.4s cubic-bezier(0.33, 1, 0.68, 1), background-color 0.3s ease;
+  transition: transform 0.4s cubic-bezier(0.33, 1, 0.68, 1), background-color 0.3s ease, -webkit-backdrop-filter 0.3s ease, backdrop-filter 0.3s ease;
 }
 
 .main-header.header-scrolled {

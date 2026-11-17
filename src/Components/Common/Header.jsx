@@ -29,8 +29,8 @@ const Header = () => {
                 currentScrollY = Math.max(currentScrollY, e.target.scrollTop);
             }
 
-            // Toggle scrolled state with low threshold
-            if (currentScrollY > 5) {
+            // Toggle scrolled state with threshold
+            if (currentScrollY > 15) {
                 setScrolled(true);
             } else {
                 setScrolled(false);
