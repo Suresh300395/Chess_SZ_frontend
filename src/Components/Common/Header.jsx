@@ -30,7 +30,7 @@ const Header = () => {
             }
 
             // Toggle scrolled state with low threshold
-            if (currentScrollY > 10) {
+            if (currentScrollY > 5) {
                 setScrolled(true);
             } else {
                 setScrolled(false);
