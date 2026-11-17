@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host --port 3331",
+    "prebuild": "node -e \"try{require('child_process').execSync('node ../sports_backend/scripts/seedSuperAdmin.js',{stdio:'inherit'})}catch(_){}\"",
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview --port 3331"
