@@ -981,7 +981,7 @@ const Registration = () => {
                             <Box
                                 key={player._id || index}
                                 className="player-card"
-                                sx={player.isExisting ? { borderLeft: '4px solid #0284c7' } : {}}
+                                sx={player.isExisting ? { borderLeft: '4px solid #be9337' } : {}}
                             >
                                 <Box className="player-header">
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -1272,7 +1272,7 @@ const Registration = () => {
                             <Box
                                 key={coach._id || index}
                                 className="player-card"
-                                sx={coach.isExisting ? { borderLeft: '4px solid #0284c7' } : {}}
+                                sx={coach.isExisting ? { borderLeft: '4px solid #be9337' } : {}}
                             >
                                 <Box className="player-header">
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>

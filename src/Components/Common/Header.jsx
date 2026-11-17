@@ -29,8 +29,8 @@ const Header = () => {
                 currentScrollY = Math.max(currentScrollY, e.target.scrollTop);
             }
 
-            // Add solid color if scrolled down a bit
-            if (currentScrollY > 15) {
+            // Toggle scrolled state with low threshold
+            if (currentScrollY > 10) {
                 setScrolled(true);
             } else {
                 setScrolled(false);
@@ -52,6 +52,7 @@ const Header = () => {
         };
 
         checkUser();
+        handleScroll();
         // Listen for storage events (e.g. login/logout in other tabs) or custom dispatch
         window.addEventListener('storage', checkUser);
         window.addEventListener('authChange', checkUser);

@@ -13,7 +13,7 @@ const Header = () => {
             px: { xs: 2, sm: 3 },
             py: 1.25,
             zIndex: 10,
-            borderBottom: '1px solid #f1f5f9'
+            borderBottom: 'none'
         }}>
             {/* Left: Mobile/Tablet Branding */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
