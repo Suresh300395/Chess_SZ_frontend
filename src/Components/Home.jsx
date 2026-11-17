@@ -398,37 +398,38 @@ const Home = () => {
 
                         {/* LIVE BOARD TAB */}
                         {activeTab === 'Live Board' && (() => {
-                            const currentEmbedUrl = liveBoard?.embedUrl || 'https://s1.chess-results.com/tnr1522420.aspx?lan=1&SNode=S0';
+                            const hasLiveResults = Boolean(liveBoard?.embedUrl && liveBoard.embedUrl.trim());
+                            const hasLiveStream = Boolean(liveBoard?.streamUrl && liveBoard.streamUrl.trim());
+                            const hasAnyLive = hasLiveResults || hasLiveStream;
+                            const currentEmbedUrl = liveBoard?.embedUrl || '';
                             const currentExternalLink = liveBoard?.externalLink || currentEmbedUrl;
 
                             return (
-                            <Box>
-                                {/* Responsive Full-Width Embed Video / Live Board */}
-                                {currentEmbedUrl && (
-                                    <AnimatedCard whileInView={true} delay={0.05} style={{ width: '100%', marginBottom: '32px' }}>
-                                        <ResponsiveLiveBoardIframe
-                                            url={currentEmbedUrl}
-                                            streamUrl={liveBoard?.streamUrl}
-                                            title="South Zone Inter-University Chess Championship - Live Broadcast"
-                                            externalLink={currentExternalLink}
-                                            height={{ xs: '620px', sm: '750px', md: '850px' }}
-                                        />
-                                    </AnimatedCard>
-                                )}
-
-                                {!currentEmbedUrl && (
-
-                                    <Box sx={{ textAlign: 'center', py: 6, bgcolor: '#f8fafc', borderRadius: 3, border: '1px dashed #cbd5e1' }}>
-                                        <LiveTvIcon sx={{ fontSize: 48, color: '#94a3b8', mb: 1 }} />
-                                        <Typography variant="subtitle1" fontWeight="bold" color="#334155">
-                                            {liveBoard?.title || 'Live Match Center'}
-                                        </Typography>
-                                        <Typography variant="body2" color="#64748b" sx={{ mt: 0.5 }}>
-                                            {liveBoard?.announcement || 'Live chess matches and board broadcasts will be updated once the round commences.'}
-                                        </Typography>
-                                    </Box>
-                                )}
-                            </Box>
+                                <Box>
+                                    {/* Responsive Full-Width Embed Video / Live Board */}
+                                    {hasAnyLive ? (
+                                        <AnimatedCard whileInView={true} delay={0.05} style={{ width: '100%', marginBottom: '32px' }}>
+                                            <ResponsiveLiveBoardIframe
+                                                url={currentEmbedUrl}
+                                                streamUrl={liveBoard?.streamUrl || ''}
+                                                title="South Zone Inter-University Chess Championship - Live Broadcast"
+                                                externalLink={currentExternalLink}
+                                                defaultView={hasLiveResults ? 'results' : 'stream'}
+                                                height={{ xs: '620px', sm: '750px', md: '850px' }}
+                                            />
+                                        </AnimatedCard>
+                                    ) : (
+                                        <Box sx={{ textAlign: 'center', py: 8, px: 2, bgcolor: '#f8fafc', borderRadius: 3, border: '1px dashed #cbd5e1' }}>
+                                            <LiveTvIcon sx={{ fontSize: 52, color: '#94a3b8', mb: 1.5 }} />
+                                            <Typography variant="h6" fontWeight="bold" color="#334155" sx={{ mb: 0.5 }}>
+                                                {liveBoard?.title || 'Live Match Center'}
+                                            </Typography>
+                                            <Typography variant="body2" color="#64748b" sx={{ maxWidth: 500, mx: 'auto', lineHeight: 1.6 }}>
+                                                {liveBoard?.announcement || 'Live chess matches and tournament standings will be updated once the round commences.'}
+                                            </Typography>
+                                        </Box>
+                                    )}
+                                </Box>
                             );
                         })()}
 

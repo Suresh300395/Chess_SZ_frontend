@@ -21,8 +21,8 @@ const ManageLiveBoard = () => {
         currentRound: 'Round 1',
         status: 'LIVE',
         announcement: 'Tournament live board is active. Follow the top boards in real-time!',
-        embedUrl: 'https://s1.chess-results.com/tnr1522420.aspx?lan=1&SNode=S0',
-        externalLink: 'https://s1.chess-results.com/tnr1522420.aspx?lan=1&SNode=S0',
+        embedUrl: '',
+        externalLink: '',
         streamUrl: '',
         matches: []
     });
@@ -34,13 +34,13 @@ const ManageLiveBoard = () => {
             if (res.ok) {
                 const data = await res.json();
                 setFormData({
-                    title: data.title || 'South Zone Inter-University Chess Championship - Live Board',
-                    currentRound: data.currentRound || 'Round 1',
-                    status: data.status || 'LIVE',
-                    announcement: data.announcement || 'Tournament live board is active. Follow the top boards in real-time!',
-                    embedUrl: data.embedUrl || 'https://s1.chess-results.com/tnr1522420.aspx?lan=1&SNode=S0',
-                    externalLink: data.externalLink || 'https://s1.chess-results.com/tnr1522420.aspx?lan=1&SNode=S0',
-                    streamUrl: data.streamUrl || '',
+                    title: data.title ?? 'South Zone Inter-University Chess Championship - Live Board',
+                    currentRound: data.currentRound ?? 'Round 1',
+                    status: data.status ?? 'LIVE',
+                    announcement: data.announcement ?? 'Tournament live board is active. Follow the top boards in real-time!',
+                    embedUrl: data.embedUrl ?? '',
+                    externalLink: (data.externalLink !== undefined ? data.externalLink : data.embedUrl) ?? '',
+                    streamUrl: data.streamUrl ?? '',
                     matches: data.matches || []
                 });
             }
@@ -65,9 +65,26 @@ const ManageLiveBoard = () => {
         e.preventDefault();
         try {
             setSaving(true);
-            const res = await liveBoardAPI.update(formData);
+            const cleanEmbedUrl = (formData.embedUrl || '').trim();
+            const cleanStreamUrl = (formData.streamUrl || '').trim();
+            const payload = {
+                ...formData,
+                embedUrl: cleanEmbedUrl,
+                externalLink: cleanEmbedUrl, // Paina chess live link field okkati chalu, ade renditi work avvali
+                streamUrl: cleanStreamUrl
+            };
+            const res = await liveBoardAPI.update(payload);
             if (res.ok) {
+                const data = await res.json().catch(() => ({}));
                 toast.success('Live board settings saved successfully!');
+                if (data.liveBoard) {
+                    setFormData(prev => ({
+                        ...prev,
+                        embedUrl: data.liveBoard.embedUrl ?? '',
+                        externalLink: data.liveBoard.externalLink ?? '',
+                        streamUrl: data.liveBoard.streamUrl ?? ''
+                    }));
+                }
             } else {
                 const data = await res.json().catch(() => ({}));
                 toast.error(data.message || 'Failed to save live board');
@@ -128,51 +145,30 @@ const ManageLiveBoard = () => {
                             </Typography>
                         </Box>
 
-                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2.5, mb: 2 }}>
-                            <Box>
-                                <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155', mb: 0.8, fontSize: '13px' }}>
-                                    Live Board Embed URL (Chess-Results.com) *
-                                </Typography>
-                                <TextField
-                                    fullWidth
-                                    size="small"
-                                    name="embedUrl"
-                                    value={formData.embedUrl}
-                                    onChange={handleChange}
-                                    required
-                                    placeholder="https://s1.chess-results.com/tnr1522420.aspx?lan=1&SNode=S0"
-                                    helperText="Paste the Chess-Results URL to embed live standings and pairings into the home page."
-                                    sx={{
-                                        '& .MuiOutlinedInput-root': { borderRadius: 2 },
-                                        '& .MuiFormHelperText-root': { fontSize: '12px', color: '#64748b', mt: 0.8 }
-                                    }}
-                                />
-                            </Box>
-
-                            <Box>
-                                <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155', mb: 0.8, fontSize: '13px' }}>
-                                    External Full Screen / Pairings Link
-                                </Typography>
-                                <TextField
-                                    fullWidth
-                                    size="small"
-                                    name="externalLink"
-                                    value={formData.externalLink}
-                                    onChange={handleChange}
-                                    placeholder="https://s1.chess-results.com/tnr1522420.aspx?lan=1&SNode=S0"
-                                    helperText="Link used when users click 'Open in Full Screen / New Tab' on the home page live board."
-                                    sx={{
-                                        '& .MuiOutlinedInput-root': { borderRadius: 2 },
-                                        '& .MuiFormHelperText-root': { fontSize: '12px', color: '#64748b', mt: 0.8 }
-                                    }}
-                                />
-                            </Box>
+                        {/* Chess Results Live Link (Single Field for both Embed & External) */}
+                        <Box sx={{ mb: 2.5 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155', mb: 0.8, fontSize: '13px' }}>
+                                Chess Results Live Link
+                            </Typography>
+                            <TextField
+                                fullWidth
+                                size="small"
+                                name="embedUrl"
+                                value={formData.embedUrl}
+                                onChange={handleChange}
+                                placeholder="https://s1.chess-results.com/tnr1522420.aspx?lan=1&SNode=S0"
+                                helperText="Paste the Chess-Results tournament URL. This link is used for both the embedded live board standings and the 'Open in New Tab' button."
+                                sx={{
+                                    '& .MuiOutlinedInput-root': { borderRadius: 2 },
+                                    '& .MuiFormHelperText-root': { fontSize: '12px', color: '#64748b', mt: 0.8 }
+                                }}
+                            />
                         </Box>
 
-                        {/* Live Video Streaming URL Field */}
+                        {/* YouTube Live Stream Link */}
                         <Box sx={{ mb: 2 }}>
                             <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155', mb: 0.8, fontSize: '13px' }}>
-                                Live Video Streaming Embed URL (YouTube / Stream URL)
+                                YouTube Live Stream Link
                             </Typography>
                             <TextField
                                 fullWidth
@@ -180,8 +176,8 @@ const ManageLiveBoard = () => {
                                 name="streamUrl"
                                 value={formData.streamUrl}
                                 onChange={handleChange}
-                                placeholder="e.g. https://www.youtube.com/watch?v=... or https://www.youtube.com/embed/..."
-                                helperText="Enter a YouTube live stream or video link. When viewers on the home page click the 'Live Streaming' button, this live broadcast is displayed."
+                                placeholder="https://www.youtube.com/watch?v=... or https://www.youtube.com/live/..."
+                                helperText="Enter a YouTube live stream or video link. When viewers on the home page click 'Live Streaming', this broadcast is displayed."
                                 sx={{
                                     '& .MuiOutlinedInput-root': { borderRadius: 2 },
                                     '& .MuiFormHelperText-root': { fontSize: '12px', color: '#64748b', mt: 0.8 }
@@ -190,7 +186,7 @@ const ManageLiveBoard = () => {
                         </Box>
 
                         {/* Live Embed Preview */}
-                        {formData.embedUrl && (
+                        {(formData.embedUrl || formData.streamUrl) ? (
                             <Box sx={{ mt: 3, p: { xs: 1.5, sm: 2 }, bgcolor: '#f8fafc', borderRadius: 2.5, border: '1px solid #e2e8f0' }}>
                                 <Typography variant="subtitle2" fontWeight="700" sx={{ color: '#0b5299', fontSize: '13px', mb: 1.5 }}>
                                     Live Embed Preview (Interactive View)
@@ -199,9 +195,16 @@ const ManageLiveBoard = () => {
                                     url={formData.embedUrl}
                                     streamUrl={formData.streamUrl}
                                     title="Live Board Embed Preview"
-                                    externalLink={formData.externalLink || formData.embedUrl}
+                                    externalLink={formData.embedUrl}
+                                    defaultView={formData.embedUrl ? 'results' : 'stream'}
                                     height={{ xs: '450px', sm: '550px', md: '650px' }}
                                 />
+                            </Box>
+                        ) : (
+                            <Box sx={{ mt: 3, p: 3, bgcolor: '#f8fafc', borderRadius: 2.5, border: '1px dashed #cbd5e1', textAlign: 'center' }}>
+                                <Typography variant="body2" sx={{ color: '#94a3b8', fontSize: '13px' }}>
+                                    Live board preview will appear here once you enter a Chess Results link or YouTube Live Stream link.
+                                </Typography>
                             </Box>
                         )}
 

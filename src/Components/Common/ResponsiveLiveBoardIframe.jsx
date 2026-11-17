@@ -51,6 +51,17 @@ const ResponsiveLiveBoardIframe = ({
     const [refreshKey, setRefreshKey] = useState(0);
     const [activeView, setActiveView] = useState(defaultView); // 'results' | 'stream'
 
+    // Automatically switch activeView if one source is absent
+    useEffect(() => {
+        if (!url && streamUrl) {
+            setActiveView('stream');
+        } else if (url && !streamUrl) {
+            setActiveView('results');
+        } else if (defaultView) {
+            setActiveView(defaultView);
+        }
+    }, [url, streamUrl, defaultView]);
+
     const isChessResults = Boolean(url && url.toLowerCase().includes('chess-results.com'));
     const formattedStreamUrl = formatEmbedStreamUrl(streamUrl);
 
@@ -539,7 +550,7 @@ const ResponsiveLiveBoardIframe = ({
                             }}
                         />
                     </Box>
-                ) : (
+                ) : url ? (
                     <iframe
                         key={refreshKey}
                         src={url}
@@ -552,6 +563,50 @@ const ResponsiveLiveBoardIframe = ({
                         referrerPolicy="no-referrer-when-downgrade"
                         style={{ border: 0, width: '100%', height: '100%', display: 'block' }}
                     />
+                ) : (
+                    <Box
+                        sx={{
+                            width: '100%',
+                            height: '100%',
+                            minHeight: '380px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            p: 3,
+                            textAlign: 'center',
+                            bgcolor: '#f8fafc'
+                        }}
+                    >
+                        <Typography variant="h6" sx={{ fontWeight: 700, mb: 1, color: '#334155' }}>
+                            Chess Results Link Not Configured
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#64748b', maxWidth: 440, mb: formattedStreamUrl ? 2.5 : 0, lineHeight: 1.6, fontSize: '13px' }}>
+                            Live standings and pairings will appear here once the link is updated.
+                        </Typography>
+                        {formattedStreamUrl && (
+                            <Button
+                                variant="outlined"
+                                onClick={() => setActiveView('stream')}
+                                sx={{
+                                    color: '#dc2626',
+                                    borderColor: '#fca5a5',
+                                    borderRadius: '50px',
+                                    textTransform: 'none',
+                                    fontWeight: 600,
+                                    fontSize: '13px',
+                                    px: 2.5,
+                                    py: 0.8,
+                                    '&:hover': {
+                                        borderColor: '#dc2626',
+                                        bgcolor: '#fef2f2'
+                                    }
+                                }}
+                            >
+                                Switch to Live Stream
+                            </Button>
+                        )}
+                    </Box>
                 )}
             </Box>
         </Box>
