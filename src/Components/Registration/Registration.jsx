@@ -51,6 +51,7 @@ const Registration = () => {
     // Existing university reuse state
     const [selectedUniversity, setSelectedUniversity] = useState(null);
     const isExistingUniversity = Boolean(selectedUniversity?.isExistingUniversity);
+    const isUniversityDetailsFetched = Boolean(selectedUniversity);
 
     // Autocomplete search state
     const [searchResults, setSearchResults] = useState([]);
@@ -80,6 +81,8 @@ const Registration = () => {
         universityEmail: '',
         address: ''
     });
+
+    const hasUniversityName = Boolean(teamDetails.universityName && teamDetails.universityName.trim());
 
     const [players, setPlayers] = useState(createInitialPlayersList());
     const [coaches, setCoaches] = useState([createInitialCoach()]);
@@ -179,15 +182,43 @@ const Registration = () => {
         }
 
         setSelectedUniversity(uni);
-        const resolvedContact = uni.universityContact || uni.phone || '';
-        const resolvedEmail = uni.universityEmail || (uni.address && uni.address.includes('@') ? uni.address : '') || uni.email || '';
-        const resolvedAddress = uni.address || resolvedEmail || [uni.city, uni.state].filter(Boolean).join(', ');
+        let contact = (uni.universityContact || uni.phone || '').trim();
+        let email = (uni.universityEmail || uni.email || (uni.address && uni.address.includes('@') ? uni.address : '')).trim();
+        let address = (uni.address || email || [uni.city, uni.state].filter(Boolean).join(', ')).trim();
+
+        // Smart detect: if contact has '@' and email doesn't, swap them
+        if (contact.includes('@') && !email.includes('@')) {
+            const temp = contact;
+            contact = email;
+            email = temp;
+        } else if (contact.includes('@') && !email) {
+            email = contact;
+            contact = '';
+        }
+
+        // Smart detect: if email is digits / phone number and contact is not
+        if (/^[\d\s+\-()]{7,15}$/.test(email) && !/^[\d\s+\-()]{7,15}$/.test(contact)) {
+            const temp = contact;
+            contact = email;
+            email = temp;
+        }
+
+        // Clean digits for contact number
+        let digits = contact.replace(/\D/g, '');
+        if (digits.length === 12 && digits.startsWith('91')) {
+            digits = digits.slice(2);
+        } else if (digits.length === 11 && digits.startsWith('0')) {
+            digits = digits.slice(1);
+        }
+        if (digits.length === 10) {
+            contact = digits;
+        }
 
         setTeamDetails({
             universityName: uni.universityName,
-            universityContact: resolvedContact,
-            universityEmail: resolvedEmail,
-            address: resolvedAddress
+            universityContact: contact,
+            universityEmail: email,
+            address: address || email
         });
 
         if (uni.isExistingUniversity) {
@@ -239,8 +270,8 @@ const Registration = () => {
 
     const handleTeamChange = (e) => {
         const { name, value } = e.target;
-        if (isExistingUniversity && (name === 'universityContact' || name === 'universityEmail' || name === 'address')) {
-            return; // Locked for existing universities
+        if (isUniversityDetailsFetched && (name === 'universityContact' || name === 'universityEmail' || name === 'address')) {
+            return; // Locked after university details are fetched
         }
 
         let finalValue = value;
@@ -390,7 +421,7 @@ const Registration = () => {
     };
 
     const handleTeamBlur = (field) => {
-        if (field === 'universityContact' && !isExistingUniversity) {
+        if (field === 'universityContact' && !isUniversityDetailsFetched) {
             const val = teamDetails.universityContact;
             if (val && val.length !== 10) {
                 setErrors(prev => ({
@@ -398,7 +429,7 @@ const Registration = () => {
                     team: { ...prev.team, universityContact: 'Must be exactly 10 digits' }
                 }));
             }
-        } else if (field === 'universityEmail' && !isExistingUniversity) {
+        } else if (field === 'universityEmail' && !isUniversityDetailsFetched) {
             const val = (teamDetails.universityEmail || teamDetails.address || '').trim();
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             if (val && !emailRegex.test(val)) {
@@ -836,7 +867,17 @@ const Registration = () => {
                     <Box component="fieldset" className="section-fieldset">
                         <Box component="legend" className="section-legend">University Details of the Player</Box>
 
-                        <Box className="form-grid">
+                        <Box
+                            className={hasUniversityName ? "form-grid" : ""}
+                            sx={!hasUniversityName ? {
+                                maxWidth: { xs: '100%', sm: '560px' },
+                                mx: 'auto',
+                                py: { xs: 1, sm: 2 },
+                                transition: 'all 0.3s ease'
+                            } : {
+                                transition: 'all 0.3s ease'
+                            }}
+                        >
                             {/* University Name: Autocomplete, Always Editable */}
                             <Box sx={{ mt: 1 }}>
                                 <Autocomplete
@@ -923,54 +964,60 @@ const Registration = () => {
                                 />
                             </Box>
 
-                            {/* University Email: Read-only if existing */}
-                            <Box sx={{ mt: 1 }}>
-                                <TextField
-                                    fullWidth
-                                    label="University Email*"
-                                    name="universityEmail"
-                                    type="email"
-                                    value={teamDetails.universityEmail || teamDetails.address}
-                                    onChange={handleTeamChange}
-                                    onBlur={() => handleTeamBlur('universityEmail')}
-                                    error={!!(errors.team?.universityEmail || errors.team?.address)}
-                                    helperText={errors.team?.universityEmail || errors.team?.address || (isExistingUniversity ? 'Saved record (read-only)' : '')}
-                                    disabled={isExistingUniversity}
-                                    placeholder="e.g. sports@university.ac.in"
-                                    slotProps={{
-                                        input: {
-                                            readOnly: isExistingUniversity
-                                        }
-                                    }}
-                                    sx={isExistingUniversity ? { bgcolor: '#f8fafc', borderRadius: 1 } : {}}
-                                />
-                            </Box>
+                            {/* Remaining two fields appear only once university name is entered */}
+                            {hasUniversityName && (
+                                <>
+                                    {/* University Contact Number: Read-only if fetched */}
+                                    <Box sx={{ mt: 1 }}>
+                                        <TextField
+                                            fullWidth
+                                            label="University Contact No*"
+                                            name="universityContact"
+                                            type="tel"
+                                            value={teamDetails.universityContact}
+                                            onChange={handleTeamChange}
+                                            onBlur={() => handleTeamBlur('universityContact')}
+                                            error={!!errors.team?.universityContact}
+                                            helperText={errors.team?.universityContact || (isUniversityDetailsFetched ? 'Saved record (read-only)' : '')}
+                                            disabled={isUniversityDetailsFetched}
+                                            placeholder="e.g. 9876543210"
+                                            slotProps={{
+                                                input: {
+                                                    readOnly: isUniversityDetailsFetched
+                                                },
+                                                htmlInput: {
+                                                    maxLength: 10,
+                                                    inputMode: 'numeric'
+                                                }
+                                            }}
+                                            sx={isUniversityDetailsFetched ? { bgcolor: '#f8fafc', borderRadius: 1 } : {}}
+                                        />
+                                    </Box>
 
-                            {/* Contact Number: Read-only if existing */}
-                            <Box sx={{ mt: 1 }}>
-                                <TextField
-                                    fullWidth
-                                    label="University Contact No*"
-                                    name="universityContact"
-                                    type="tel"
-                                    value={teamDetails.universityContact}
-                                    onChange={handleTeamChange}
-                                    onBlur={() => handleTeamBlur('universityContact')}
-                                    error={!!errors.team?.universityContact}
-                                    helperText={errors.team?.universityContact || (isExistingUniversity ? 'Saved record (read-only)' : '')}
-                                    disabled={isExistingUniversity}
-                                    slotProps={{
-                                        input: {
-                                            readOnly: isExistingUniversity
-                                        },
-                                        htmlInput: {
-                                            maxLength: 10,
-                                            inputMode: 'numeric'
-                                        }
-                                    }}
-                                    sx={isExistingUniversity ? { bgcolor: '#f8fafc', borderRadius: 1 } : {}}
-                                />
-                            </Box>
+                                    {/* University Email: Read-only if fetched */}
+                                    <Box sx={{ mt: 1 }}>
+                                        <TextField
+                                            fullWidth
+                                            label="University Email*"
+                                            name="universityEmail"
+                                            type="email"
+                                            value={teamDetails.universityEmail || teamDetails.address}
+                                            onChange={handleTeamChange}
+                                            onBlur={() => handleTeamBlur('universityEmail')}
+                                            error={!!(errors.team?.universityEmail || errors.team?.address)}
+                                            helperText={errors.team?.universityEmail || errors.team?.address || (isUniversityDetailsFetched ? 'Saved record (read-only)' : '')}
+                                            disabled={isUniversityDetailsFetched}
+                                            placeholder="e.g. sports@university.ac.in"
+                                            slotProps={{
+                                                input: {
+                                                    readOnly: isUniversityDetailsFetched
+                                                }
+                                            }}
+                                            sx={isUniversityDetailsFetched ? { bgcolor: '#f8fafc', borderRadius: 1 } : {}}
+                                        />
+                                    </Box>
+                                </>
+                            )}
                         </Box>
                     </Box>
 
