@@ -5,6 +5,7 @@ import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import HomeIcon from '@mui/icons-material/Home';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import LogoutIcon from '@mui/icons-material/Logout';
+import InstallAppMenuItem from '../PWA/InstallAppMenuItem';
 import { getCurrentUser, clearAuthSession } from '../../utils/auth';
 import { SOCKET_URL } from '../../utils/api';
 import './ProfilePopover.css';
@@ -261,6 +262,9 @@ const ProfilePopover = ({
                             </Typography>
                             <KeyboardArrowRightIcon className="profile-action-arrow" sx={{ fontSize: 20, color: '#0b5299' }} />
                         </ButtonBase>
+
+                        {/* Install App Option (Automatically hidden when already installed) */}
+                        <InstallAppMenuItem onClick={handleClose} />
 
                         {/* Logout Action */}
                         <ButtonBase

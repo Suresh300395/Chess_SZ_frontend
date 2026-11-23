@@ -9,6 +9,7 @@ import QrCodeScannerRoundedIcon from '@mui/icons-material/QrCodeScannerRounded';
 import RestaurantRoundedIcon from '@mui/icons-material/RestaurantRounded';
 import GridViewOutlinedIcon from '@mui/icons-material/GridViewOutlined';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
+import InstallAppMenuItem from '../../PWA/InstallAppMenuItem';
 
 import { getCurrentUser } from '../../../utils/auth';
 import { getMenusByRole } from './RolesNav';
@@ -306,6 +307,13 @@ const MobileBottomBar = () => {
                             );
                         })}
                     </Box>
+
+                    {/* Quick Install Option in Drawer */}
+                    <InstallAppMenuItem
+                        variant="drawer"
+                        onClick={() => setModulesSheetOpen(false)}
+                        sx={{ mt: 2 }}
+                    />
                 </Box>
             </Drawer>
         </>

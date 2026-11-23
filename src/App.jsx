@@ -23,6 +23,10 @@ import FrontendLayout from './Components/FrontendLayout'
 import ProtectedRoute from './Components/Common/ProtectedRoute'
 import InactivityTracker from './Components/Common/InactivityTracker'
 import ForgotPasswordPage from './Components/Common/ForgotPasswordPage'
+import { PWAProvider } from './hooks/usePWA'
+import UpdateNotification from './Components/PWA/UpdateNotification'
+import OfflineIndicator from './Components/PWA/OfflineIndicator'
+import InstallModal from './Components/PWA/InstallModal'
 
 const theme = createTheme({
   typography: {
@@ -178,9 +182,13 @@ const theme = createTheme({
 function App() {
   return (
     <ThemeProvider theme={theme}>
-      <Toaster position="top-right" richColors closeButton />
-      <InactivityTracker />
-      <Routes>
+      <PWAProvider>
+        <Toaster position="top-right" richColors closeButton />
+        <InactivityTracker />
+        <OfflineIndicator />
+        <UpdateNotification />
+        <InstallModal />
+        <Routes>
         {/* Frontend Layout for Public and User Pages */}
         <Route element={<FrontendLayout />}>
             <Route path="/" element={<Home />} />
@@ -214,6 +222,7 @@ function App() {
           <Route path="/admin/university-master" element={<UniversityMaster />} />
         </Route>
       </Routes>
+      </PWAProvider>
     </ThemeProvider>
   )
 }

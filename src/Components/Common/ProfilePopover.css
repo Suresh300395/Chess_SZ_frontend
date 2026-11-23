@@ -136,6 +136,22 @@
     transform: translateX(3px);
 }
 
+.profile-popover-action-install {
+    background: linear-gradient(135deg, #fefce8 0%, #fef3c7 100%) !important;
+    border: 1px solid rgba(253, 230, 138, 0.6) !important;
+    margin-top: 10px !important;
+}
+
+.profile-popover-action-install:hover {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%) !important;
+    transform: translateX(3px) !important;
+    box-shadow: 0 4px 12px rgba(208, 108, 56, 0.15) !important;
+}
+
+.profile-popover-action-install:hover .profile-action-arrow {
+    transform: translateX(3px);
+}
+
 .profile-popover-action-logout {
     background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%) !important;
     border: 1px solid rgba(254, 215, 170, 0.4) !important;
