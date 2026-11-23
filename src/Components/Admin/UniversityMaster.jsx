@@ -76,7 +76,7 @@ const UniversityMaster = () => {
     const [formData, setFormData] = useState({
         name: '',
         phone: '',
-        mail: '',
+        email: '',
         status: 'ACTIVE'
     });
     const [saving, setSaving] = useState(false);
@@ -231,7 +231,7 @@ const UniversityMaster = () => {
         setFormData({
             name: '',
             phone: '',
-            mail: '',
+            email: '',
             status: 'ACTIVE'
         });
         setDuplicateWarning(null);
@@ -243,7 +243,7 @@ const UniversityMaster = () => {
         setFormData({
             name: uni.name || '',
             phone: uni.phone || '',
-            mail: uni.mail || uni.email || uni.address || '',
+            email: uni.email || uni.mail || uni.address || '',
             status: uni.status || 'ACTIVE'
         });
         setDuplicateWarning(null);
@@ -271,8 +271,8 @@ const UniversityMaster = () => {
             const payload = {
                 name: formData.name.trim(),
                 phone: formData.phone.trim(),
-                mail: (formData.mail || '').trim(),
-                email: (formData.mail || '').trim(),
+                email: (formData.email || '').trim(),
+                mail: (formData.email || '').trim(),
                 status: formData.status || 'ACTIVE'
             };
 
@@ -780,7 +780,7 @@ const UniversityMaster = () => {
                                     <TableCell sx={{ fontWeight: 700, color: '#334155', py: 1.75, width: 60 }}>#</TableCell>
                                     <TableCell sx={{ fontWeight: 700, color: '#334155', py: 1.75 }}>University Name</TableCell>
                                     <TableCell sx={{ fontWeight: 700, color: '#334155', py: 1.75 }}>University Contact</TableCell>
-                                    <TableCell sx={{ fontWeight: 700, color: '#334155', py: 1.75 }}>University Mail</TableCell>
+                                    <TableCell sx={{ fontWeight: 700, color: '#334155', py: 1.75 }}>University Email</TableCell>
                                     <TableCell sx={{ fontWeight: 700, color: '#334155', py: 1.75, textAlign: 'center' }}>Registered Players</TableCell>
                                     <TableCell sx={{ fontWeight: 700, color: '#334155', py: 1.75, textAlign: 'center' }}>Status</TableCell>
                                     <TableCell sx={{ fontWeight: 700, color: '#334155', py: 1.75, textAlign: 'center' }}>Actions</TableCell>
@@ -833,12 +833,12 @@ const UniversityMaster = () => {
                                                 )}
                                             </TableCell>
 
-                                            {/* University Mail */}
+                                            {/* University Email */}
                                             <TableCell sx={{ py: 1.5 }}>
-                                                {(uni.mail || uni.email || uni.address) ? (
+                                                {(uni.email || uni.mail || uni.address) ? (
                                                     <Typography sx={{ fontSize: '13px', color: '#475569', display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                                         <EmailOutlinedIcon sx={{ fontSize: 15, color: '#0b5299', flexShrink: 0 }} />
-                                                        <span>{uni.mail || uni.email || uni.address}</span>
+                                                        <span>{uni.email || uni.mail || uni.address}</span>
                                                     </Typography>
                                                 ) : (
                                                     <Typography variant="caption" sx={{ color: '#94a3b8' }}>—</Typography>
@@ -991,12 +991,12 @@ const UniversityMaster = () => {
                                         </Box>
                                     ) : null}
 
-                                    {/* University Mail */}
-                                    {(uni.mail || uni.email || uni.address) ? (
+                                    {/* University Email */}
+                                    {(uni.email || uni.mail || uni.address) ? (
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
                                             <EmailOutlinedIcon sx={{ fontSize: 15, color: '#0b5299', flexShrink: 0 }} />
                                             <Typography sx={{ fontSize: '13px', color: '#475569', wordBreak: 'break-all', lineHeight: 1.4 }}>
-                                                {uni.mail || uni.email || uni.address}
+                                                {uni.email || uni.mail || uni.address}
                                             </Typography>
                                         </Box>
                                     ) : null}
@@ -1176,12 +1176,12 @@ const UniversityMaster = () => {
                         type="tel"
                     />
 
-                    {/* 3. University Mail */}
+                    {/* 3. University Email */}
                     <TextField
-                        label="University Mail*"
+                        label="University Email*"
                         placeholder="e.g. sports@university.edu.in"
-                        value={formData.mail}
-                        onChange={(e) => setFormData(prev => ({ ...prev, mail: e.target.value }))}
+                        value={formData.email}
+                        onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                         fullWidth
                         type="email"
                     />
@@ -1229,7 +1229,7 @@ const UniversityMaster = () => {
                                     Step 1: Download Sample Excel Template
                                 </Typography>
                                 <Typography variant="caption" sx={{ color: '#3b82f6', display: 'block', mt: 0.2 }}>
-                                    The template contains columns: University Name, University Contact, University Mail, Status.
+                                    The template contains columns: University Name, University Contact, University Email, Status.
                                 </Typography>
                             </Box>
                             <Button
@@ -1293,7 +1293,7 @@ const UniversityMaster = () => {
                                         <TableRow>
                                             <TableCell sx={{ fontWeight: 700, fontSize: '12px' }}>University Name</TableCell>
                                             <TableCell sx={{ fontWeight: 700, fontSize: '12px' }}>University Contact</TableCell>
-                                            <TableCell sx={{ fontWeight: 700, fontSize: '12px' }}>University Mail</TableCell>
+                                            <TableCell sx={{ fontWeight: 700, fontSize: '12px' }}>University Email</TableCell>
                                             <TableCell sx={{ fontWeight: 700, fontSize: '12px' }}>Status</TableCell>
                                         </TableRow>
                                     </TableHead>
@@ -1302,7 +1302,7 @@ const UniversityMaster = () => {
                                             <TableRow key={i}>
                                                 <TableCell sx={{ fontSize: '12px', fontWeight: 600 }}>{r['University Name'] || r['Name'] || r['name'] || '—'}</TableCell>
                                                 <TableCell sx={{ fontSize: '12px' }}>{r['University Contact'] || r['Phone'] || r['phone'] || '—'}</TableCell>
-                                                <TableCell sx={{ fontSize: '12px' }}>{r['University Mail'] || r['Mail'] || r['mail'] || r['University Email'] || r['Email'] || r['email'] || r['Address'] || r['address'] || '—'}</TableCell>
+                                                <TableCell sx={{ fontSize: '12px' }}>{r['University Email'] || r['Email'] || r['email'] || r['University Mail'] || r['Mail'] || r['mail'] || r['Address'] || r['address'] || '—'}</TableCell>
                                                 <TableCell sx={{ fontSize: '12px' }}>{r['Status'] || 'ACTIVE'}</TableCell>
                                             </TableRow>
                                         ))}
