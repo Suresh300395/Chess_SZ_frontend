@@ -24,7 +24,10 @@ import {
     TableRow,
     Paper,
     Divider,
-    Tooltip
+    Tooltip,
+    Dialog,
+    DialogContent,
+    DialogActions
 } from '@mui/material';
 import QrCodeScannerIcon from '@mui/icons-material/QrCodeScanner';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -193,6 +196,7 @@ const QRScanner = () => {
     const controlsRef = useRef(null);
     const nativeScanRef = useRef(null);
     const handleTokenCodeDetectedRef = useRef(null);
+    const manualInputRef = useRef(null);
 
     const [videoDevices, setVideoDevices] = useState([]);
     const [selectedDeviceId, setSelectedDeviceId] = useState('');
@@ -211,9 +215,21 @@ const QRScanner = () => {
     // Manual input & current verification state
     const [manualCode, setManualCode] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
-    const [lastScanResult, setLastScanResult] = useState(null); // { token, status, message, error }
+    const [lastScanResult, setLastScanResult] = useState(null); // { token, status, isVerified, message, reason, timestamp }
     const [lastScannedCode, setLastScannedCode] = useState('');
     const [cooldown, setCooldown] = useState(false);
+    const [isResultDialogOpen, setIsResultDialogOpen] = useState(false);
+
+    // Close result dialog and immediately ready scanner for next token
+    const handleCloseDialog = useCallback(() => {
+        setIsResultDialogOpen(false);
+        setCooldown(false);
+        setLastScannedCode('');
+        setManualCode('');
+        setTimeout(() => {
+            manualInputRef.current?.focus();
+        }, 120);
+    }, []);
 
     // Session log / history of scans
     const [sessionHistory, setSessionHistory] = useState([]);
@@ -530,7 +546,7 @@ const QRScanner = () => {
         if (!cleanCode) return;
 
         // Debounce / Cooldown to avoid rapid multiple triggers of the same QR code
-        if (cooldown || isProcessing) return;
+        if (cooldown || isProcessing || isResultDialogOpen) return;
         if (cleanCode === lastScannedCode && Date.now() - (lastScanResult?.timestamp || 0) < 3000) {
             return;
         }
@@ -542,7 +558,7 @@ const QRScanner = () => {
         playAudioFeedback('scan', soundEnabled);
 
         await processTokenCode(cleanCode);
-    }, [cooldown, isProcessing, lastScannedCode, lastScanResult, soundEnabled]);
+    }, [cooldown, isProcessing, isResultDialogOpen, lastScannedCode, lastScanResult, soundEnabled]);
 
     useEffect(() => {
         handleTokenCodeDetectedRef.current = handleTokenCodeDetected;
@@ -564,11 +580,14 @@ const QRScanner = () => {
                     const scanData = {
                         token: data.token,
                         status: 'REDEEMED_NOW',
+                        isVerified: true,
                         message: data.message || `Token ${code} redeemed successfully!`,
+                        reason: '',
                         timestamp: Date.now()
                     };
                     setLastScanResult(scanData);
                     addSessionHistoryItem(scanData);
+                    setIsResultDialogOpen(true);
                     toast.success(data.message || `Redeemed for ${data.token?.name}!`);
                 } else if (res.status === 409) {
                     // Already redeemed
@@ -576,34 +595,44 @@ const QRScanner = () => {
                     const scanData = {
                         token: data.token,
                         status: 'ALREADY_REDEEMED',
+                        isVerified: false,
                         message: data.message || `Token ${code} was ALREADY REDEEMED!`,
+                        reason: data.message || `This token was ALREADY USED previously! Cannot serve meal again.`,
                         timestamp: Date.now()
                     };
                     setLastScanResult(scanData);
                     addSessionHistoryItem(scanData);
+                    setIsResultDialogOpen(true);
                     toast.warning(data.message || 'Already redeemed!');
                 } else if (res.status === 404) {
                     playAudioFeedback('error', soundEnabled);
                     const scanData = {
                         token: null,
                         status: 'NOT_FOUND',
+                        isVerified: false,
                         message: data.message || `Token "${code}" not found in database.`,
+                        reason: `Token code "${code}" does not exist in the database. Please check the QR code or verify registration.`,
                         timestamp: Date.now()
                     };
                     setLastScanResult(scanData);
                     addSessionHistoryItem(scanData);
+                    setIsResultDialogOpen(true);
                     toast.error(data.message || 'Token not found');
                 } else {
                     // Cancelled or server error
                     playAudioFeedback('error', soundEnabled);
+                    const isCancelled = data.token?.status === 'CANCELLED';
                     const scanData = {
                         token: data.token || null,
-                        status: data.token?.status === 'CANCELLED' ? 'CANCELLED' : 'INVALID',
+                        status: isCancelled ? 'CANCELLED' : 'INVALID',
+                        isVerified: false,
                         message: data.message || `Unable to redeem token (${code})`,
+                        reason: data.message || (isCancelled ? 'This token has been CANCELLED by the admin.' : `Unable to verify token (${code}).`),
                         timestamp: Date.now()
                     };
                     setLastScanResult(scanData);
                     addSessionHistoryItem(scanData);
+                    setIsResultDialogOpen(true);
                     toast.error(data.message || 'Failed to redeem token');
                 }
             } else {
@@ -612,7 +641,8 @@ const QRScanner = () => {
                 const data = await res.json();
 
                 if (res.ok && data.success) {
-                    if (data.token.status === 'ISSUED') {
+                    const isIssued = data.token.status === 'ISSUED';
+                    if (isIssued) {
                         playAudioFeedback('success', soundEnabled);
                     } else {
                         playAudioFeedback('error', soundEnabled);
@@ -620,18 +650,24 @@ const QRScanner = () => {
                     const scanData = {
                         token: data.token,
                         status: data.token.status,
+                        isVerified: isIssued,
                         message: `Token is ${data.token.status}`,
+                        reason: isIssued ? '' : `Token status is ${data.token.status} (Not valid for redemption)`,
                         timestamp: Date.now()
                     };
                     setLastScanResult(scanData);
+                    setIsResultDialogOpen(true);
                 } else {
                     playAudioFeedback('error', soundEnabled);
                     setLastScanResult({
                         token: null,
                         status: 'NOT_FOUND',
+                        isVerified: false,
                         message: data.message || `Token code "${code}" not found`,
+                        reason: data.message || `Token code "${code}" does not exist in the database.`,
                         timestamp: Date.now()
                     });
+                    setIsResultDialogOpen(true);
                 }
             }
         } catch (err) {
@@ -640,9 +676,12 @@ const QRScanner = () => {
             setLastScanResult({
                 token: null,
                 status: 'ERROR',
+                isVerified: false,
                 message: 'Network or server error while validating token',
+                reason: 'Network or server error occurred while connecting to the database.',
                 timestamp: Date.now()
             });
+            setIsResultDialogOpen(true);
             toast.error('Network or server error');
         } finally {
             setIsProcessing(false);
@@ -990,6 +1029,7 @@ const QRScanner = () => {
                                     alignItems: 'stretch'
                                 }}>
                                     <TextField
+                                        inputRef={manualInputRef}
                                         size="small"
                                         fullWidth
                                         placeholder="Enter or scan token code (e.g. 7W36FS9GCB)"
@@ -1035,96 +1075,239 @@ const QRScanner = () => {
                             </form>
                         </Box>
 
-                        {/* Scan Result & Meal Details (Appears right here when a token is scanned) */}
-                        {lastScanResult && (
-                            <Box sx={{ mt: 3, pt: 2.5, borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                {/* Big Status Banner */}
-                                {lastScanResult.status === 'REDEEMED_NOW' && (
-                                    <Box sx={{
-                                        backgroundColor: '#e8f5e9',
-                                        border: '2px solid #4caf50',
-                                        borderRadius: 2,
-                                        p: 2,
-                                        textAlign: 'center'
-                                    }}>
-                                        <CheckCircleIcon sx={{ fontSize: 44, color: '#2e7d32', mb: 0.5 }} />
-                                        <Typography variant="h6" sx={{ fontWeight: 800, color: '#2e7d32', letterSpacing: 0.5 }}>
-                                            MEAL SERVED - REDEEMED!
-                                        </Typography>
-                                        <Typography variant="caption" sx={{ color: '#1b5e20', fontWeight: 600 }}>
-                                            Token successfully accepted
-                                        </Typography>
-                                    </Box>
-                                )}
-
-                                {lastScanResult.status === 'ISSUED' && (
-                                    <Box sx={{
-                                        backgroundColor: '#e3f2fd',
-                                        border: '2px solid #2196f3',
-                                        borderRadius: 2,
-                                        p: 2,
-                                        textAlign: 'center'
-                                    }}>
-                                        <CheckCircleIcon sx={{ fontSize: 44, color: '#1976d2', mb: 0.5 }} />
-                                        <Typography variant="h6" sx={{ fontWeight: 800, color: '#1565c0' }}>
-                                            TOKEN VALID
-                                        </Typography>
-                                        <Typography variant="caption" sx={{ color: '#0d47a1', fontWeight: 600 }}>
-                                            Eligible for redemption
-                                        </Typography>
-                                    </Box>
-                                )}
-
-                                {lastScanResult.status === 'ALREADY_REDEEMED' && (
-                                    <Box sx={{
-                                        backgroundColor: '#ffebee',
-                                        border: '2px solid #f44336',
-                                        borderRadius: 2,
-                                        p: 2,
-                                        textAlign: 'center'
-                                    }}>
-                                        <WarningAmberIcon sx={{ fontSize: 44, color: '#d32f2f', mb: 0.5 }} />
-                                        <Typography variant="h6" sx={{ fontWeight: 800, color: '#c62828' }}>
-                                            ALREADY REDEEMED!
-                                        </Typography>
-                                        <Typography variant="body2" sx={{ color: '#b71c1c', fontWeight: 600, mt: 0.5 }}>
-                                            {lastScanResult.message}
-                                        </Typography>
-                                    </Box>
-                                )}
-
-                                {(lastScanResult.status === 'CANCELLED' || lastScanResult.status === 'INVALID' || lastScanResult.status === 'NOT_FOUND' || lastScanResult.status === 'ERROR') && (
-                                    <Box sx={{
-                                        backgroundColor: '#fff3e0',
-                                        border: '2px solid #ff9800',
-                                        borderRadius: 2,
-                                        p: 2,
-                                        textAlign: 'center'
-                                    }}>
-                                        <ErrorOutlineIcon sx={{ fontSize: 44, color: '#e65100', mb: 0.5 }} />
-                                        <Typography variant="h6" sx={{ fontWeight: 800, color: '#e65100' }}>
-                                            {lastScanResult.status === 'CANCELLED' ? 'TOKEN CANCELLED' : 'INVALID TOKEN'}
-                                        </Typography>
-                                        <Typography variant="body2" sx={{ color: '#bf360c', fontWeight: 600, mt: 0.5 }}>
-                                            {lastScanResult.message}
-                                        </Typography>
-                                    </Box>
-                                )}
-
-                                {/* Clear / Scan Next Button */}
-                                <Button
-                                    variant="outlined"
-                                    size="small"
-                                    onClick={() => setLastScanResult(null)}
-                                    startIcon={<RestartAltIcon />}
-                                    sx={{ alignSelf: 'flex-start' }}
-                                >
-                                    Scan Next Token
-                                </Button>
-                            </Box>
-                        )}
                     </CardContent>
             </Card>
+
+            {/* Verification Result Dialog Box */}
+            <Dialog
+                open={isResultDialogOpen}
+                onClose={handleCloseDialog}
+                maxWidth="xs"
+                fullWidth
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleCloseDialog();
+                    }
+                }}
+                PaperProps={{
+                    sx: {
+                        borderRadius: '20px',
+                        p: 1,
+                        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.08)'
+                    }
+                }}
+            >
+                <DialogContent sx={{ textAlign: 'center', pt: 3, pb: 2 }}>
+                    {lastScanResult?.isVerified ? (
+                        /* VERIFIED / SUCCESS */
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            <Box sx={{
+                                width: 72,
+                                height: 72,
+                                borderRadius: '50%',
+                                backgroundColor: '#e8f5e9',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                mb: 1.5,
+                                border: '3px solid #81c784'
+                            }}>
+                                <CheckCircleIcon sx={{ fontSize: 48, color: '#2e7d32' }} />
+                            </Box>
+
+                            <Typography variant="h5" sx={{ fontWeight: 800, color: '#1b5e20', letterSpacing: 0.5, mb: 0.5 }}>
+                                Verified
+                            </Typography>
+
+                            <Typography variant="body2" sx={{ color: '#388e3c', fontWeight: 600, mb: 2 }}>
+                                Food Token Accepted & Meal Served!
+                            </Typography>
+
+                            {lastScanResult.token && (
+                                <Box sx={{
+                                    width: '100%',
+                                    backgroundColor: '#f8fafc',
+                                    border: '1px solid #e2e8f0',
+                                    borderRadius: '12px',
+                                    p: 2,
+                                    textAlign: 'left',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: 1.2
+                                }}>
+                                    {/* Name */}
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <PersonIcon sx={{ color: '#0b5299', fontSize: 20 }} />
+                                        <Box>
+                                            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', lineHeight: 1 }}>
+                                                Name
+                                            </Typography>
+                                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#0f172a' }}>
+                                                {lastScanResult.token.name || 'N/A'}
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+
+                                    <Divider />
+
+                                    {/* Meal & Date */}
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Box>
+                                            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', lineHeight: 1 }}>
+                                                Meal Type
+                                            </Typography>
+                                            <Chip
+                                                label={(lastScanResult.token.mealType || 'MEAL').toUpperCase()}
+                                                size="small"
+                                                sx={{
+                                                    fontWeight: 800,
+                                                    backgroundColor: '#0b5299',
+                                                    color: '#ffffff',
+                                                    mt: 0.5
+                                                }}
+                                            />
+                                        </Box>
+                                        <Box sx={{ textAlign: 'right' }}>
+                                            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', lineHeight: 1 }}>
+                                                Meal Date
+                                            </Typography>
+                                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#0f172a', mt: 0.5 }}>
+                                                {lastScanResult.token.mealDate || 'N/A'}
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+
+                                    {/* University */}
+                                    {lastScanResult.token.universityName && (
+                                        <>
+                                            <Divider />
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <SchoolIcon sx={{ color: '#d06c38', fontSize: 18 }} />
+                                                <Box sx={{ minWidth: 0 }}>
+                                                    <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', lineHeight: 1 }}>
+                                                        University
+                                                    </Typography>
+                                                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                        {lastScanResult.token.universityName}
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+                                        </>
+                                    )}
+
+                                    <Divider />
+
+                                    {/* Token Code */}
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                            Token Code
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ fontFamily: 'monospace', fontWeight: 800, letterSpacing: '1px', backgroundColor: '#e2e8f0', px: 1, py: 0.3, borderRadius: '4px' }}>
+                                            {lastScanResult.token.code || lastScannedCode}
+                                        </Typography>
+                                    </Box>
+                                </Box>
+                            )}
+                        </Box>
+                    ) : (
+                        /* NOT VERIFIED / FAILED */
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            <Box sx={{
+                                width: 72,
+                                height: 72,
+                                borderRadius: '50%',
+                                backgroundColor: lastScanResult?.status === 'ALREADY_REDEEMED' ? '#fff3e0' : '#ffebee',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                mb: 1.5,
+                                border: lastScanResult?.status === 'ALREADY_REDEEMED' ? '3px solid #ffb74d' : '3px solid #e57373'
+                            }}>
+                                {lastScanResult?.status === 'ALREADY_REDEEMED' ? (
+                                    <WarningAmberIcon sx={{ fontSize: 46, color: '#e65100' }} />
+                                ) : (
+                                    <ErrorOutlineIcon sx={{ fontSize: 46, color: '#d32f2f' }} />
+                                )}
+                            </Box>
+
+                            <Typography variant="h5" sx={{
+                                fontWeight: 800,
+                                color: lastScanResult?.status === 'ALREADY_REDEEMED' ? '#e65100' : '#c62828',
+                                letterSpacing: 0.5,
+                                mb: 0.5
+                            }}>
+                                {lastScanResult?.status === 'ALREADY_REDEEMED' ? 'Already Redeemed!' : 'Verification Failed'}
+                            </Typography>
+
+                            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, mb: 2 }}>
+                                This food token cannot be accepted
+                            </Typography>
+
+                            {/* Reason Box */}
+                            <Box sx={{
+                                width: '100%',
+                                backgroundColor: lastScanResult?.status === 'ALREADY_REDEEMED' ? '#fff8e1' : '#fef2f2',
+                                border: lastScanResult?.status === 'ALREADY_REDEEMED' ? '1.5px solid #ffe082' : '1.5px solid #fecaca',
+                                borderRadius: '12px',
+                                p: 2,
+                                textAlign: 'left'
+                            }}>
+                                <Typography variant="caption" sx={{ fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', mb: 0.5 }}>
+                                    Reason:
+                                </Typography>
+                                <Typography variant="body2" sx={{
+                                    fontWeight: 700,
+                                    color: lastScanResult?.status === 'ALREADY_REDEEMED' ? '#b45309' : '#b91c1c',
+                                    lineHeight: 1.4
+                                }}>
+                                    {lastScanResult?.reason || lastScanResult?.message || 'Invalid or unverified token.'}
+                                </Typography>
+
+                                {/* Show token details if available */}
+                                {lastScanResult?.token && (
+                                    <Box sx={{ mt: 1.5, pt: 1.5, borderTop: '1px dashed #cbd5e1' }}>
+                                        <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>
+                                            <strong>Issued To:</strong> {lastScanResult.token.name} ({lastScanResult.token.mealType || 'Meal'})
+                                        </Typography>
+                                        {lastScanResult.token.universityName && (
+                                            <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>
+                                                <strong>University:</strong> {lastScanResult.token.universityName}
+                                            </Typography>
+                                        )}
+                                        <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>
+                                            <strong>Token Code:</strong> {lastScanResult.token.code}
+                                        </Typography>
+                                    </Box>
+                                )}
+                            </Box>
+                        </Box>
+                    )}
+                </DialogContent>
+
+                {/* OK Button at Bottom Right Corner */}
+                <DialogActions sx={{ px: 3, pb: 2.5, pt: 0, justifyContent: 'flex-end' }}>
+                    <Button
+                        variant="contained"
+                        autoFocus
+                        onClick={handleCloseDialog}
+                        sx={{
+                            minWidth: '100px',
+                            py: 1,
+                            px: 3.5,
+                            fontWeight: 700,
+                            fontSize: '0.95rem',
+                            borderRadius: '8px',
+                            backgroundColor: lastScanResult?.isVerified ? '#2e7d32' : '#0b5299',
+                            '&:hover': {
+                                backgroundColor: lastScanResult?.isVerified ? '#1b5e20' : '#093e74'
+                            }
+                        }}
+                    >
+                        OK
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };
