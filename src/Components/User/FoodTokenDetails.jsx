@@ -547,6 +547,10 @@ const FoodTokenDetails = ({ onBack }) => {
         const generateQRs = async () => {
             const map = {};
             for (const token of data.tokens) {
+                // Skip generating QR for expired or cancelled tokens
+                if (token.isExpired || token.status === 'EXPIRED' || token.status === 'CANCELLED' || isMealTokenExpired(token.mealDate, token.mealType)) {
+                    continue;
+                }
                 try {
                     map[token.code] = await QRCode.toDataURL(token.code, {
                         width: 240,
@@ -837,57 +841,138 @@ const FoodTokenDetails = ({ onBack }) => {
                         </DialogTitle>
 
                         <DialogContent sx={{ textAlign: 'center', pt: 1, pb: 2 }}>
-                            {/* QR Code */}
-                            <Box
-                                sx={{
-                                    p: 1.5,
-                                    bgcolor: '#ffffff',
-                                    border: '2px solid #fed7aa',
-                                    borderRadius: '16px',
-                                    display: 'inline-flex',
-                                    boxShadow: '0 4px 16px rgba(249, 115, 22, 0.1)',
-                                    mb: 2
-                                }}
-                            >
-                                {qrMap[detailsToken.code] ? (
-                                    <img
-                                        src={qrMap[detailsToken.code]}
-                                        alt={`QR for ${detailsToken.code}`}
-                                        style={{ width: 180, height: 180, display: 'block', borderRadius: '8px' }}
-                                    />
-                                ) : (
-                                    <Box sx={{ width: 180, height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        <CircularProgress size={30} sx={{ color: '#ea580c' }} />
-                                    </Box>
-                                )}
-                            </Box>
+                            {/* Check if coupon is expired */}
+                            {(() => {
+                                const isExpired = detailsToken.isExpired || detailsToken.status === 'EXPIRED' || isMealTokenExpired(detailsToken.mealDate, detailsToken.mealType);
 
-                            {/* Coupon Code Pill */}
-                            <Box
-                                onClick={() => handleCopy(detailsToken.code)}
-                                sx={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: 1,
-                                    px: 2,
-                                    py: 0.75,
-                                    bgcolor: '#fff7ed',
-                                    borderRadius: '12px',
-                                    border: '1.5px dashed #ea580c',
-                                    cursor: 'pointer',
-                                    mb: 2,
-                                    '&:hover': { bgcolor: '#ffedd5' }
-                                }}
-                            >
-                                <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#9a3412', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                                    CODE:
-                                </Typography>
-                                <Typography sx={{ fontFamily: 'monospace', fontSize: 18, fontWeight: 900, color: '#ea580c', letterSpacing: '2px' }}>
-                                    {detailsToken.code}
-                                </Typography>
-                                <ContentCopyIcon sx={{ fontSize: 16, color: '#9a3412' }} />
-                            </Box>
+                                if (isExpired) {
+                                    return (
+                                        <>
+                                            {/* Expired Visual Block - No QR Shown */}
+                                            <Box
+                                                sx={{
+                                                    p: 2.5,
+                                                    bgcolor: '#fef2f2',
+                                                    border: '2px dashed #fca5a5',
+                                                    borderRadius: '16px',
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    minHeight: 180,
+                                                    width: 220,
+                                                    mx: 'auto',
+                                                    mb: 2
+                                                }}
+                                            >
+                                                <Box
+                                                    sx={{
+                                                        width: 56,
+                                                        height: 56,
+                                                        borderRadius: '50%',
+                                                        bgcolor: '#fee2e2',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        mb: 1.2
+                                                    }}
+                                                >
+                                                    <ScheduleIcon sx={{ fontSize: 32, color: '#dc2626' }} />
+                                                </Box>
+                                                <Typography sx={{ fontSize: '1.05rem', fontWeight: 900, color: '#991b1b', letterSpacing: '0.5px' }}>
+                                                    COUPON EXPIRED
+                                                </Typography>
+                                                <Typography sx={{ fontSize: '0.78rem', color: '#7f1d1d', fontWeight: 600, mt: 0.5, lineHeight: 1.3 }}>
+                                                    Cutoff passed ({getMealExpiryCutoffLabel(detailsToken.mealType)})
+                                                </Typography>
+                                                <Typography sx={{ fontSize: '0.7rem', color: '#b91c1c', mt: 0.5 }}>
+                                                    QR Code is disabled and invalid
+                                                </Typography>
+                                            </Box>
+
+                                            {/* Expired Code Pill - Disabled */}
+                                            <Box
+                                                sx={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: 1,
+                                                    px: 2,
+                                                    py: 0.75,
+                                                    bgcolor: '#f1f5f9',
+                                                    borderRadius: '12px',
+                                                    border: '1.5px solid #cbd5e1',
+                                                    mb: 2
+                                                }}
+                                            >
+                                                <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                                                    CODE:
+                                                </Typography>
+                                                <Typography sx={{ fontFamily: 'monospace', fontSize: 17, fontWeight: 900, color: '#64748b', letterSpacing: '2px', textDecoration: 'line-through' }}>
+                                                    {detailsToken.code}
+                                                </Typography>
+                                                <Chip label="EXPIRED" size="small" sx={{ bgcolor: '#fee2e2', color: '#b91c1c', fontWeight: 800, fontSize: '0.65rem', height: 20 }} />
+                                            </Box>
+                                        </>
+                                    );
+                                }
+
+                                return (
+                                    <>
+                                        {/* Active Valid QR Code */}
+                                        <Box
+                                            sx={{
+                                                p: 1.5,
+                                                bgcolor: '#ffffff',
+                                                border: '2px solid #fed7aa',
+                                                borderRadius: '16px',
+                                                display: 'inline-flex',
+                                                boxShadow: '0 4px 16px rgba(249, 115, 22, 0.1)',
+                                                mb: 2
+                                            }}
+                                        >
+                                            {qrMap[detailsToken.code] ? (
+                                                <img
+                                                    src={qrMap[detailsToken.code]}
+                                                    alt={`QR for ${detailsToken.code}`}
+                                                    style={{ width: 180, height: 180, display: 'block', borderRadius: '8px' }}
+                                                />
+                                            ) : (
+                                                <Box sx={{ width: 180, height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                    <CircularProgress size={30} sx={{ color: '#ea580c' }} />
+                                                </Box>
+                                            )}
+                                        </Box>
+
+                                        {/* Coupon Code Pill */}
+                                        <Box
+                                            onClick={() => handleCopy(detailsToken.code)}
+                                            sx={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: 1,
+                                                px: 2,
+                                                py: 0.75,
+                                                bgcolor: '#fff7ed',
+                                                borderRadius: '12px',
+                                                border: '1.5px dashed #ea580c',
+                                                cursor: 'pointer',
+                                                mb: 2,
+                                                '&:hover': { bgcolor: '#ffedd5' }
+                                            }}
+                                        >
+                                            <Typography sx={{ fontSize: 11, fontWeight: 700, color: '#9a3412', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                                                CODE:
+                                            </Typography>
+                                            <Typography sx={{ fontFamily: 'monospace', fontSize: 18, fontWeight: 900, color: '#ea580c', letterSpacing: '2px' }}>
+                                                {detailsToken.code}
+                                            </Typography>
+                                            <ContentCopyIcon sx={{ fontSize: 16, color: '#9a3412' }} />
+                                        </Box>
+                                    </>
+                                );
+                            })()}
 
                             {/* Details Card */}
                             <Box sx={{ bgcolor: '#f8fafc', borderRadius: '12px', p: 1.5, textAlign: 'left', border: '1px solid #e2e8f0' }}>

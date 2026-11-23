@@ -589,6 +589,21 @@ const QRScanner = () => {
                     addSessionHistoryItem(scanData);
                     setIsResultDialogOpen(true);
                     toast.success(data.message || `Redeemed for ${data.token?.name}!`);
+                } else if (res.status === 410 || data.isExpired || data.status === 'EXPIRED') {
+                    // Expired coupon
+                    playAudioFeedback('error', soundEnabled);
+                    const scanData = {
+                        token: data.token || null,
+                        status: 'EXPIRED',
+                        isVerified: false,
+                        message: data.message || `Token ${code} has EXPIRED!`,
+                        reason: data.message || `Meal cutoff time has passed for ${data.token?.mealType || 'meal'} on ${data.token?.mealDate || 'date'}. Coupon is INVALID and cannot be served.`,
+                        timestamp: Date.now()
+                    };
+                    setLastScanResult(scanData);
+                    addSessionHistoryItem(scanData);
+                    setIsResultDialogOpen(true);
+                    toast.error(data.message || 'Coupon expired / Invalid');
                 } else if (res.status === 409) {
                     // Already redeemed
                     playAudioFeedback('error', soundEnabled);
@@ -657,6 +672,21 @@ const QRScanner = () => {
                     };
                     setLastScanResult(scanData);
                     setIsResultDialogOpen(true);
+                } else if (res.status === 410 || data.isExpired || data.status === 'EXPIRED') {
+                    // Expired coupon
+                    playAudioFeedback('error', soundEnabled);
+                    const scanData = {
+                        token: data.token || null,
+                        status: 'EXPIRED',
+                        isVerified: false,
+                        message: data.message || `Token ${code} has EXPIRED!`,
+                        reason: data.message || `Meal cutoff time has passed for ${data.token?.mealType || 'meal'} on ${data.token?.mealDate || 'date'}. Coupon is INVALID.`,
+                        timestamp: Date.now()
+                    };
+                    setLastScanResult(scanData);
+                    addSessionHistoryItem(scanData);
+                    setIsResultDialogOpen(true);
+                    toast.error(data.message || 'Coupon expired / Invalid');
                 } else {
                     playAudioFeedback('error', soundEnabled);
                     setLastScanResult({
@@ -1217,12 +1247,12 @@ const QRScanner = () => {
                                 width: 72,
                                 height: 72,
                                 borderRadius: '50%',
-                                backgroundColor: lastScanResult?.status === 'ALREADY_REDEEMED' ? '#fff3e0' : '#ffebee',
+                                backgroundColor: lastScanResult?.status === 'ALREADY_REDEEMED' ? '#fff3e0' : lastScanResult?.status === 'EXPIRED' ? '#fef2f2' : '#ffebee',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 mb: 1.5,
-                                border: lastScanResult?.status === 'ALREADY_REDEEMED' ? '3px solid #ffb74d' : '3px solid #e57373'
+                                border: lastScanResult?.status === 'ALREADY_REDEEMED' ? '3px solid #ffb74d' : lastScanResult?.status === 'EXPIRED' ? '3px solid #ef4444' : '3px solid #e57373'
                             }}>
                                 {lastScanResult?.status === 'ALREADY_REDEEMED' ? (
                                     <WarningAmberIcon sx={{ fontSize: 46, color: '#e65100' }} />
@@ -1237,7 +1267,7 @@ const QRScanner = () => {
                                 letterSpacing: 0.5,
                                 mb: 0.5
                             }}>
-                                {lastScanResult?.status === 'ALREADY_REDEEMED' ? 'Already Redeemed!' : 'Verification Failed'}
+                                {lastScanResult?.status === 'ALREADY_REDEEMED' ? 'Already Redeemed!' : lastScanResult?.status === 'EXPIRED' ? 'Coupon Expired / Invalid' : 'Verification Failed'}
                             </Typography>
 
                             <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, mb: 2 }}>

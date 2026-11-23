@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
     Box, TextField, MenuItem, FormControl, FormLabel, RadioGroup,
     FormControlLabel, Radio, Button, Typography, Dialog,
@@ -12,6 +12,25 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import Authentication from '../Admin/Authentication';
 import { registrationAPI, universityMasterAPI } from '../../utils/api';
 import { AnimatedCard, AnimatedText } from '../animations';
+
+// Helper to get today's date string YYYY-MM-DD
+const getTodayDateString = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+// Helper to get max DOB date string (Minimum 15 years old)
+const getMaxDobDateString = () => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - 15);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
 
 const createInitialPlayer = () => ({
     playerName: '',
@@ -47,6 +66,10 @@ const Registration = () => {
     const [submitting, setSubmitting] = useState(false);
     const [copiedField, setCopiedField] = useState('');
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+
+    // Date constraints for HTML5 pickers & validation
+    const todayStr = useMemo(() => getTodayDateString(), []);
+    const maxDobStr = useMemo(() => getMaxDobDateString(), []);
 
     // Existing university reuse state
     const [selectedUniversity, setSelectedUniversity] = useState(null);
@@ -182,43 +205,60 @@ const Registration = () => {
         }
 
         setSelectedUniversity(uni);
-        let contact = (uni.universityContact || uni.phone || '').trim();
-        let email = (uni.universityEmail || uni.email || (uni.address && uni.address.includes('@') ? uni.address : '')).trim();
-        let address = (uni.address || email || [uni.city, uni.state].filter(Boolean).join(', ')).trim();
 
-        // Smart detect: if contact has '@' and email doesn't, swap them
-        if (contact.includes('@') && !email.includes('@')) {
-            const temp = contact;
-            contact = email;
-            email = temp;
-        } else if (contact.includes('@') && !email) {
-            email = contact;
-            contact = '';
+        let email = '';
+        let contact = '';
+
+        // 1. Resolve email: look for any candidate field that contains '@'
+        const candidateEmails = [uni.universityEmail, uni.email, uni.address, uni.phone];
+        for (const f of candidateEmails) {
+            if (f && typeof f === 'string' && f.includes('@')) {
+                email = f.trim();
+                break;
+            }
         }
 
-        // Smart detect: if email is digits / phone number and contact is not
-        if (/^[\d\s+\-()]{7,15}$/.test(email) && !/^[\d\s+\-()]{7,15}$/.test(contact)) {
-            const temp = contact;
-            contact = email;
-            email = temp;
+        // 2. Resolve contact phone number: look for 10-digit mobile number
+        const candidateContacts = [uni.universityContact, uni.phone, uni.address, uni.email];
+        for (const f of candidateContacts) {
+            if (f && typeof f === 'string' && !f.includes('@')) {
+                const match = f.match(/[6-9]\d{9}/);
+                if (match) {
+                    contact = match[0];
+                    break;
+                } else {
+                    const digits = f.replace(/\D/g, '');
+                    if (digits.length >= 10) {
+                        const clean = digits.length === 12 && digits.startsWith('91') ? digits.slice(2)
+                            : digits.length === 11 && digits.startsWith('0') ? digits.slice(1)
+                            : digits.slice(-10);
+                        if (/^[6-9]\d{9}$/.test(clean)) {
+                            contact = clean;
+                            break;
+                        }
+                    }
+                }
+            }
         }
 
-        // Clean digits for contact number
-        let digits = contact.replace(/\D/g, '');
-        if (digits.length === 12 && digits.startsWith('91')) {
-            digits = digits.slice(2);
-        } else if (digits.length === 11 && digits.startsWith('0')) {
-            digits = digits.slice(1);
-        }
-        if (digits.length === 10) {
-            contact = digits;
+        // 3. Fallback: if contact is still empty, check if any field has 10 digits
+        if (!contact) {
+            for (const f of candidateContacts) {
+                if (f && typeof f === 'string') {
+                    const match = f.match(/[6-9]\d{9}/);
+                    if (match) {
+                        contact = match[0];
+                        break;
+                    }
+                }
+            }
         }
 
         setTeamDetails({
-            universityName: uni.universityName,
+            universityName: uni.universityName || uni.name || '',
             universityContact: contact,
             universityEmail: email,
-            address: address || email
+            address: email
         });
 
         if (uni.isExistingUniversity) {
@@ -352,13 +392,73 @@ const Registration = () => {
             if (finalValue.length === 10) {
                 errorMsg = '';
             }
-        } else if (name === 'dob' || name === 'arrivalDate' || name === 'departureDate') {
+        } else if (name === 'dob') {
             if (value) {
                 const parts = value.split('-');
                 if (parts[0] && parts[0].length > 4) {
                     parts[0] = parts[0].slice(0, 4);
                     finalValue = parts.join('-');
                 }
+                if (finalValue > todayStr) {
+                    errorMsg = 'Date of birth cannot be in the future';
+                } else if (finalValue > maxDobStr) {
+                    errorMsg = 'Player must be at least 15 years old';
+                } else {
+                    errorMsg = '';
+                }
+            } else {
+                errorMsg = '';
+            }
+        } else if (name === 'arrivalDate') {
+            if (value) {
+                const parts = value.split('-');
+                if (parts[0] && parts[0].length > 4) {
+                    parts[0] = parts[0].slice(0, 4);
+                    finalValue = parts.join('-');
+                }
+                if (finalValue < todayStr) {
+                    errorMsg = 'Arrival date cannot be in the past';
+                } else {
+                    errorMsg = '';
+                }
+            } else {
+                errorMsg = '';
+            }
+
+            // Cross check with existing departure date if set
+            const currentDeparture = players[index]?.departureDate;
+            if (currentDeparture && finalValue && currentDeparture < finalValue) {
+                setErrors(prev => {
+                    const newPlayers = [...(prev.players || [])];
+                    newPlayers[index] = { ...(newPlayers[index] || {}), departureDate: 'Departure date cannot be before arrival date' };
+                    return { ...prev, players: newPlayers };
+                });
+            } else if (currentDeparture && finalValue && currentDeparture >= finalValue) {
+                setErrors(prev => {
+                    const newPlayers = [...(prev.players || [])];
+                    if (newPlayers[index]?.departureDate === 'Departure date cannot be before arrival date') {
+                        newPlayers[index] = { ...(newPlayers[index] || {}), departureDate: '' };
+                    }
+                    return { ...prev, players: newPlayers };
+                });
+            }
+        } else if (name === 'departureDate') {
+            if (value) {
+                const parts = value.split('-');
+                if (parts[0] && parts[0].length > 4) {
+                    parts[0] = parts[0].slice(0, 4);
+                    finalValue = parts.join('-');
+                }
+                const arrival = players[index]?.arrivalDate;
+                if (finalValue < todayStr) {
+                    errorMsg = 'Departure date cannot be in the past';
+                } else if (arrival && finalValue < arrival) {
+                    errorMsg = 'Departure date cannot be before arrival date';
+                } else {
+                    errorMsg = '';
+                }
+            } else {
+                errorMsg = '';
             }
         }
 
@@ -624,6 +724,12 @@ const Registration = () => {
             } else if (player.dob.split('-')[0]?.length > 4 || Number(player.dob.split('-')[0]) > 9999) {
                 playerErrors.dob = 'Year cannot exceed 4 digits';
                 isValid = false;
+            } else if (player.dob > todayStr) {
+                playerErrors.dob = 'Date of birth cannot be in the future';
+                isValid = false;
+            } else if (player.dob > maxDobStr) {
+                playerErrors.dob = 'Player must be at least 15 years old';
+                isValid = false;
             }
             if (!player.transportMode) {
                 playerErrors.transportMode = 'Transport mode is required';
@@ -639,14 +745,25 @@ const Registration = () => {
             } else if (player.arrivalDate.split('-')[0]?.length > 4 || Number(player.arrivalDate.split('-')[0]) > 9999) {
                 playerErrors.arrivalDate = 'Year cannot exceed 4 digits';
                 isValid = false;
+            } else if (player.arrivalDate < todayStr) {
+                playerErrors.arrivalDate = 'Arrival date cannot be in the past';
+                isValid = false;
             }
             if (!player.arrivalTime) {
                 playerErrors.arrivalTime = 'Arrival time is required';
                 isValid = false;
             }
-            if (player.departureDate && (player.departureDate.split('-')[0]?.length > 4 || Number(player.departureDate.split('-')[0]) > 9999)) {
-                playerErrors.departureDate = 'Year cannot exceed 4 digits';
-                isValid = false;
+            if (player.departureDate) {
+                if (player.departureDate.split('-')[0]?.length > 4 || Number(player.departureDate.split('-')[0]) > 9999) {
+                    playerErrors.departureDate = 'Year cannot exceed 4 digits';
+                    isValid = false;
+                } else if (player.departureDate < todayStr) {
+                    playerErrors.departureDate = 'Departure date cannot be in the past';
+                    isValid = false;
+                } else if (player.arrivalDate && player.departureDate < player.arrivalDate) {
+                    playerErrors.departureDate = 'Departure date cannot be before arrival date';
+                    isValid = false;
+                }
             }
             newErrors.players[index] = playerErrors;
         });
@@ -1142,9 +1259,13 @@ const Registration = () => {
                                             label="DOB (as per SSC)*"
                                             name="dob"
                                             type="date"
+                                            inputProps={{
+                                                max: maxDobStr,
+                                                min: "1900-01-01"
+                                            }}
                                             slotProps={{
                                                 inputLabel: { shrink: true },
-                                                htmlInput: { max: "9999-12-31", min: "1900-01-01" },
+                                                htmlInput: { max: maxDobStr, min: "1900-01-01" },
                                                 input: { readOnly: player.isExisting }
                                             }}
                                             placeholder=" "
@@ -1200,9 +1321,13 @@ const Registration = () => {
                                             label="Date of Arrival*"
                                             name="arrivalDate"
                                             type="date"
+                                            inputProps={{
+                                                min: todayStr,
+                                                max: "9999-12-31"
+                                            }}
                                             slotProps={{
                                                 inputLabel: { shrink: true },
-                                                htmlInput: { max: "9999-12-31", min: "1900-01-01" },
+                                                htmlInput: { min: todayStr, max: "9999-12-31" },
                                                 input: { readOnly: player.isExisting }
                                             }}
                                             placeholder=" "
@@ -1239,9 +1364,13 @@ const Registration = () => {
                                             label="Date of Departure"
                                             name="departureDate"
                                             type="date"
+                                            inputProps={{
+                                                min: player.arrivalDate || todayStr,
+                                                max: "9999-12-31"
+                                            }}
                                             slotProps={{
                                                 inputLabel: { shrink: true },
-                                                htmlInput: { max: "9999-12-31", min: "1900-01-01" },
+                                                htmlInput: { min: player.arrivalDate || todayStr, max: "9999-12-31" },
                                                 input: { readOnly: player.isExisting }
                                             }}
                                             placeholder=" "
