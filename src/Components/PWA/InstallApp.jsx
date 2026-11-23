@@ -1,1 +1,2 @@
-export { default } from './InstallAppMenuItem';
+import InstallAppMenuItem from './InstallAppMenuItem';
+export default InstallAppMenuItem;
