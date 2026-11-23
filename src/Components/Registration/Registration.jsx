@@ -210,18 +210,20 @@ const Registration = () => {
         let contact = '';
 
         // 1. Resolve email: look for any candidate field that contains '@'
-        const candidateEmails = [uni.universityEmail, uni.email, uni.address, uni.phone];
-        for (const f of candidateEmails) {
-            if (f && typeof f === 'string' && f.includes('@')) {
-                email = f.trim();
+        const candidateEmails = [uni.mail, uni.universityEmail, uni.email, uni.address, uni.phone];
+        for (const raw of candidateEmails) {
+            const f = String(raw || '').trim();
+            if (f && f.includes('@')) {
+                email = f;
                 break;
             }
         }
 
         // 2. Resolve contact phone number: look for 10-digit mobile number
-        const candidateContacts = [uni.universityContact, uni.phone, uni.address, uni.email];
-        for (const f of candidateContacts) {
-            if (f && typeof f === 'string' && !f.includes('@')) {
+        const candidateContacts = [uni.phone, uni.universityContact, uni.contact, uni.mobile, uni.address, uni.email];
+        for (const raw of candidateContacts) {
+            const f = String(raw || '').trim();
+            if (f && !f.includes('@')) {
                 const match = f.match(/[6-9]\d{9}/);
                 if (match) {
                     contact = match[0];
@@ -243,8 +245,9 @@ const Registration = () => {
 
         // 3. Fallback: if contact is still empty, check if any field has 10 digits
         if (!contact) {
-            for (const f of candidateContacts) {
-                if (f && typeof f === 'string') {
+            for (const raw of candidateContacts) {
+                const f = String(raw || '').trim();
+                if (f) {
                     const match = f.match(/[6-9]\d{9}/);
                     if (match) {
                         contact = match[0];
