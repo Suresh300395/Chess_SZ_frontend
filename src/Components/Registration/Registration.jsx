@@ -105,7 +105,8 @@ const Registration = () => {
         address: ''
     });
 
-    const hasUniversityName = Boolean(teamDetails.universityName && teamDetails.universityName.trim());
+    const [universityInputValue, setUniversityInputValue] = useState('');
+    const isUniversitySelected = Boolean(selectedUniversity && teamDetails.universityName && teamDetails.universityName.trim());
 
     const [players, setPlayers] = useState(createInitialPlayersList());
     const [coaches, setCoaches] = useState([createInitialCoach()]);
@@ -128,6 +129,7 @@ const Registration = () => {
             errorMsg = 'Numbers are not allowed in university name';
         }
         finalValue = finalValue.replace(/[0-9]/g, '');
+        setUniversityInputValue(finalValue);
 
         // CASE B: If changing university name after selecting an existing university,
         // immediately clear loaded data and reset to fresh state
@@ -195,16 +197,34 @@ const Registration = () => {
      */
     const handleSelectUniversity = (uni) => {
         if (!uni) {
-            handleUniversityNameInput('');
+            setSelectedUniversity(null);
+            setUniversityInputValue('');
+            setTeamDetails({
+                universityName: '',
+                universityContact: '',
+                universityEmail: '',
+                address: ''
+            });
+            setPlayers(createInitialPlayersList());
+            setCoaches([createInitialCoach()]);
+            setErrors(prev => ({
+                ...prev,
+                team: { ...prev.team, universityName: '' }
+            }));
             return;
         }
 
         if (typeof uni === 'string') {
-            handleUniversityNameInput(uni);
             return;
         }
 
         setSelectedUniversity(uni);
+        const resolvedName = uni.universityName || uni.name || '';
+        setUniversityInputValue(resolvedName);
+        setErrors(prev => ({
+            ...prev,
+            team: { ...prev.team, universityName: '' }
+        }));
 
         let email = '';
         let contact = '';
@@ -623,6 +643,10 @@ const Registration = () => {
         } else if (/[0-9]/.test(teamDetails.universityName)) {
             newErrors.team.universityName = 'Numbers are not allowed in university name';
             isValid = false;
+        } else if (!selectedUniversity) {
+            newErrors.team.universityName = 'Please select a valid university from the approved database list';
+            isValid = false;
+            toast.error('Only universities present in the database can register. Please select your university from the list.');
         }
 
         // For new university, contact and email are required
@@ -905,8 +929,14 @@ const Registration = () => {
 
         if (!validateForm()) return;
 
+        if (!selectedUniversity) {
+            toast.error('Only universities present in the database can register. Please select your university from the list.');
+            return;
+        }
+
         const payload = {
             universityId: (selectedUniversity?.isExistingUniversity ? (selectedUniversity.registrationId || selectedUniversity._id) : undefined),
+            masterUniversityId: (selectedUniversity?.isMaster ? selectedUniversity._id : undefined),
             teamDetails: {
                 universityName: teamDetails.universityName,
                 universityContact: teamDetails.universityContact,
@@ -988,8 +1018,8 @@ const Registration = () => {
                         <Box component="legend" className="section-legend">University Details of the Player</Box>
 
                         <Box
-                            className={hasUniversityName ? "form-grid" : ""}
-                            sx={!hasUniversityName ? {
+                            className={isUniversitySelected ? "form-grid" : ""}
+                            sx={!isUniversitySelected ? {
                                 maxWidth: { xs: '100%', sm: '560px' },
                                 mx: 'auto',
                                 py: { xs: 1, sm: 2 },
@@ -998,15 +1028,15 @@ const Registration = () => {
                                 transition: 'all 0.3s ease'
                             }}
                         >
-                            {/* University Name: Autocomplete, Always Editable */}
+                            {/* University Name: Autocomplete, Database Verified */}
                             <Box sx={{ mt: 1 }}>
                                 <Autocomplete
-                                    freeSolo
                                     options={searchResults}
-                                    getOptionLabel={(option) => (typeof option === 'string' ? option : option.universityName || '')}
+                                    getOptionLabel={(option) => (typeof option === 'string' ? option : option.universityName || option.name || '')}
                                     filterOptions={(x) => x}
                                     loading={isSearching}
-                                    value={teamDetails.universityName}
+                                    value={selectedUniversity}
+                                    inputValue={universityInputValue}
                                     onInputChange={(event, newInputValue, reason) => {
                                         if (reason === 'input' || reason === 'clear') {
                                             handleUniversityNameInput(newInputValue);
@@ -1015,6 +1045,18 @@ const Registration = () => {
                                     onChange={(event, newValue) => {
                                         handleSelectUniversity(newValue);
                                     }}
+                                    isOptionEqualToValue={(option, value) => {
+                                        if (!option || !value) return false;
+                                        if (typeof value === 'string') return (option.universityName || option.name) === value;
+                                        return option._id === value._id || option.universityName === value.universityName;
+                                    }}
+                                    noOptionsText={
+                                        universityInputValue.trim().length < 2
+                                            ? "Type at least 2 characters to search approved universities"
+                                            : isSearching
+                                            ? "Searching approved universities..."
+                                            : "No approved university found in database"
+                                    }
                                     renderInput={(params) => (
                                         <TextField
                                             {...params}
@@ -1025,7 +1067,7 @@ const Registration = () => {
                                             helperText={errors.team?.universityName || (
                                                 isExistingUniversity 
                                                     ? "Saved university loaded — new members will be appended" 
-                                                    : (selectedUniversity?.isMaster ? "Verified university selected" : "Type to search or enter university name")
+                                                    : (selectedUniversity?.isMaster ? "✓ Verified university selected from database" : "Type to search and select your university from the list")
                                             )}
                                             slotProps={{
                                                 ...params.slotProps,
@@ -1084,10 +1126,10 @@ const Registration = () => {
                                 />
                             </Box>
 
-                            {/* Remaining two fields appear only once university name is entered */}
-                            {hasUniversityName && (
+                            {/* Remaining two fields appear only once an approved university is selected */}
+                            {isUniversitySelected && (
                                 <>
-                                    {/* University Contact Number: Read-only if fetched */}
+                                    {/* University Contact Number */}
                                     <Box sx={{ mt: 1 }}>
                                         <TextField
                                             fullWidth
@@ -1098,23 +1140,23 @@ const Registration = () => {
                                             onChange={handleTeamChange}
                                             onBlur={() => handleTeamBlur('universityContact')}
                                             error={!!errors.team?.universityContact}
-                                            helperText={errors.team?.universityContact || (isUniversityDetailsFetched ? 'Saved record (read-only)' : '')}
-                                            disabled={isUniversityDetailsFetched}
+                                            helperText={errors.team?.universityContact || (isUniversityDetailsFetched && teamDetails.universityContact ? 'Saved record (read-only)' : '')}
+                                            disabled={Boolean(selectedUniversity?.isExistingUniversity || (isUniversityDetailsFetched && teamDetails.universityContact))}
                                             placeholder="e.g. 9876543210"
                                             slotProps={{
                                                 input: {
-                                                    readOnly: isUniversityDetailsFetched
+                                                    readOnly: Boolean(selectedUniversity?.isExistingUniversity || (isUniversityDetailsFetched && teamDetails.universityContact))
                                                 },
                                                 htmlInput: {
                                                     maxLength: 10,
                                                     inputMode: 'numeric'
                                                 }
                                             }}
-                                            sx={isUniversityDetailsFetched ? { bgcolor: '#f8fafc', borderRadius: 1 } : {}}
+                                            sx={(selectedUniversity?.isExistingUniversity || (isUniversityDetailsFetched && teamDetails.universityContact)) ? { bgcolor: '#f8fafc', borderRadius: 1 } : {}}
                                         />
                                     </Box>
 
-                                    {/* University Email: Read-only if fetched */}
+                                    {/* University Email */}
                                     <Box sx={{ mt: 1 }}>
                                         <TextField
                                             fullWidth
@@ -1125,15 +1167,15 @@ const Registration = () => {
                                             onChange={handleTeamChange}
                                             onBlur={() => handleTeamBlur('universityEmail')}
                                             error={!!(errors.team?.universityEmail || errors.team?.address)}
-                                            helperText={errors.team?.universityEmail || errors.team?.address || (isUniversityDetailsFetched ? 'Saved record (read-only)' : '')}
-                                            disabled={isUniversityDetailsFetched}
+                                            helperText={errors.team?.universityEmail || errors.team?.address || (isUniversityDetailsFetched && (teamDetails.universityEmail || teamDetails.address) ? 'Saved record (read-only)' : '')}
+                                            disabled={Boolean(selectedUniversity?.isExistingUniversity || (isUniversityDetailsFetched && (teamDetails.universityEmail || teamDetails.address)))}
                                             placeholder="e.g. sports@university.ac.in"
                                             slotProps={{
                                                 input: {
-                                                    readOnly: isUniversityDetailsFetched
+                                                    readOnly: Boolean(selectedUniversity?.isExistingUniversity || (isUniversityDetailsFetched && (teamDetails.universityEmail || teamDetails.address)))
                                                 }
                                             }}
-                                            sx={isUniversityDetailsFetched ? { bgcolor: '#f8fafc', borderRadius: 1 } : {}}
+                                            sx={(selectedUniversity?.isExistingUniversity || (isUniversityDetailsFetched && (teamDetails.universityEmail || teamDetails.address))) ? { bgcolor: '#f8fafc', borderRadius: 1 } : {}}
                                         />
                                     </Box>
                                 </>
@@ -1141,6 +1183,28 @@ const Registration = () => {
                         </Box>
                     </Box>
 
+                    {/* If university is not selected, prompt user */}
+                    {!isUniversitySelected && (
+                        <Box sx={{
+                            textAlign: 'center',
+                            p: { xs: 3, sm: 4 },
+                            my: 3,
+                            borderRadius: '16px',
+                            bgcolor: '#ffffff',
+                            border: '1.5px dashed #cbd5e1',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                        }}>
+                            <Typography variant="h6" sx={{ fontWeight: 700, color: '#0f172a', fontSize: '15px', mb: 0.5 }}>
+                                Search & Select University to Register
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: '#64748b', fontSize: '13px', maxWidth: 460, mx: 'auto', lineHeight: 1.5 }}>
+                                Only universities present in the official database are eligible to participate. Type in the box above to find and select your university.
+                            </Typography>
+                        </Box>
+                    )}
+
+                    {isUniversitySelected && (
+                        <>
                     {/* Players Section */}
                     <Box component="fieldset" className="section-fieldset">
                         <Box component="legend" className="section-legend">Player Details</Box>
@@ -1632,6 +1696,8 @@ const Registration = () => {
                     >
                         {submitting ? 'Submitting...' : (isExistingUniversity ? 'Submit New Participants' : 'Submit Registration')}
                     </Box>
+                    </>
+                    )}
                 </Box>
                 </AnimatedCard>
             </Box>
