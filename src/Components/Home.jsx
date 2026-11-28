@@ -13,10 +13,12 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import DownloadIcon from '@mui/icons-material/Download';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import Tabs from './Common/Tabs';
 import CommitteeCard from './Common/CommitteeCard';
 import PublicBottomBar from './Common/PublicBottomBar';
 import ResponsiveLiveBoardIframe from './Common/ResponsiveLiveBoardIframe';
+import BrochureFlipbook from './BrochureFlipbook';
 import { AnimatedCard, AnimatedText } from './animations';
 import io from 'socket.io-client';
 import { committeeAPI, routeMapAPI, liveBoardAPI, SOCKET_URL } from '../utils/api';
@@ -25,15 +27,16 @@ import { getAssetUrl } from '../utils/assetHelper';
 
 const Home = () => {
     const location = useLocation();
-    const [activeTab, setActiveTab] = useState(location.state?.targetTab || 'About');
+    const [activeTab, setActiveTab] = useState(location.state?.targetTab || 'Brochure');
     const [committeeMembers, setCommitteeMembers] = useState([]);
     const [liveBoard, setLiveBoard] = useState(null);
     const [routeMap, setRouteMap] = useState(null);
     const [isMapModalOpen, setIsMapModalOpen] = useState(false);
     const [selectedMapIndex, setSelectedMapIndex] = useState(0);
     const [iframeKey, setIframeKey] = useState(0);
-    const tabs = ['About', 'Live Board', 'Route Map', 'Organizing Committee'];
+    const tabs = ['Brochure', 'Live Board', 'Route Map', 'Organizing Committee'];
 
+    const brochureRef = useRef(null);
     const isFirstMount = useRef(true);
 
     useEffect(() => {
@@ -202,197 +205,66 @@ const Home = () => {
 
                 <Box component="section" className="tab-content-section" sx={{ mt: { xs: 2.5, sm: 3.5, md: 0 }, px: { xs: 1.5, sm: 2, md: '96px' }, pb: { xs: 2.5, sm: 3.5, md: 8 } }}>
                     <AnimatedCard key={activeTab} whileInView={true} style={{ width: '100%' }}>
-                        <Box className="tab-content-card" sx={{ p: { xs: 2, sm: 3, md: 5 }, bgcolor: 'white', borderRadius: 4, boxShadow: '0px 4px 20px rgba(0,0,0,0.05)', height: 'auto', minHeight: 'auto' }}>
+                        <Box className="tab-content-card" sx={{ p: activeTab === 'Brochure' ? { xs: 1.5, sm: 2, md: 3 } : { xs: 2, sm: 3, md: 5 }, bgcolor: 'white', borderRadius: 4, boxShadow: '0px 4px 20px rgba(0,0,0,0.05)', height: 'auto', minHeight: 'auto', overflow: 'hidden' }}>
                         <Box
-                            component="h2"
-                            className="tab-card-title"
                             sx={{
-                                mb: 3,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                mb: activeTab === 'Brochure' ? 1.5 : 3,
                                 mt: 0,
-                                color: '#0b5299',
-                                fontSize: { xs: '1.45rem', sm: '1.75rem', md: '2rem' },
-                                fontWeight: 700
+                                width: '100%',
                             }}
                         >
-                            {activeTab}
-                        </Box>
-
-                        {/* ABOUT TAB */}
-                        {activeTab === 'About' && (
-                            <Box sx={{ width: '100%', mt: 0 }}>
-                                <AnimatedCard whileInView={true} delay={0.04} style={{ width: '100%', marginBottom: '28px' }}>
-                                    <Box
+                            <Box
+                                component="h2"
+                                className="tab-card-title"
+                                sx={{
+                                    m: 0,
+                                    color: '#0b5299',
+                                    fontSize: { xs: '1.45rem', sm: '1.75rem', md: '2rem' },
+                                    fontWeight: 700
+                                }}
+                            >
+                                {activeTab}
+                            </Box>
+                            {activeTab === 'Brochure' && (
+                                <Tooltip title="Full Screen View">
+                                    <Button
+                                        variant="outlined"
+                                        size="small"
+                                        onClick={() => brochureRef.current?.toggleFullscreen()}
+                                        startIcon={<FullscreenIcon />}
                                         sx={{
-                                            background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                                            borderRadius: 3,
-                                            p: { xs: 2.5, sm: 3.5, md: 4 },
-                                            border: '1px solid #e2e8f0',
+                                            color: '#0b5299',
+                                            borderColor: '#93c5fd',
+                                            borderRadius: '8px',
+                                            textTransform: 'none',
+                                            fontWeight: 600,
+                                            fontSize: { xs: '12px', sm: '13px' },
+                                            px: { xs: 1.5, sm: 2 },
+                                            py: { xs: 0.4, sm: 0.6 },
+                                            bgcolor: '#f8fafc',
+                                            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                                            transition: 'all 0.2s ease',
+                                            '&:hover': {
+                                                bgcolor: '#0b5299',
+                                                color: '#ffffff',
+                                                borderColor: '#0b5299',
+                                                boxShadow: '0 4px 12px rgba(11,82,153,0.25)',
+                                            }
                                         }}
                                     >
-                                        <Typography
-                                            variant="h5"
-                                            sx={{
-                                                color: '#0b5299',
-                                                fontWeight: 700,
-                                                fontSize: { xs: '1.25rem', sm: '1.45rem', md: '1.65rem' },
-                                                mb: 1.5,
-                                            }}
-                                        >
-                                            South Zone Inter University Chess (Men) Tournament 2026
-                                        </Typography>
-                                        <Typography
-                                            variant="body1"
-                                            sx={{
-                                                color: '#334155',
-                                                lineHeight: 1.75,
-                                                fontSize: { xs: '14px', sm: '15px', md: '16px' },
-                                            }}
-                                        >
-                                            Welcome to the prestigious South Zone Inter University Chess (Men) Tournament, proudly organized and hosted by <strong>Aditya University</strong>, Surampalem, under the esteemed auspices of the <strong>Association of Indian Universities (AIU)</strong>, New Delhi. This grand championship brings together top collegiate chess players and university teams from across the southern zone to compete in strategic mastery, intellectual discipline, and true sportsmanship.
-                                        </Typography>
-                                    </Box>
-                                </AnimatedCard>
+                                        Full Screen
+                                    </Button>
+                                </Tooltip>
+                            )}
+                        </Box>
 
-                                <Box
-                                    sx={{
-                                        display: 'grid',
-                                        gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
-                                        gap: 2.5,
-                                        mb: 3.5,
-                                    }}
-                                >
-                                    <AnimatedCard whileInView={true} delay={0.05} style={{ height: '100%', width: '100%' }}>
-                                        <Box
-                                            sx={{
-                                                p: 2.5,
-                                                bgcolor: '#ffffff',
-                                                borderRadius: 3,
-                                                border: '1px solid #e2e8f0',
-                                                boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
-                                                height: '100%',
-                                                boxSizing: 'border-box',
-                                                transition: 'transform 0.2s, box-shadow 0.2s',
-                                                '&:hover': { transform: 'translateY(-3px)', boxShadow: '0 6px 16px rgba(11, 82, 153, 0.08)' },
-                                            }}
-                                        >
-                                            <Typography sx={{ fontSize: '24px', mb: 1 }}>🏛️</Typography>
-                                            <Typography variant="subtitle2" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px' }}>
-                                                Host Institution
-                                            </Typography>
-                                            <Typography variant="body1" sx={{ color: '#0b5299', fontWeight: 700, mt: 0.5 }}>
-                                                Aditya University
-                                            </Typography>
-                                            <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.5 }}>
-                                                Surampalem, Kakinada Dist., A.P.
-                                            </Typography>
-                                        </Box>
-                                    </AnimatedCard>
-
-                                    <AnimatedCard whileInView={true} delay={0.1} style={{ height: '100%', width: '100%' }}>
-                                        <Box
-                                            sx={{
-                                                p: 2.5,
-                                                bgcolor: '#ffffff',
-                                                borderRadius: 3,
-                                                border: '1px solid #e2e8f0',
-                                                boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
-                                                height: '100%',
-                                                boxSizing: 'border-box',
-                                                transition: 'transform 0.2s, box-shadow 0.2s',
-                                                '&:hover': { transform: 'translateY(-3px)', boxShadow: '0 6px 16px rgba(11, 82, 153, 0.08)' },
-                                            }}
-                                        >
-                                            <Typography sx={{ fontSize: '24px', mb: 1 }}>🏆</Typography>
-                                            <Typography variant="subtitle2" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px' }}>
-                                                Governing Body
-                                            </Typography>
-                                            <Typography variant="body1" sx={{ color: '#0b5299', fontWeight: 700, mt: 0.5 }}>
-                                                AIU, New Delhi
-                                            </Typography>
-                                            <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.5 }}>
-                                                Association of Indian Universities
-                                            </Typography>
-                                        </Box>
-                                    </AnimatedCard>
-
-                                    <AnimatedCard whileInView={true} delay={0.15} style={{ height: '100%', width: '100%' }}>
-                                        <Box
-                                            sx={{
-                                                p: 2.5,
-                                                bgcolor: '#ffffff',
-                                                borderRadius: 3,
-                                                border: '1px solid #e2e8f0',
-                                                boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
-                                                height: '100%',
-                                                boxSizing: 'border-box',
-                                                transition: 'transform 0.2s, box-shadow 0.2s',
-                                                '&:hover': { transform: 'translateY(-3px)', boxShadow: '0 6px 16px rgba(11, 82, 153, 0.08)' },
-                                            }}
-                                        >
-                                            <Typography sx={{ fontSize: '24px', mb: 1 }}>♟️</Typography>
-                                            <Typography variant="subtitle2" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px' }}>
-                                                Event Discipline
-                                            </Typography>
-                                            <Typography variant="body1" sx={{ color: '#0b5299', fontWeight: 700, mt: 0.5 }}>
-                                                Chess (Men)
-                                            </Typography>
-                                            <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.5 }}>
-                                                South Zone Universities Championship
-                                            </Typography>
-                                        </Box>
-                                    </AnimatedCard>
-
-                                    <AnimatedCard whileInView={true} delay={0.2} style={{ height: '100%', width: '100%' }}>
-                                        <Box
-                                            sx={{
-                                                p: 2.5,
-                                                bgcolor: '#ffffff',
-                                                borderRadius: 3,
-                                                border: '1px solid #e2e8f0',
-                                                boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
-                                                height: '100%',
-                                                boxSizing: 'border-box',
-                                                transition: 'transform 0.2s, box-shadow 0.2s',
-                                                '&:hover': { transform: 'translateY(-3px)', boxShadow: '0 6px 16px rgba(11, 82, 153, 0.08)' },
-                                            }}
-                                        >
-                                            <Typography sx={{ fontSize: '24px', mb: 1 }}>📍</Typography>
-                                            <Typography variant="subtitle2" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px' }}>
-                                                Tournament Venue
-                                            </Typography>
-                                            <Typography variant="body1" sx={{ color: '#0b5299', fontWeight: 700, mt: 0.5 }}>
-                                                Aditya Campus
-                                            </Typography>
-                                            <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.5 }}>
-                                                Indoor Sports Complex & Halls
-                                            </Typography>
-                                        </Box>
-                                    </AnimatedCard>
-                                </Box>
-
-                                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
-                                    <AnimatedCard whileInView={true} delay={0.08} style={{ height: '100%', width: '100%' }}>
-                                        <Box sx={{ p: { xs: 2.5, sm: 3 }, bgcolor: '#ffffff', borderRadius: 3, border: '1px solid #e2e8f0', height: '100%', boxSizing: 'border-box' }}>
-                                            <Typography variant="h6" sx={{ color: '#0b5299', fontWeight: 700, mb: 1.5, fontSize: { xs: '1.05rem', sm: '1.15rem' } }}>
-                                                About Aditya University
-                                            </Typography>
-                                            <Typography variant="body2" sx={{ color: '#475569', lineHeight: 1.7, fontSize: '14px' }}>
-                                                Aditya University stands as a premier higher education institution dedicated to academic brilliance and athletic prowess. The campus features world-class indoor sports facilities, fully furnished accommodations, and experienced organizers committed to conducting zonal tournaments of the highest caliber.
-                                            </Typography>
-                                        </Box>
-                                    </AnimatedCard>
-
-                                    <AnimatedCard whileInView={true} delay={0.14} style={{ height: '100%', width: '100%' }}>
-                                        <Box sx={{ p: { xs: 2.5, sm: 3 }, bgcolor: '#ffffff', borderRadius: 3, border: '1px solid #e2e8f0', height: '100%', boxSizing: 'border-box' }}>
-                                            <Typography variant="h6" sx={{ color: '#0b5299', fontWeight: 700, mb: 1.5, fontSize: { xs: '1.05rem', sm: '1.15rem' } }}>
-                                                Tournament Format & Fair Play
-                                            </Typography>
-                                            <Typography variant="body2" sx={{ color: '#475569', lineHeight: 1.7, fontSize: '14px' }}>
-                                                The tournament is conducted in strict compliance with official FIDE Laws of Chess and AIU sports guidelines. Featuring live digital broadcast scoreboards, computerized pairing systems, and certified arbiters, the championship ensures complete transparency and high-level competition.
-                                            </Typography>
-                                        </Box>
-                                    </AnimatedCard>
-                                </Box>
+                        {/* BROCHURE TAB */}
+                        {activeTab === 'Brochure' && (
+                            <Box sx={{ width: '100%', mt: 0, pt: 0 }}>
+                                <BrochureFlipbook ref={brochureRef} />
                             </Box>
                         )}
 
